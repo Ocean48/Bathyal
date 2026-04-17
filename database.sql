@@ -56,6 +56,7 @@ CREATE TABLE tasks (
     status ENUM('todo', 'in_progress', 'paused', 'completed') DEFAULT 'todo',
     due_date DATETIME NULL,
     estimated_minutes INT DEFAULT 0,
+    position INT DEFAULT 0, -- For ordering native subtasks
     storage_location ENUM('active', 'backlog', 'archive', 'unattached') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -158,6 +159,7 @@ CREATE TABLE project_integrations (
 CREATE TABLE task_links (
     parent_id INT NOT NULL,
     subtask_id INT NOT NULL,
+    position INT DEFAULT 0, -- For ordering linked subtasks
     PRIMARY KEY (parent_id, subtask_id),
     FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE,
     FOREIGN KEY (subtask_id) REFERENCES tasks(id) ON DELETE CASCADE
@@ -213,32 +215,22 @@ INSERT INTO project_members (project_id, user_id, role) VALUES
 
 -- Insert Tasks
 -- First batch of Top-Level Tasks
-INSERT INTO tasks (title, description, status, due_date, estimated_minutes) VALUES 
-('Draft AI trigger automations', 'Create the project triggers for the AI and Slack.', 'todo', '2026-04-20 12:00:00', 120),
-('Review Kanban board drag-and-drop', 'Review the UI implementation for the boards.', 'in_progress', '2026-04-21 16:30:00', 90),
-('Prepare Q3 Budget', 'Draft the expected budget for new marketing campaigns.', 'todo', '2026-05-01 10:00:00', 240),
-('Update Typography Globals', 'Update the global css file and Tailwind config for the new font stack.', 'todo', '2026-04-22 17:00:00', 60),
-('Fix Sidebar Navigation', 'Mobile menu is broken on iOS Safari when scrolled.', 'todo', '2026-04-25 12:00:00', 120),
-('Social Media Assets', 'Design banners for Twitter, Facebook, and LinkedIn.', 'in_progress', '2026-04-30 09:00:00', 200),
-('App Store Descriptions', 'Write localization text for the Apple App Store and Google Play.', 'todo', '2026-05-15 15:00:00', 90);
-
--- Insert Subtasks (Parent task references ID 1: Draft AI trigger automations)
-INSERT INTO tasks (parent_task_id, title, description, status, due_date, estimated_minutes) VALUES 
-(1, 'Define webhooks', 'Create JSON schema for Slack webhook payloads.', 'completed', '2026-04-18 10:00:00', 30),
-(1, 'Setup OpenAI integration logic', 'Connect via cURL the prompt handlers.', 'todo', '2026-04-19 14:00:00', 90);
-
--- Insert Subtasks (Parent task references ID 4: Update Typography Globals)
-INSERT INTO tasks (parent_task_id, title, description, status, due_date, estimated_minutes) VALUES 
-(4, 'Download Google Fonts', 'Download Poppins and Inter locally to serve them properly.', 'completed', '2026-04-20 17:00:00', 15),
-(4, 'Update tailwind.config.js', 'Add font families to tailwind overrides.', 'todo', '2026-04-21 17:00:00', 30);
-
--- Insert Subtasks (Parent task references ID 5: Fix Sidebar Navigation)
-INSERT INTO tasks (parent_task_id, title, description, status, due_date, estimated_minutes) VALUES 
-(5, 'Check z-index issues', 'Overlay is going behind the canvas on iOS Safari specifically.', 'todo', '2026-04-25 10:00:00', 30);
-
--- Insert Subtasks (Parent task references ID 2: Review Kanban)
-INSERT INTO tasks (parent_task_id, title, description, status, due_date, estimated_minutes) VALUES 
-(2, 'Fix drag ghost image transparency', 'Currently the SortableJS ghost image looks bad when dragging.', 'todo', '2026-04-21 15:00:00', 45);
+INSERT INTO tasks (id, parent_task_id, title, description, status, due_date, estimated_minutes, position, storage_location, created_at, updated_at) VALUES
+(1, NULL, 'Draft AI trigger automations', 'Create the project triggers for the AI and Slack.', 'todo', '2026-04-20 12:00:00', 120, 0, 'active', '2026-04-17 23:49:20', '2026-04-17 23:49:20'),
+(2, NULL, 'Review Kanban board drag-and-drop', 'Review the UI implementation for the boards.', 'in_progress', '2026-04-21 16:30:00', 90, 0, 'active', '2026-04-17 23:49:20', '2026-04-17 23:49:20'),
+(3, NULL, 'Prepare Q3 Budget', 'Draft the expected budget for new marketing campaigns.', 'todo', '2026-05-01 10:00:00', 240, 0, 'active', '2026-04-17 23:49:20', '2026-04-17 23:49:20'),
+(4, NULL, 'Update Typography Globals', 'Update the global css file and Tailwind config for the new font stack.', 'todo', '2026-04-22 17:00:00', 60, 0, 'active', '2026-04-17 23:49:20', '2026-04-17 23:49:20'),
+(5, NULL, 'Fix Sidebar Navigation', 'Mobile menu is broken on iOS Safari when scrolled.', 'todo', '2026-04-25 12:00:00', 120, 0, 'active', '2026-04-17 23:49:20', '2026-04-17 23:49:20'),
+(6, NULL, 'Social Media Assets', 'Design banners for Twitter, Facebook, and LinkedIn.', 'in_progress', '2026-04-30 09:00:00', 200, 0, 'active', '2026-04-17 23:49:20', '2026-04-17 23:49:20'),
+(7, NULL, 'App Store Descriptions', 'Write localization text for the Apple App Store and Google Play.', 'todo', '2026-05-15 15:00:00', 90, 0, 'active', '2026-04-17 23:49:20', '2026-04-17 23:49:20'),
+(8, 1, 'Define webhooks', 'Create JSON schema for Slack webhook payloads.', 'completed', '2026-04-18 10:00:00', 30, 3, 'active', '2026-04-17 23:49:20', '2026-04-17 23:54:44'),
+(9, 1, 'Setup OpenAI integration logic', 'Connect via cURL the prompt handlers.', 'todo', '2026-04-19 14:00:00', 90, 4, 'active', '2026-04-17 23:49:20', '2026-04-17 23:54:46'),
+(10, 4, 'Download Google Fonts', 'Download Poppins and Inter locally to serve them properly.', 'completed', '2026-04-20 17:00:00', 15, 0, 'active', '2026-04-17 23:49:20', '2026-04-17 23:49:20'),
+(11, 4, 'Update tailwind.config.js', 'Add font families to tailwind overrides.', 'todo', '2026-04-21 17:00:00', 30, 0, 'active', '2026-04-17 23:49:20', '2026-04-17 23:49:20'),
+(12, 5, 'Check z-index issues', 'Overlay is going behind the canvas on iOS Safari specifically.', 'todo', '2026-04-25 10:00:00', 30, 1, 'active', '2026-04-17 23:49:20', '2026-04-17 23:49:54'),
+(13, 2, 'Fix drag ghost image transparency', 'Currently the SortableJS ghost image looks bad when dragging.', 'todo', '2026-04-21 15:00:00', 45, 0, 'active', '2026-04-17 23:49:20', '2026-04-17 23:49:20'),
+(14, 1, 'Sub1', NULL, 'todo', NULL, 0, 2, 'active', '2026-04-17 23:49:33', '2026-04-17 23:54:44'),
+(15, 5, 'Sub2', NULL, 'todo', NULL, 0, 2, 'active', '2026-04-17 23:49:37', '2026-04-17 23:49:54');
 
 INSERT INTO task_assignees (task_id, user_id) VALUES
 (1, 2),
@@ -265,3 +257,7 @@ INSERT INTO task_projects (task_id, project_id, section_id, position) VALUES
 (5, 1, 1, 2), -- Fix Sidebar attached to 'To Do' in Website Redesign (Section 1)
 (6, 2, 7, 1), -- Social Media attached to 'Drafting' in Marketing Q3 (Section 7)
 (7, 3, 11, 1); -- App Store attached to 'Backlog' in Ocean Conservation (Section 11)
+
+INSERT INTO task_links (parent_id, subtask_id, position) VALUES
+(1, 3, 5),
+(1, 6, 1);

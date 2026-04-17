@@ -66,6 +66,15 @@ switch ($method) {
                     http_response_code(500);
                     echo json_encode(['status' => 'error', 'message' => 'Failed to link subtask']);
                 }
+            } elseif ($data['action'] === 'unlink_subtask') {
+                $parentId = $data['parent_task_id'];
+                $subtaskId = $data['subtask_id'];
+                if ($db->unlinkSubtask($parentId, $subtaskId)) {
+                    echo json_encode(['status' => 'success']);
+                } else {
+                    http_response_code(500);
+                    echo json_encode(['status' => 'error', 'message' => 'Failed to unlink subtask']);
+                }
             } elseif ($data['action'] === 'reorder') {
                 $sectionId = isset($data['section_id']) ? $data['section_id'] : null;
                 $taskIds = isset($data['task_ids']) ? $data['task_ids'] : [];

@@ -423,14 +423,18 @@ function renderTaskCard(task) {
         assigneesHtml += `</div>`;
     }
 
-    const subtaskBadge = task.subtasks && task.subtasks.length > 0 
-        ? `<div class="text-[10px] text-slate-500 flex items-center"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>${task.subtasks.length} subtasks</div>` 
+const totalSubtasks = parseInt(task.subtask_count || 0, 10);
+    const subtaskBadge = totalSubtasks > 0
+        ? `<div class="text-[10px] text-slate-500 flex items-center"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>${totalSubtasks} subtasks</div>`
         : '';
+    
+    // Add subtask count to the end of the title if it exists
+    const titleWithCount = totalSubtasks > 0 ? `${task.title} <span class="text-xs text-slate-400 ml-1">(${totalSubtasks})</span>` : task.title;
     
     return `
         <div class="bg-white p-3.5 rounded-lg shadow-sm border border-slate-200 task-card hover:border-teal-400 hover:shadow transition-all cursor-grab active:cursor-grabbing" data-task-id="${task.id}" onclick="openTaskModal(${task.id})">
             <div class="flex justify-between items-start mb-2">
-                <h4 class="text-sm text-slate-800 font-medium leading-snug">${task.title}</h4>
+                <h4 class="text-sm text-slate-800 font-medium leading-snug">${titleWithCount}</h4>
                 ${assigneesHtml}
             </div>
             ${task.description ? `<p class="text-xs text-slate-500 line-clamp-2 mb-3 mt-1">${task.description}</p>` : ''}
@@ -460,7 +464,8 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
     // Add padding based on subtask depth
     const paddingVal = depth * 24 + 16;
     
-    const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+    const totalSubtasks = parseInt(task.subtask_count || 0, 10);
+    const hasSubtasks = totalSubtasks > 0 || (task.subtasks && task.subtasks.length > 0);
     let toggleIcon = '';
     if (hasSubtasks) {
         toggleIcon = `
@@ -488,13 +493,16 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
         assigneesHtml += `</div>`;
     }
 
+    // Add subtask count to the end of the title if it exists
+    const titleWithCount = totalSubtasks > 0 ? `${task.title} <span class="text-xs text-slate-400 ml-1">(${totalSubtasks})</span>` : task.title;
+
     tr.innerHTML = `
         <td class="py-3 font-medium text-slate-800 flex items-center" style="padding-left: ${paddingVal}px">
             <div class="cursor-grab-list text-slate-300 hover:text-slate-500 mr-2 flex items-center justify-center cursor-move" title="Drag to reorder">
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z"></path></svg>
             </div>
             ${toggleIcon}
-            <span class="truncate block max-w-sm">${task.title}</span>
+            <span class="truncate block max-w-sm">${titleWithCount}</span>
         </td>
         <td class="px-4 py-3">
             ${assigneesHtml}

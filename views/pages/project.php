@@ -207,12 +207,23 @@ require_once 'views/layouts/header.php';
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Est. Time</label>
                     <span id="task-modal-estimated" class="text-sm text-slate-700">0h 0m</span>
                 </div>
-                <div>
+                <div class="relative">
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Parent Task</label>
-                    <select id="task-modal-parent-id" onchange="updateTaskDetails()" class="text-sm text-slate-700 border border-slate-200 focus:ring-teal-500 p-1 rounded bg-white w-full max-w-[150px]">
-                        <option value="">None</option>
-                        <!-- Dynamic options will be fetched -->
-                    </select>
+                    <div class="flex items-center justify-between cursor-pointer border border-slate-300 hover:bg-slate-50 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 p-1.5 rounded-lg bg-slate-50 w-full shadow-sm transition-colors text-sm text-slate-700 truncate" onclick="toggleParentTaskDropdown(event)" id="parent-task-display">
+                        <span id="parent-task-name" class="truncate">None</span>
+                        <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                    <input type="hidden" id="task-modal-parent-id" onchange="updateTaskDetails()">
+                    
+                    <!-- Dropdown for Parent Task -->
+                    <div id="parent-task-dropdown" class="hidden absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg z-[60] max-h-64 flex-col">
+                        <div class="p-2 border-b border-slate-100 flex">
+                            <input type="text" id="parent-task-search" oninput="searchParentTasks(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search tasks by title..." onclick="event.stopPropagation()">
+                        </div>
+                        <ul id="parent-task-list" class="overflow-y-auto flex-1 p-1 text-sm text-slate-600">
+                            <!-- Items here -->
+                        </ul>
+                    </div>
                 </div>
             </div>
 
@@ -364,29 +375,27 @@ async function openTaskModal(taskId) {
         }
         document.getElementById('task-modal-due-date').value = dateVal;
 
-        // Fetch parent tasks for dropdown
+        // Fetch parent tasks for dropdown cache
         const allTasksRes = await fetch('api/tasks.php');
-        const allTasksList = await allTasksRes.json();
-        const parentSelect = document.getElementById('task-modal-parent-id');
-        parentSelect.innerHTML = '<option value="">None</option>';
-        allTasksList.forEach(t => {
-            if (t.id != task.id && t.id != task.parent_task_id) { // Prevent cyclic reference to self
-                const opt = document.createElement('option');
-                opt.value = t.id;
-                opt.text = t.title;
-                parentSelect.appendChild(opt);
-            }
-        });
+        window.allTasksParentCache = await allTasksRes.json();
+
+        let pId = '';
+        let pName = 'None';
         
         if (task.parent_task_id) {
-            // Check if it exists in the new options list, if not add it so it selects properly
-            if (!Array.from(parentSelect.options).find(o => o.value == task.parent_task_id)) {
-                parentSelect.innerHTML += `<option value="${task.parent_task_id}">Task #${task.parent_task_id}</option>`;
+            pId = task.parent_task_id;
+            const pTask = window.allTasksParentCache.find(t => t.id == task.parent_task_id);
+            if (pTask) {
+                const countStr = pTask.subtask_count > 0 ? ` (${pTask.subtask_count})` : '';
+                const projStr = pTask.project_names ? ` [${pTask.project_names}]` : '';
+                pName = `${pTask.title}${projStr}${countStr}`;
+            } else {
+                pName = `Task #${task.parent_task_id}`;
             }
-            parentSelect.value = task.parent_task_id;
-        } else {
-            parentSelect.value = '';
         }
+        
+        document.getElementById('task-modal-parent-id').value = pId;
+        document.getElementById('parent-task-name').innerText = pName;
         
         // Track current assignee IDs globally for the dropdown
         window.currentTaskAssigneeIds = task.assignee_ids ? task.assignee_ids.split(',').map(id => parseInt(id)) : [];
@@ -416,14 +425,24 @@ async function openTaskModal(taskId) {
         // Render Subtasks
         const subtasksContainer = document.getElementById('task-modal-subtasks');
         subtasksContainer.innerHTML = '';
+        window.currentTaskSubtaskIds = [];
         if(task.subtasks) {
+            window.currentTaskSubtaskIds = task.subtasks.map(s => s.id);
             task.subtasks.forEach(sub => {
+                const isLinked = sub.parent_task_id !== task.id;
+                const unlinkBtn = isLinked 
+                    ? `<button onclick="unlinkSubtask(${task.id}, ${sub.id})" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-1 rounded transition-colors" title="Unlink Subtask">
+                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                       </button>`
+                    : `<div class="w-6 h-6"></div>`;
+
                 subtasksContainer.innerHTML += `
-                    <div class="flex flex-col mb-1 group">
-                        <div class="flex items-center space-x-3">
+                    <div class="flex flex-col mb-1 group items-start justify-between bg-white border border-transparent hover:bg-slate-50 hover:border-slate-200 rounded px-2 py-1.5 transition-colors">
+                        <div class="flex items-center space-x-3 w-full">
                             <input type="checkbox" ${sub.status==='completed'?'checked':''} onchange="updateSubtaskStatus(${sub.id}, this)" class="rounded text-teal-500 focus:ring-teal-500 focus:ring-offset-0 w-4 h-4 cursor-pointer">
-                            <span class="flex-1 text-sm text-slate-700 cursor-pointer" onclick="openTaskModal(${sub.id})">${sub.title}</span>
-                            <span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded uppercase">${sub.status}</span>
+                            <span class="flex-1 text-sm text-slate-700 cursor-pointer truncate" onclick="openTaskModal(${sub.id})" title="${sub.title}">${sub.title}</span>
+                            <span class="text-[10px] items-center text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-medium tracking-wide uppercase shadow-sm border border-slate-200/50">${sub.status}</span>
+                            ${unlinkBtn}
                         </div>
                     </div>
                 `;
@@ -903,6 +922,97 @@ function promptAddSubtask(parentId) {
     });
 }
 
+function toggleParentTaskDropdown(e) {
+    if (e) e.stopPropagation();
+    const dropdown = document.getElementById('parent-task-dropdown');
+    if (dropdown.classList.contains('hidden')) {
+        dropdown.classList.remove('hidden');
+        dropdown.classList.add('flex');
+        document.getElementById('parent-task-search').value = '';
+        renderParentTaskList('');
+        document.getElementById('parent-task-search').focus();
+        
+        const outsideClickListener = (evt) => {
+            if (!dropdown.contains(evt.target) && !evt.target.closest('#parent-task-display')) {
+                dropdown.classList.add('hidden');
+                dropdown.classList.remove('flex');
+                document.removeEventListener('click', outsideClickListener);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', outsideClickListener), 10);
+    } else {
+        dropdown.classList.add('hidden');
+        dropdown.classList.remove('flex');
+    }
+}
+
+function searchParentTasks(query) {
+    renderParentTaskList(query);
+}
+
+function renderParentTaskList(query) {
+    const list = document.getElementById('parent-task-list');
+    list.innerHTML = '';
+    const currentTaskIdIdStr = document.getElementById('task-modal-id').value;
+    const currentTaskId = currentTaskIdIdStr ? parseInt(currentTaskIdIdStr, 10) : null;
+    
+    // Default None option
+    if (!query) {
+        const li = document.createElement('li');
+        li.className = `p-2 hover:bg-slate-50 cursor-pointer rounded mb-0.5 text-slate-500 italic flex justify-between items-center`;
+        li.innerText = 'None';
+        li.onclick = (e) => {
+            e.stopPropagation();
+            setParentTask('', 'None');
+        };
+        list.appendChild(li);
+    }
+
+    if (!window.allTasksParentCache) return;
+
+    const filtered = window.allTasksParentCache.filter(t => {
+        if (currentTaskId && t.id === currentTaskId) return false; // Prevent self
+        if (currentTaskId && t.parent_task_id === currentTaskId) return false; // Prevent choosing a subtask as parent
+        
+        return t.title.toLowerCase().includes(query.toLowerCase());
+    });
+    
+    if (filtered.length === 0) {
+        list.innerHTML += `<li class="p-2 text-slate-400 italic text-xs">No tasks found</li>`;
+        return;
+    }
+    
+    filtered.forEach(t => {
+        const li = document.createElement('li');
+        li.className = `p-2 hover:bg-slate-50 cursor-pointer rounded mb-0.5 flex justify-between items-center group`;
+        const countStr = t.subtask_count > 0 ? ` <span class="text-slate-400 text-xs ml-1">(${t.subtask_count})</span>` : '';
+        const projStr = t.project_names ? ` <span class="text-teal-600 bg-teal-50 px-1 rounded text-[10px] ml-1">#${t.project_names}</span>` : '';
+        
+        li.innerHTML = `
+            <div class="flex items-center truncate">
+                <span class="truncate font-medium">${t.title}</span>
+                ${projStr}
+                ${countStr}
+            </div>
+        `;
+        li.onclick = (e) => {
+            e.stopPropagation();
+            const displayName = `${t.title}${t.project_names ? ` [${t.project_names}]` : ''}${t.subtask_count > 0 ? ` (${t.subtask_count})` : ''}`;
+            setParentTask(t.id, displayName);
+        };
+        list.appendChild(li);
+    });
+}
+
+function setParentTask(id, name) {
+    document.getElementById('task-modal-parent-id').value = id;
+    document.getElementById('parent-task-name').innerText = name || 'None';
+    const dropdown = document.getElementById('parent-task-dropdown');
+    dropdown.classList.add('hidden');
+    dropdown.classList.remove('flex');
+    updateTaskDetails(); // trigger save
+}
+
 function toggleLinkSubtaskDropdown() {
     const dropdown = document.getElementById('link-subtask-dropdown');
     if (dropdown.classList.contains('hidden')) {
@@ -936,7 +1046,12 @@ async function searchTasksToLink(query) {
     if(!parentIdStr) return;
     const parentId = parseInt(parentIdStr, 10);
 
-    const filtered = allTasks.filter(t => t.title.toLowerCase().includes(query.toLowerCase()) && t.id !== parentId && t.parent_task_id !== parentId);
+    const filtered = allTasks.filter(t => 
+        t.title.toLowerCase().includes(query.toLowerCase()) 
+        && t.id !== parentId 
+        && t.parent_task_id !== parentId
+        && !(window.currentTaskSubtaskIds && window.currentTaskSubtaskIds.includes(t.id))
+    );
     
     const ul = document.getElementById('link-subtask-list');
     ul.innerHTML = '';
@@ -947,8 +1062,21 @@ async function searchTasksToLink(query) {
     
     filtered.forEach(task => {
         const li = document.createElement('li');
-        li.className = 'p-1.5 hover:bg-slate-100 rounded cursor-pointer transition-colors mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis';
-        li.textContent = `#${task.id} - ${task.title}`;
+        li.className = 'p-2 hover:bg-slate-100 rounded cursor-pointer transition-colors mt-0.5 flex flex-col';
+        
+        const countStr = task.subtask_count > 0 ? `<span class="text-[10px] font-semibold text-slate-500 bg-slate-200 px-1 rounded ml-1">(${task.subtask_count})</span>` : '';
+        const projStr = task.project_names ? `<span class="text-[10px] text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-100 mr-2">${task.project_names}</span>` : '';
+        
+        li.innerHTML = `
+            <div class="flex items-center w-full truncate">
+                <span class="text-xs font-medium text-slate-400 mr-2">#${task.id}</span>
+                <span class="text-sm font-medium text-slate-700 truncate" title="${task.title}">${task.title}</span>
+                ${countStr}
+            </div>
+            <div class="flex items-center mt-1 w-full truncate">
+                ${projStr}
+            </div>
+        `;
         li.onclick = () => submitLinkSubtask(parentId, task.id);
         ul.appendChild(li);
     });
@@ -970,6 +1098,30 @@ function submitLinkSubtask(parentId, subtaskId) {
         } else {
             alert('Failed to link subtask.');
         }
+    });
+}
+
+function unlinkSubtask(parentId, subtaskId) {
+    if (!confirm('Are you sure you want to unlink this subtask?')) return;
+    
+    fetch('api/tasks.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            action: 'unlink_subtask',
+            parent_task_id: parentId,
+            subtask_id: subtaskId
+        })
+    }).then(res => res.json()).then(data => {
+        if(data.status === 'success') {
+            openTaskModal(parentId); // Reload parent to reflect changes
+            if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
+        } else {
+            alert('Failed to unlink subtask: ' + data.message);
+        }
+    }).catch(e => {
+        console.error('Error unlinking subtask', e);
+        alert('An error occurred while unlinking.');
     });
 }
 
