@@ -3,7 +3,7 @@
 session_start();
 
 if (isset($_SESSION['user_id'])) {
-    header("Location: index.php");
+    header("Location: /Bathyal/index.php");
     exit;
 }
 
@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['team_id'] = $user['team_id'];
             $_SESSION['role'] = $user['role'];
-            header("Location: index.php");
+            header("Location: /Bathyal/index.php");
             exit;
         } else {
             $error = 'Invalid email or password.';
@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         <?php endif; ?>
 
-        <form method="POST" action="login.php" class="space-y-4">
+        <form method="POST" action="/Bathyal/login" class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-slate-600 mb-1" for="email">Email</label>
                 <input type="email" id="email" name="email" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-colors">
@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </form>
         
         <p class="text-center text-sm text-slate-500 mt-6">
-            Don't have an account? <a href="register.php" class="text-teal-600 font-medium hover:underline">Sign up</a>
+            Don't have an account? <a href="/Bathyal/register" class="text-teal-600 font-medium hover:underline">Sign up</a>
         </p>
     </div>
 </body>

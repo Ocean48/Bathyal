@@ -3,7 +3,7 @@
 session_start();
 
 if (isset($_SESSION['user_id'])) {
-    header("Location: index.php");
+    header("Location: /Bathyal/index.php");
     exit;
 }
 
@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['user_id'] = $userId;
                 $_SESSION['team_id'] = $teamId;
                 $_SESSION['role'] = $teamName ? 'admin' : 'member';
-                header("Location: index.php");
+                header("Location: /Bathyal/index.php");
                 exit;
             } else {
                 $error = 'Failed to register. Please try again.';
@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         <?php endif; ?>
 
-        <form method="POST" action="register.php" class="space-y-4">
+        <form method="POST" action="/Bathyal/register" class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-slate-600 mb-1" for="name">Full Name</label>
                 <input type="text" id="name" name="name" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:bg-white transition-colors">
@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </form>
         
         <p class="text-center text-sm text-slate-500 mt-6">
-            Already have an account? <a href="login.php" class="text-cyan-700 font-medium hover:underline">Sign in</a>
+            Already have an account? <a href="/Bathyal/login" class="text-cyan-700 font-medium hover:underline">Sign in</a>
         </p>
     </div>
 </body>
