@@ -1,0 +1,30 @@
+# /var/www/html/bathyal/.htaccess
+
+# Security to prevent directory listing
+Options -Indexes
+
+# Set Environment Variables for Database Configuration
+SetEnv DB_HOST 127.0.0.1
+SetEnv DB_NAME bathyal_db
+SetEnv DB_USER xxxxxx
+SetEnv DB_PASS xxxxxx
+SetEnv DB_CHARSET utf8mb4
+
+# Basic routing (if you want all traffic through index.php later)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /bathyal/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Protect environment variables and config files from being read directly
+<FilesMatch "^\.|\.php$">
+    # Allow execution but deny direct read access from browser
+    # (Handled mostly by Apache evaluating PHP, but a good safety net for config)
+</FilesMatch>
+<FilesMatch "^(config\.php|database\.php|\.env|\.htaccess)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
