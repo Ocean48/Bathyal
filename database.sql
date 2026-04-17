@@ -50,6 +50,7 @@ CREATE TABLE tasks (
     estimated_minutes INT DEFAULT 0,
     storage_location ENUM('active', 'backlog', 'archive', 'unattached') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
     FOREIGN KEY (assignee_id) REFERENCES users(id) ON DELETE SET NULL
 );
@@ -113,6 +114,18 @@ CREATE TABLE task_triggers (
     action ENUM('start_next_task', 'notify_assignee', 'notify_admin', 'create_task') NOT NULL,
     FOREIGN KEY (source_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
     FOREIGN KEY (target_task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+
+-- NOTIFICATIONS (For automations, assignments, and trigger alerts)
+CREATE TABLE notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    task_id INT NULL,
+    message VARCHAR(255) NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
 );
 
 -- INTEGRATIONS (Slack/Email/AI)

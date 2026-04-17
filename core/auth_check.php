@@ -3,7 +3,7 @@
 session_start();
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: /Bathyal/login.php");
+    header("Location: /bathyal/login.php");
     exit;
 }
 
@@ -16,7 +16,7 @@ $currentUser = $db->getUserById($_SESSION['user_id']);
 
 if (!$currentUser) {
     session_destroy();
-    header("Location: /Bathyal/login.php");
+    header("Location: /bathyal/login.php");
     exit;
 }
 ?>

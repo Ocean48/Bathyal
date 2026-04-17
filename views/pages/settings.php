@@ -100,7 +100,7 @@ require_once 'views/layouts/header.php';
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <?php if($member['id'] !== $currentUser['id']): ?>
-                                    <form method="POST" action="/Bathyal/settings" class="inline-flex items-center">
+                                    <form method="POST" action="/bathyal/settings" class="inline-flex items-center">
                                         <input type="hidden" name="action" value="update_role">
                                         <input type="hidden" name="user_id" value="<?= $member['id'] ?>">
                                         <select name="role" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded p-1.5 mr-2 outline-none focus:border-teal-400">

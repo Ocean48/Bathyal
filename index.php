@@ -8,7 +8,7 @@ $path = parse_url($request_uri, PHP_URL_PATH);
 
 // Base directory path depending on Apache Alias/DocumentRoot setups.
 // Change this if the app is hosted directly at the domain root (e.g. replacing it with '')
-$base_path = '/Bathyal'; 
+$base_path = '/bathyal'; 
 // Remove the base path (case-insensitive to support /bathyal symlink) to figure out the internal app route
 $route = str_ireplace($base_path, '', $path);
 $route = trim($route, '/');

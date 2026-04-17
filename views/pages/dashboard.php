@@ -106,7 +106,7 @@ require_once 'views/layouts/header.php';
             
             <div class="flex-1 overflow-y-auto p-4 space-y-3">
                 <!-- Project Item -->
-                <div class="group flex items-center p-3 border border-slate-100 rounded-lg hover:border-teal-300 hover:shadow-sm cursor-pointer transition-all">
+                <div class="group flex items-center p-3 border border-slate-100 rounded-lg hover:border-teal-300 hover:shadow-sm cursor-pointer transition-all" onclick="window.location.href='/bathyal/project?id=1'">
                     <div class="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center text-teal-700 font-bold mr-4">
                         WR
                     </div>
@@ -120,7 +120,7 @@ require_once 'views/layouts/header.php';
                 </div>
 
                 <!-- Project Item -->
-                <div class="group flex items-center p-3 border border-slate-100 rounded-lg hover:border-cyan-300 hover:shadow-sm cursor-pointer transition-all">
+                <div class="group flex items-center p-3 border border-slate-100 rounded-lg hover:border-cyan-300 hover:shadow-sm cursor-pointer transition-all" onclick="window.location.href='/bathyal/project?id=2'">
                     <div class="w-10 h-10 rounded-lg bg-cyan-100 flex items-center justify-center text-cyan-700 font-bold mr-4">
                         MQ
                     </div>
