@@ -1,0 +1,10 @@
+/* /assets/css/style.css */
+/* Add any custom CSS overrides here. Using Tailwind CSS for base styling. */
+
+.task-card:active {
+    cursor: grabbing;
+}
+
+.task-card {
+    cursor: grab;
+}
