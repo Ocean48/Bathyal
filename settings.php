@@ -6,7 +6,7 @@ require_once 'includes/auth_check.php';
 
 // Only admins should ideally manage team roles. Assuming role 'admin'
 if ($currentUser['role'] !== 'admin') {
-    die("<div style='padding:20px; font-family:sans-serif; color:red;'>Access Denied. Only Team Admins can view settings. <a href='/'>Go back</a></div>");
+    die("<div style='padding:20px; font-family:sans-serif; color:red;'>Access Denied. Only Team Admins can view settings. <a href='index.php'>Go back</a></div>");
 }
 
 $successMsg = '';

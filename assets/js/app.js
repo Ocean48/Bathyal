@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadProjectBoard(projectId) {
     try {
-        const response = await fetch(`/api/projects.php?id=${projectId}`);
+        const response = await fetch(`api/projects.php?id=${projectId}`);
         const project = await response.json();
         
         if (project.error) {
