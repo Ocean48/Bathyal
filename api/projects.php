@@ -1,8 +1,8 @@
 <?php
 // /api/projects.php
 
-require_once '../config/database.php';
-require_once '../includes/db_query.php';
+require_once '../core/database.php';
+require_once '../core/db_query.php';
 
 header('Content-Type: application/json');
 

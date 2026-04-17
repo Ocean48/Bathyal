@@ -1,8 +1,8 @@
 <?php
 // /settings.php
 
-require_once 'config/database.php';
-require_once 'includes/auth_check.php';
+require_once 'core/database.php';
+require_once 'core/auth_check.php';
 
 // Only admins should ideally manage team roles. Assuming role 'admin'
 if ($currentUser['role'] !== 'admin') {
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 $db = new DBQueries($pdo);
 $members = $db->getTeamMembers($currentUser['team_id']);
 
-require_once 'includes/header.php';
+require_once 'views/layouts/header.php';
 ?>
 
 <div class="max-w-6xl mx-auto px-6 py-8">
@@ -122,4 +122,4 @@ require_once 'includes/header.php';
     </div>
 </div>
 
-<?php require_once 'includes/footer.php'; ?>
+<?php require_once 'views/layouts/footer.php'; ?>

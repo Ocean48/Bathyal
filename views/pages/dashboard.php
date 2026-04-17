@@ -1,14 +1,14 @@
 <?php
 // /index.php
 
-require_once 'config/database.php';
-require_once 'includes/auth_check.php';
+require_once 'core/database.php';
+require_once 'core/auth_check.php';
 
 // Simple routing logic could go here
 $request_uri = $_SERVER['REQUEST_URI'];
 
 // Basic entry point
-require_once 'includes/header.php';
+require_once 'views/layouts/header.php';
 ?>
 
 <div class="max-w-6xl mx-auto px-6 py-8">
@@ -141,5 +141,5 @@ require_once 'includes/header.php';
 </div>
 
 <?php
-require_once 'includes/footer.php';
+require_once 'views/layouts/footer.php';
 ?>

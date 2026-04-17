@@ -8,7 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // Fetch the current user details to have globally available
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/db_query.php';
 
 $db = new DBQueries($pdo);
