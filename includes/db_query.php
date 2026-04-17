@@ -8,6 +8,51 @@ class DBQueries {
         $this->pdo = $pdo;
     }
 
+    // --- USERS & AUTH ---
+    public function getUserById($userId) {
+        $stmt = $this->pdo->prepare("SELECT * FROM users WHERE id = :user_id");
+        $stmt->bindValue(':user_id', (int)$userId, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetch();
+    }
+
+    public function getUserByEmail($email) {
+        $stmt = $this->pdo->prepare("SELECT * FROM users WHERE email = :email");
+        $stmt->bindValue(':email', $email, PDO::PARAM_STR);
+        $stmt->execute();
+        return $stmt->fetch();
+    }
+
+    public function createUser($data) {
+        $stmt = $this->pdo->prepare("
+            INSERT INTO users (name, email, password_hash, team_id, role) 
+            VALUES (:name, :email, :password_hash, :team_id, :role)
+        ");
+        $stmt->bindValue(':name', $data['name'], PDO::PARAM_STR);
+        $stmt->bindValue(':email', $data['email'], PDO::PARAM_STR);
+        $stmt->bindValue(':password_hash', $data['password_hash'], PDO::PARAM_STR);
+        $stmt->bindValue(':team_id', $data['team_id'] ?? null, $data['team_id'] ? PDO::PARAM_INT : PDO::PARAM_NULL);
+        $stmt->bindValue(':role', $data['role'] ?? 'member', PDO::PARAM_STR);
+        
+        $stmt->execute();
+        return $this->pdo->lastInsertId();
+    }
+
+    public function getTeamMembers($teamId) {
+        $stmt = $this->pdo->prepare("SELECT id, name, email, role, created_at FROM users WHERE team_id = :team_id ORDER BY role ASC, name ASC");
+        $stmt->bindValue(':team_id', (int)$teamId, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function updateUserRole($userId, $teamId, $role) {
+        $stmt = $this->pdo->prepare("UPDATE users SET role = :role WHERE id = :user_id AND team_id = :team_id");
+        $stmt->bindValue(':role', $role, PDO::PARAM_STR);
+        $stmt->bindValue(':user_id', (int)$userId, PDO::PARAM_INT);
+        $stmt->bindValue(':team_id', (int)$teamId, PDO::PARAM_INT);
+        return $stmt->execute();
+    }
+
     // --- PROJECTS ---
     public function getProjectById($projectId) {
         $stmt = $this->pdo->prepare("SELECT * FROM projects WHERE id = :project_id");

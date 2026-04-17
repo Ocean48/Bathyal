@@ -2,6 +2,7 @@
 // /project.php
 
 require_once 'config/database.php';
+require_once 'includes/auth_check.php';
 
 // Include the UI wrapper
 require_once 'includes/header.php';

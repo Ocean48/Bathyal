@@ -2,6 +2,7 @@
 // /index.php
 
 require_once 'config/database.php';
+require_once 'includes/auth_check.php';
 
 // Simple routing logic could go here
 $request_uri = $_SERVER['REQUEST_URI'];
