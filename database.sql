@@ -30,6 +30,15 @@ CREATE TABLE projects (
     FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE project_members (
+    project_id INT NOT NULL,
+    user_id INT NOT NULL,
+    role ENUM('manager', 'member', 'viewer') DEFAULT 'member',
+    PRIMARY KEY (project_id, user_id),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE sections (
     id INT AUTO_INCREMENT PRIMARY KEY,
     project_id INT NOT NULL,
@@ -45,14 +54,21 @@ CREATE TABLE tasks (
     title VARCHAR(255) NOT NULL,
     description TEXT, -- Supports URL hyperlinks parsing
     status ENUM('todo', 'in_progress', 'paused', 'completed') DEFAULT 'todo',
-    assignee_id INT NULL,
     due_date DATETIME NULL,
     estimated_minutes INT DEFAULT 0,
     storage_location ENUM('active', 'backlog', 'archive', 'unattached') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-    FOREIGN KEY (assignee_id) REFERENCES users(id) ON DELETE SET NULL
+    FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+
+-- MULTIPLE ASSIGNEES PER TASK
+CREATE TABLE task_assignees (
+    task_id INT NOT NULL,
+    user_id INT NOT NULL,
+    PRIMARY KEY (task_id, user_id),
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- TASK TO PROJECT MAPPING (Supports attaching a single task to many projects)
@@ -138,6 +154,15 @@ CREATE TABLE project_integrations (
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
+-- LINKED SUBTASKS (Shared across projects)
+CREATE TABLE task_links (
+    parent_id INT NOT NULL,
+    subtask_id INT NOT NULL,
+    PRIMARY KEY (parent_id, subtask_id),
+    FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY (subtask_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+
 -- ==========================================
 -- FAKE TEST DATA
 -- ==========================================
@@ -163,19 +188,80 @@ INSERT INTO sections (project_id, name, position) VALUES
 (1, 'To Do', 1),
 (1, 'In Progress', 2),
 (1, 'Done', 3),
+(1, 'QA Review', 4),
+(1, 'Backlog', 5),
 -- Marketing Sections
 (2, 'Ideation', 1),
 (2, 'Drafting', 2),
-(2, 'Published', 3);
+(2, 'Published', 3),
+(2, 'Review', 4),
+(2, 'Archived', 5),
+-- Ocean Conservation App Sections
+(3, 'Backlog', 1),
+(3, 'Sprints', 2);
+
+-- Insert Project Members
+INSERT INTO project_members (project_id, user_id, role) VALUES 
+(1, 1, 'manager'),
+(1, 2, 'member'),
+(1, 3, 'viewer'),
+(2, 1, 'manager'),
+(2, 3, 'member'),
+(3, 1, 'manager'),
+(3, 2, 'manager'),
+(3, 3, 'member');
 
 -- Insert Tasks
-INSERT INTO tasks (title, description, status, assignee_id, due_date, estimated_minutes) VALUES 
-('Draft AI trigger automations', 'Create the project triggers for the AI and Slack.', 'todo', 2, '2026-04-20 12:00:00', 120),
-('Review Kanban board drag-and-drop', 'Review the UI implementation for the boards.', 'in_progress', 1, '2026-04-21 16:30:00', 90),
-('Prepare Q3 Budget', 'Draft the expected budget for new marketing campaigns.', 'todo', 3, '2026-05-01 10:00:00', 240);
+-- First batch of Top-Level Tasks
+INSERT INTO tasks (title, description, status, due_date, estimated_minutes) VALUES 
+('Draft AI trigger automations', 'Create the project triggers for the AI and Slack.', 'todo', '2026-04-20 12:00:00', 120),
+('Review Kanban board drag-and-drop', 'Review the UI implementation for the boards.', 'in_progress', '2026-04-21 16:30:00', 90),
+('Prepare Q3 Budget', 'Draft the expected budget for new marketing campaigns.', 'todo', '2026-05-01 10:00:00', 240),
+('Update Typography Globals', 'Update the global css file and Tailwind config for the new font stack.', 'todo', '2026-04-22 17:00:00', 60),
+('Fix Sidebar Navigation', 'Mobile menu is broken on iOS Safari when scrolled.', 'todo', '2026-04-25 12:00:00', 120),
+('Social Media Assets', 'Design banners for Twitter, Facebook, and LinkedIn.', 'in_progress', '2026-04-30 09:00:00', 200),
+('App Store Descriptions', 'Write localization text for the Apple App Store and Google Play.', 'todo', '2026-05-15 15:00:00', 90);
+
+-- Insert Subtasks (Parent task references ID 1: Draft AI trigger automations)
+INSERT INTO tasks (parent_task_id, title, description, status, due_date, estimated_minutes) VALUES 
+(1, 'Define webhooks', 'Create JSON schema for Slack webhook payloads.', 'completed', '2026-04-18 10:00:00', 30),
+(1, 'Setup OpenAI integration logic', 'Connect via cURL the prompt handlers.', 'todo', '2026-04-19 14:00:00', 90);
+
+-- Insert Subtasks (Parent task references ID 4: Update Typography Globals)
+INSERT INTO tasks (parent_task_id, title, description, status, due_date, estimated_minutes) VALUES 
+(4, 'Download Google Fonts', 'Download Poppins and Inter locally to serve them properly.', 'completed', '2026-04-20 17:00:00', 15),
+(4, 'Update tailwind.config.js', 'Add font families to tailwind overrides.', 'todo', '2026-04-21 17:00:00', 30);
+
+-- Insert Subtasks (Parent task references ID 5: Fix Sidebar Navigation)
+INSERT INTO tasks (parent_task_id, title, description, status, due_date, estimated_minutes) VALUES 
+(5, 'Check z-index issues', 'Overlay is going behind the canvas on iOS Safari specifically.', 'todo', '2026-04-25 10:00:00', 30);
+
+-- Insert Subtasks (Parent task references ID 2: Review Kanban)
+INSERT INTO tasks (parent_task_id, title, description, status, due_date, estimated_minutes) VALUES 
+(2, 'Fix drag ghost image transparency', 'Currently the SortableJS ghost image looks bad when dragging.', 'todo', '2026-04-21 15:00:00', 45);
+
+INSERT INTO task_assignees (task_id, user_id) VALUES
+(1, 2),
+(2, 1),
+(2, 3),
+(3, 3),
+(4, 1),
+(5, 2),
+(6, 3),
+(7, 1),
+(8, 2),
+(9, 2),
+(10, 1),
+(11, 1),
+(12, 2),
+(13, 1);
 
 -- Map Tasks to Projects/Sections
 INSERT INTO task_projects (task_id, project_id, section_id, position) VALUES 
-(1, 1, 1, 1), -- Draft AI attached to 'To Do' in Website Redesign
-(2, 1, 2, 1), -- Kanban Review attached to 'In Progress' in Website Redesign
-(3, 2, 4, 1); -- Q3 budget attached to 'Ideation' in Marketing Q3
+(1, 1, 1, 1), -- Draft AI attached to 'To Do' in Website Redesign (Section 1)
+(2, 1, 2, 1), -- Kanban Review attached to 'In Progress' in Website Redesign (Section 2)
+(3, 2, 6, 1), -- Q3 budget attached to 'Ideation' in Marketing Q3 (Section 6)
+(4, 1, 5, 1), -- Update Typography attached to 'Backlog' in Website Redesign (Section 5)
+(5, 1, 1, 2), -- Fix Sidebar attached to 'To Do' in Website Redesign (Section 1)
+(6, 2, 7, 1), -- Social Media attached to 'Drafting' in Marketing Q3 (Section 7)
+(7, 3, 11, 1); -- App Store attached to 'Backlog' in Ocean Conservation (Section 11)

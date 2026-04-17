@@ -51,22 +51,43 @@
             </div>
             <ul class="space-y-1">
                 <li>
-                    <a href="/bathyal/project?id=1" class="flex items-center px-6 py-2 hover:bg-slate-800 hover:text-white group text-sm">
-                        <span class="w-2 h-2 rounded-full bg-teal-400 mr-3"></span>
-                        Website Redesign
-                    </a>
+                    <div class="flex items-center justify-between px-6 py-2 hover:bg-slate-800 group text-sm transition-colors">
+                        <a href="/bathyal/project?id=1" class="flex items-center flex-1 hover:text-white">
+                            <span class="w-2 h-2 rounded-full bg-teal-400 mr-3"></span>
+                            Website Redesign
+                        </a>
+                        <a href="/bathyal/project_settings?id=1" class="text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" title="Project Settings">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                            </svg>
+                        </a>
+                    </div>
                 </li>
                 <li>
-                    <a href="/bathyal/project?id=2" class="flex items-center px-6 py-2 hover:bg-slate-800 hover:text-white group text-sm">
-                        <span class="w-2 h-2 rounded-full bg-cyan-500 mr-3"></span>
-                        Marketing Q3
-                    </a>
+                    <div class="flex items-center justify-between px-6 py-2 hover:bg-slate-800 group text-sm transition-colors">
+                        <a href="/bathyal/project?id=2" class="flex items-center flex-1 hover:text-white">
+                            <span class="w-2 h-2 rounded-full bg-cyan-500 mr-3"></span>
+                            Marketing Q3
+                        </a>
+                        <a href="/bathyal/project_settings?id=2" class="text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" title="Project Settings">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                            </svg>
+                        </a>
+                    </div>
                 </li>
                 <li>
-                    <a href="/bathyal/project?id=3" class="flex items-center px-6 py-2 hover:bg-slate-800 hover:text-white group text-sm">
-                        <span class="w-2 h-2 rounded-full bg-blue-500 mr-3"></span>
-                        Ocean Conservation App
-                    </a>
+                    <div class="flex items-center justify-between px-6 py-2 hover:bg-slate-800 group text-sm transition-colors">
+                        <a href="/bathyal/project?id=3" class="flex items-center flex-1 hover:text-white">
+                            <span class="w-2 h-2 rounded-full bg-blue-500 mr-3"></span>
+                            Ocean Conservation App
+                        </a>
+                        <a href="/bathyal/project_settings?id=3" class="text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" title="Project Settings">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                            </svg>
+                        </a>
+                    </div>
                 </li>
             </ul>
         </nav>

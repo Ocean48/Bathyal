@@ -24,7 +24,13 @@ SetEnv DB_CHARSET utf8mb4
     # Allow execution but deny direct read access from browser
     # (Handled mostly by Apache evaluating PHP, but a good safety net for config)
 </FilesMatch>
+# For Nginx
 <FilesMatch "^(config\.php|database\.php|\.env|\.htaccess)$">
     Order allow,deny
     Deny from all
+</FilesMatch>
+
+# For Apache
+<FilesMatch "^(config\.php|database\.php|\.env|\.htaccess)$">
+    Require all denied
 </FilesMatch>

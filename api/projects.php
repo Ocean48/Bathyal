@@ -26,7 +26,7 @@ if ($method === 'GET') {
         // Fetch Sections
         $sections = $db->getSectionsByProjectId($projectId);
 
-        // Fetch Tasks mapped to this project, including assignee name
+        // Fetch Tasks mapped to this project, including assignee name and subtasks recursively
         $tasks = $db->getTasksByProjectId($projectId);
 
         // Group tasks into their respective sections
@@ -45,6 +45,58 @@ if ($method === 'GET') {
     } catch (\PDOException $e) {
         http_response_code(500);
         echo json_encode(['error' => 'Database error', 'details' => $e->getMessage()]);
+    }
+} elseif ($method === 'POST') {
+    $data = json_decode(file_get_contents('php://input'), true);
+    if (!isset($data['action'])) {
+        http_response_code(400);
+        echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
+        exit;
+    }
+
+    $projectId = isset($_GET['id']) ? (int)$_GET['id'] : (isset($data['project_id']) ? (int)$data['project_id'] : 1);
+
+    if ($data['action'] === 'add_section') {
+        try {
+            $name = $data['name'];
+            $db->createSection($projectId, $name);
+            echo json_encode(['status' => 'success']);
+        } catch (\PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+    } elseif ($data['action'] === 'update_members') {
+        try {
+            $memberIds = isset($data['member_ids']) ? $data['member_ids'] : [];
+            
+            // For now, let's just make everyone 'member' role initially. 
+            // The request could optionally send roles, but we'll default to 'member'.
+            
+            $pdo->beginTransaction();
+            // Delete old members
+            $stmt = $pdo->prepare("DELETE FROM project_members WHERE project_id = :pid");
+            $stmt->execute(['pid' => $projectId]);
+
+            // Insert new ones
+            if (!empty($memberIds)) {
+                // Ensure unique IDs
+                $memberIds = array_unique(array_filter($memberIds, function($id) { return (int)$id > 0; }));
+                $insertStmt = $pdo->prepare("INSERT INTO project_members (project_id, user_id, role) VALUES (:pid, :uid, 'member')");
+                foreach ($memberIds as $uid) {
+                    $insertStmt->execute(['pid' => $projectId, 'uid' => (int)$uid]);
+                }
+            }
+            $pdo->commit();
+            
+            echo json_encode(['status' => 'success']);
+        } catch (\PDOException $e) {
+            $pdo->rollBack();
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+    } else {
+        http_response_code(400);
+        echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
     }
 } else {
     http_response_code(405);
