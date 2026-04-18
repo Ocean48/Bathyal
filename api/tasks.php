@@ -18,6 +18,9 @@ switch ($method) {
                 // Fetch comments for this task
                 $task['comments'] = $db->getCommentsByTaskId($taskId);
                 
+                // Fetch attachments for this task
+                $task['attachments'] = $db->getTaskAttachments($taskId);
+                
                 // Fetch subtasks strictly bound to this id
                 $task['subtasks'] = $db->getTaskSubtasks($taskId);
 
@@ -35,6 +38,33 @@ switch ($method) {
         }
         break;
     case 'POST':
+        if (isset($_POST['action']) && $_POST['action'] === 'add_attachment') {
+            $taskId = $_POST['task_id'];
+            $file = $_FILES['file'];
+            $userId = 1; // Mock user ID
+            
+            $uploadDir = '../assets/uploads/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+            
+            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $filename = uniqid() . '.' . $ext;
+            $dest = $uploadDir . $filename;
+            
+            if (move_uploaded_file($file['tmp_name'], $dest)) {
+                $filePath = 'assets/uploads/' . $filename;
+                $insertedId = $db->createTaskAttachment($taskId, $userId, $file['name'], $filePath, $file['type']);
+                if ($insertedId) {
+                    echo json_encode(['status' => 'success', 'attachment_id' => $insertedId]);
+                    exit;
+                }
+            }
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'Failed to upload attachment']);
+            exit;
+        }
+
         $data = json_decode(file_get_contents('php://input'), true);
         if (isset($data['action'])) {
             if ($data['action'] === 'update_status') {
@@ -90,6 +120,14 @@ switch ($method) {
                 } else {
                     http_response_code(500);
                     echo json_encode(['status' => 'error', 'message' => 'Failed to reorder tasks']);
+                }
+            } elseif ($data['action'] === 'delete_attachment') {
+                $attachmentId = $data['attachment_id'];
+                if ($db->deleteTaskAttachment($attachmentId)) {
+                    echo json_encode(['status' => 'success']);
+                } else {
+                    http_response_code(500);
+                    echo json_encode(['status' => 'error', 'message' => 'Failed to delete attachment']);
                 }
             } elseif ($data['action'] === 'toggle_time_track') {
                 $userId = 1; // Mock user ID

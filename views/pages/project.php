@@ -229,7 +229,61 @@ require_once 'views/layouts/header.php';
             <!-- Description -->
             <div class="mb-8">
                 <label class="font-semibold text-slate-800 mb-2 block">Description</label>
-                <div id="task-modal-desc" class="prose prose-sm text-slate-600 hover:bg-slate-50 focus:bg-white p-3 -ml-2 rounded cursor-text border border-transparent focus:border-slate-200 focus:shadow-inner outline-none min-h-[100px] transition-colors" contenteditable="true" onblur="updateTaskDetails()">
+                <div class="border border-slate-300 rounded bg-white overflow-hidden flex flex-col min-h-[200px]">
+                    <!-- RTE Toolbar -->
+                    <div class="bg-slate-50 border-b border-slate-200 px-2 py-1.5 flex flex-wrap gap-1 items-center">
+                        <button type="button" onclick="formatText('bold', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bold">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z"></path></svg>
+                        </button>
+                        <button type="button" onclick="formatText('italic', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Italic">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4-4-4-4M6 16l-4 4 4 4"></path></svg>
+                        </button>
+                        <button type="button" onclick="formatText('underline', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Underline">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3m-9 18h6"></path></svg>
+                        </button>
+                        <div class="w-px h-5 bg-slate-300 mx-1"></div>
+                        <button type="button" onclick="formatText('insertUnorderedList', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bullet List">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                        </button>
+                        <button type="button" onclick="formatText('insertOrderedList', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Numbered List">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 6h11M9 12h11M9 18h11M5 6v.01M5 12v.01M5 18v.01"></path></svg>
+                        </button>
+                        <div class="w-px h-5 bg-slate-300 mx-1"></div>
+                        <button type="button" onclick="insertTable('task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Table">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm2 4h12M12 10v10"></path></svg>
+                        </button>
+                        <button type="button" onclick="document.getElementById('rte-image-upload-desc').click()" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Image">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        </button>
+                        <input type="file" id="rte-image-upload-desc" accept="image/*" class="hidden" onchange="uploadRteImage(this, 'task-modal-desc')">
+                        <div class="w-px h-5 bg-slate-300 mx-1"></div>
+                        <button type="button" onclick="editTable('addRow', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Row">+Row</button>
+                        <button type="button" onclick="editTable('addCol', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Column">+Col</button>
+                        <button type="button" onclick="editTable('delRow', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Row">-Row</button>
+                        <button type="button" onclick="editTable('delCol', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Column">-Col</button>
+                        <div class="flex-1"></div>
+                        <button type="button" onclick="toggleCodeView('task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Toggle Code View">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4-4-4-4M6 16l-4 4 4 4"></path></svg>
+                        </button>
+                    </div>
+                    <div id="task-modal-desc" class="prose prose-sm text-slate-600 p-4 outline-none flex-1 max-w-none break-words min-h-[100px] border border-transparent focus:border-slate-200" contenteditable="true" onblur="updateTaskDetails()">
+                    </div>
+                    <textarea id="task-modal-desc-code" class="hidden font-mono text-sm p-4 w-full flex-1 outline-none text-slate-700 bg-slate-50 break-words min-h-[100px]" onblur="updateTaskDetails()"></textarea>
+                </div>
+                <div class="mt-2 flex justify-end">
+                    <button onclick="updateTaskDetails()" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded text-xs font-medium shadow-sm transition-colors">Save Description</button>
+                </div>
+            </div>
+
+            <!-- Attachments -->
+            <div class="mb-8">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="font-semibold text-slate-800">Attachments</label>
+                    <button onclick="document.getElementById('task-attachment-upload').click()" class="text-xs text-teal-600 font-medium hover:text-teal-700">Add File</button>
+                    <input type="file" id="task-attachment-upload" class="hidden" onchange="uploadTaskAttachment(this)">
+                </div>
+                <div class="space-y-2" id="task-modal-attachments-list">
+                    <!-- Dynamic Attachments -->
                 </div>
             </div>
 
@@ -266,10 +320,53 @@ require_once 'views/layouts/header.php';
                 <div class="flex space-x-3 mb-6">
                     <img class="w-8 h-8 rounded-full" src="https://ui-avatars.com/api/?name=Admin+User&background=0D8ABC&color=fff" alt="You">
                     <div class="flex-1">
-                        <textarea id="task-modal-new-comment" rows="2" class="w-full text-sm border border-slate-300 rounded-lg p-3 focus:ring-teal-500 focus:border-teal-500 shadow-sm" placeholder="Ask a question or post an update..."></textarea>
-                        <div class="mt-2 flex justify-end">
+                        <div class="border border-slate-300 rounded bg-white mb-2 overflow-hidden flex flex-col min-h-[120px]">
+                            <!-- RTE Toolbar -->
+                            <div class="bg-slate-50 border-b border-slate-200 px-2 py-1.5 flex flex-wrap gap-1 items-center">
+                                <button type="button" onclick="formatText('bold', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bold">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z"></path></svg>
+                                </button>
+                                <button type="button" onclick="formatText('italic', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Italic">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4-4-4-4M6 16l-4 4 4 4"></path></svg>
+                                </button>
+                                <button type="button" onclick="formatText('underline', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Underline">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3m-9 18h6"></path></svg>
+                                </button>
+                                <div class="w-px h-5 bg-slate-300 mx-1"></div>
+                                <button type="button" onclick="formatText('insertUnorderedList', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bullet List">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                                </button>
+                                <button type="button" onclick="formatText('insertOrderedList', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Numbered List">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 6h11M9 12h11M9 18h11M5 6v.01M5 12v.01M5 18v.01"></path></svg>
+                                </button>
+                                <div class="w-px h-5 bg-slate-300 mx-1"></div>
+                                <button type="button" onclick="insertTable('task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Table">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm2 4h12M12 10v10"></path></svg>
+                                </button>
+                                <button type="button" onclick="document.getElementById('rte-image-upload-comment').click()" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Image">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                </button>
+                                <input type="file" id="rte-image-upload-comment" accept="image/*" class="hidden" onchange="uploadRteImage(this, 'task-modal-new-comment')">
+                                <div class="w-px h-5 bg-slate-300 mx-1"></div>
+                                <button type="button" onclick="editTable('addRow', 'task-modal-new-comment')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Row">+Row</button>
+                                <button type="button" onclick="editTable('addCol', 'task-modal-new-comment')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Column">+Col</button>
+                                <button type="button" onclick="editTable('delRow', 'task-modal-new-comment')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Row">-Row</button>
+                                <button type="button" onclick="editTable('delCol', 'task-modal-new-comment')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Column">-Col</button>
+                                <div class="flex-1"></div>
+                                <button type="button" onclick="toggleCodeView('task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Toggle Code View">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4-4-4-4M6 16l-4 4 4 4"></path></svg>
+                                </button>
+                            </div>
+                            
+                            <div id="task-modal-new-comment" class="prose prose-sm text-slate-600 p-3 outline-none flex-1 max-w-none break-words" contenteditable="true" data-placeholder="Ask a question or post an update..." onfocus="if(this.innerHTML==='<p><br></p>') this.innerHTML='';" onblur="if(this.innerHTML==='') this.innerHTML='<p><br></p>';"></div>
+                            <textarea id="task-modal-new-comment-code" class="hidden font-mono text-sm p-3 w-full flex-1 outline-none text-slate-700 bg-slate-50 break-words min-h-[100px]"></textarea>
+                        </div>
+                        <div class="mt-2 flex justify-end flex-wrap gap-2">
+                            <button onclick="document.getElementById('task-comment-attachment').click()" class="text-xs text-slate-500 font-medium hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded transition">Attach File</button>
+                            <input type="file" id="task-comment-attachment" class="hidden" multiple onchange="queueCommentAttachments(this)">
                             <button onclick="submitTaskComment()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium shadow-sm transition-colors">Comment</button>
                         </div>
+                        <div id="comment-attachment-preview" class="flex flex-wrap gap-2 mt-2"></div>
                     </div>
                 </div>
 
@@ -328,6 +425,130 @@ require_once 'views/layouts/header.php';
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script>
 let timerInterval;
+
+// Custom Rich Text Editor Functions
+function formatText(command, editorId) {
+    document.getElementById(editorId).focus();
+    document.execCommand(command, false, null);
+}
+
+function toggleCodeView(editorId) {
+    const editor = document.getElementById(editorId);
+    const textarea = document.getElementById(editorId + '-code');
+    if (!editor || !textarea) return;
+
+    if (editor.classList.contains('hidden')) {
+        // Switch to rich text view
+        editor.innerHTML = textarea.value;
+        textarea.classList.add('hidden');
+        editor.classList.remove('hidden');
+    } else {
+        // Switch to code view
+        textarea.value = editor.innerHTML;
+        editor.classList.add('hidden');
+        textarea.classList.remove('hidden');
+    }
+}
+
+function getEditorContent(editorId) {
+    const editor = document.getElementById(editorId);
+    const textarea = document.getElementById(editorId + '-code');
+    if (editor && !editor.classList.contains('hidden')) {
+        return editor.innerHTML;
+    } else if (textarea) {
+        return textarea.value;
+    }
+    return '';
+}
+
+function editTable(action, editorId) {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    let node = selection.anchorNode;
+    if (!node) return;
+    if (node.nodeType === 3) node = node.parentNode; // text node
+    
+    const td = node.closest('td, th');
+    if (!td || !document.getElementById(editorId).contains(td)) {
+        return alert('Please place your cursor inside a table cell to modify the table.');
+    }
+    
+    const tr = td.closest('tr');
+    const table = tr.closest('table');
+    const cellIndex = td.cellIndex;
+
+    if (action === 'addRow') {
+        const newTr = tr.cloneNode(true);
+        Array.from(newTr.children).forEach(cell => cell.innerHTML = '<br>');
+        tr.after(newTr);
+    } else if (action === 'addCol') {
+        Array.from(table.rows).forEach(row => {
+            const newTd = row.children[cellIndex].cloneNode(true);
+            newTd.innerHTML = '<br>';
+            row.children[cellIndex].after(newTd);
+        });
+    } else if (action === 'delRow') {
+        tr.remove();
+        if (table.rows.length === 0) table.remove();
+    } else if (action === 'delCol') {
+        Array.from(table.rows).forEach(row => {
+            if (row.children[cellIndex]) row.children[cellIndex].remove();
+        });
+        if (table.rows[0] && table.rows[0].children.length === 0) table.remove();
+    }
+    
+    // Update background syncing if focused elsewhere
+    if(editorId === 'task-modal-desc') updateTaskDetails();
+}
+
+function insertTable(editorId) {
+    const rows = prompt('Enter number of rows:', '2');
+    const cols = prompt('Enter number of columns:', '2');
+    if (!rows || !cols) return;
+    
+    let html = '<table class="w-full border-collapse border border-slate-300 my-4 text-sm">';
+    for (let r = 0; r < rows; r++) {
+        html += '<tr>';
+        for (let c = 0; c < cols; c++) {
+            html += '<td class="border border-slate-300 p-2 min-w-[50px]"><br></td>';
+        }
+        html += '</tr>';
+    }
+    html += '</table><p><br></p>';
+    
+    document.getElementById(editorId).focus();
+    document.execCommand('insertHTML', false, html);
+}
+
+async function uploadRteImage(input, editorId) {
+    if (!input.files || input.files.length === 0) return;
+    
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const res = await fetch('api/upload.php', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        
+        if (data.location) {
+            document.getElementById(editorId).focus();
+            document.execCommand('insertImage', false, data.location);
+        } else {
+            alert('Image upload failed');
+        }
+    } catch(e) {
+        console.error(e);
+        alert('Image upload error');
+    } finally {
+        input.value = '';
+    }
+}
+
 let timerSeconds = 0;
 let isProgressRunning = false;
 
@@ -419,7 +640,30 @@ async function openTaskModal(taskId) {
         }
         
         document.getElementById('task-modal-estimated').innerText = task.estimated_minutes ? `${Math.floor(task.estimated_minutes/60)}h ${task.estimated_minutes%60}m` : '0h 0m';
-        document.getElementById('task-modal-desc').innerHTML = task.description || '';
+        
+        // Render custom editor content
+        document.getElementById('task-modal-desc').innerHTML = task.description || '<p><br></p>';
+
+        // Render Attachments
+        const attachmentsContainer = document.getElementById('task-modal-attachments-list');
+        attachmentsContainer.innerHTML = '';
+        if(task.attachments && task.attachments.length > 0) {
+            task.attachments.forEach(att => {
+                const isImage = att.file_type.startsWith('image/');
+                const icon = isImage ? '<svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>'
+                                     : '<svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>';
+                attachmentsContainer.innerHTML += `
+                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 p-2 rounded relative group">
+                        <a href="${att.file_path}" target="_blank" class="flex items-center hover:underline text-slate-700 text-sm truncate max-w-[80%]">
+                            ${icon} <span class="ml-2 truncate">${att.file_name}</span>
+                        </a>
+                        <button onclick="deleteAttachment(${att.id})" class="text-red-500 opacity-0 group-hover:opacity-100 hover:text-red-700 p-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                    </div>
+                `;
+            });
+        } else {
+            attachmentsContainer.innerHTML = '<div class="text-sm text-slate-400 italic">No attachments</div>';
+        }
         
         // Render Subtasks
         const subtasksContainer = document.getElementById('task-modal-subtasks');
@@ -463,7 +707,7 @@ async function openTaskModal(taskId) {
                                 <span class="font-medium text-slate-800 text-sm">${comment.user_name}</span>
                                 <span class="text-xs text-slate-400">${dt}</span>
                             </div>
-                            <div class="text-sm text-slate-600 whitespace-pre-wrap">${comment.content}</div>
+                            <div class="text-sm text-slate-600 prose prose-sm max-w-none">${comment.content}</div>
                         </div>
                     </div>
                 `;
@@ -526,7 +770,11 @@ async function updateTaskDetails() {
     const title = document.getElementById('task-modal-title').value;
     const status = document.getElementById('task-modal-status').value;
     const dueDate = document.getElementById('task-modal-due-date').value;
-    const desc = document.getElementById('task-modal-desc').innerHTML.trim();
+    
+    // Get content from custom editor or code block
+    let desc = getEditorContent('task-modal-desc');
+    if (desc === '<p><br></p>') desc = '';
+    
     let parentId = document.getElementById('task-modal-parent-id').value;
     parentId = parentId === '' ? null : parentId;
     
@@ -558,9 +806,16 @@ async function updateSubtaskStatus(id, checkbox) {
 
 async function submitTaskComment() {
     const id = document.getElementById('task-modal-id').value;
-    const content = document.getElementById('task-modal-new-comment').value.trim();
+    let content = getEditorContent('task-modal-new-comment').trim();
+    if (content === '<p><br></p>') content = '';
+    
     if(!id || !content) return;
     
+    // Check if we have attachments to upload first
+    const fileInput = document.getElementById('task-comment-attachment');
+    const files = fileInput.files;
+    let commentId = null;
+
     const res = await fetch('api/tasks.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -568,8 +823,92 @@ async function submitTaskComment() {
     });
     
     if(res.ok) {
-        document.getElementById('task-modal-new-comment').value = '';
-        openTaskModal(id); // Reload modal to show new comment
+        const data = await res.json();
+        commentId = data.comment_id;
+        
+        // Handle attachments if any
+        if (files.length > 0) {
+            for (let i = 0; i < files.length; i++) {
+                const formData = new FormData();
+                formData.append('action', 'add_attachment');
+                formData.append('task_id', id);
+                formData.append('file', files[i]);
+                await fetch('api/tasks.php', {
+                    method: 'POST',
+                    body: formData
+                });
+            }
+        }
+
+        if (editor) {
+            editor.innerHTML = '<p><br></p>';
+        }
+        
+        // clear attachment input
+        fileInput.value = '';
+        document.getElementById('comment-attachment-preview').innerHTML = '';
+        
+        openTaskModal(id); // Reload modal to show new comment and attachments
+    }
+}
+
+let pendingCommentFiles = [];
+function queueCommentAttachments(input) {
+    const preview = document.getElementById('comment-attachment-preview');
+    preview.innerHTML = '';
+    if (input.files.length > 0) {
+        Array.from(input.files).forEach(f => {
+            preview.innerHTML += `<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs inline-block">${f.name}</span>`;
+        });
+    }
+}
+
+async function deleteAttachment(attachmentId) {
+    if(!confirm('Are you sure you want to delete this attachment?')) return;
+    
+    const res = await fetch('api/tasks.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ action: 'delete_attachment', attachment_id: attachmentId })
+    });
+    if(res.ok) {
+        const id = document.getElementById('task-modal-id').value;
+        openTaskModal(id);
+    }
+}
+
+async function uploadTaskAttachment(input) {
+    const id = document.getElementById('task-modal-id').value;
+    if (!id || input.files.length === 0) return;
+    
+    const formData = new FormData();
+    formData.append('action', 'add_attachment');
+    formData.append('task_id', id);
+    formData.append('file', input.files[0]);
+    
+    const btn = input.previousElementSibling;
+    const oldText = btn.innerText;
+    btn.innerText = 'Uploading...';
+    btn.disabled = true;
+    
+    try {
+        const res = await fetch('api/tasks.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (res.ok) {
+            openTaskModal(id);
+        } else {
+            alert('Upload failed');
+        }
+    } catch(e) {
+        console.error(e);
+        alert('Upload completely failed.');
+    } finally {
+        input.value = '';
+        btn.innerText = oldText;
+        btn.disabled = false;
     }
 }
 

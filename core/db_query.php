@@ -715,6 +715,47 @@ class DBQueries {
         }
     }
 
+    // --- ATTACHMENTS ---
+    public function getTaskAttachments($taskId) {
+        $stmt = $this->pdo->prepare("
+            SELECT * FROM task_attachments 
+            WHERE task_id = :task_id 
+            ORDER BY created_at DESC
+        ");
+        $stmt->bindValue(':task_id', (int)$taskId, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function createTaskAttachment($taskId, $userId, $fileName, $filePath, $fileType) {
+        $stmt = $this->pdo->prepare("
+            INSERT INTO task_attachments (task_id, user_id, file_name, file_path, file_type) 
+            VALUES (:task_id, :user_id, :file_name, :file_path, :file_type)
+        ");
+        $stmt->bindValue(':task_id', (int)$taskId, PDO::PARAM_INT);
+        $stmt->bindValue(':user_id', (int)$userId, PDO::PARAM_INT);
+        $stmt->bindValue(':file_name', $fileName, PDO::PARAM_STR);
+        $stmt->bindValue(':file_path', $filePath, PDO::PARAM_STR);
+        $stmt->bindValue(':file_type', $fileType, PDO::PARAM_STR);
+        $stmt->execute();
+        return $this->pdo->lastInsertId();
+    }
+
+    public function deleteTaskAttachment($attachmentId) {
+        $stmt = $this->pdo->prepare("SELECT file_path FROM task_attachments WHERE id = :id");
+        $stmt->execute([':id' => $attachmentId]);
+        $attachment = $stmt->fetch();
+        if ($attachment) {
+            $fullPath = __DIR__ . '/../' . $attachment['file_path'];
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+            $del = $this->pdo->prepare("DELETE FROM task_attachments WHERE id = :id");
+            return $del->execute([':id' => $attachmentId]);
+        }
+        return false;
+    }
+
     // --- COMMENTS ---
     public function getCommentsByTaskId($taskId) {
         $stmt = $this->pdo->prepare("
