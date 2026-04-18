@@ -123,31 +123,36 @@ async function loadProjectBoard(projectId) {
 
         document.getElementById('project-title').textContent = project.name;
         document.getElementById('project-status').textContent = project.status.toUpperCase();
+        window.currentUserProjectRole = project.user_role || 'viewer';
         
-        // Render project members
+        // Render project default notify members setup
         const projectMembersDiv = document.getElementById('project-members');
         if (projectMembersDiv) {
             projectMembersDiv.innerHTML = '';
-            if (project.member_names) {
-                const names = project.member_names.split(',');
-                const ids = project.member_ids.split(',');
+            if (project.default_notify_names) {
+                const names = project.default_notify_names.split(',');
+                const ids = project.default_notify_ids;
                 
-                // Keep track of current project members for the dropdown
+                // Keep track of current project default notify members for the dropdown
                 window.currentProjectMemberIds = ids.map(id => parseInt(id));
                 
+                const cursorClass = (window.currentUserProjectRole === 'viewer') ? 'cursor-default opacity-80' : 'cursor-pointer hover:bg-slate-200 transition-colors';
+
                 names.slice(0, 5).forEach(n => {
                     const initial = n.trim().charAt(0).toUpperCase();
-                    projectMembersDiv.innerHTML += `<div class="w-8 h-8 rounded-full bg-teal-100 border-2 border-white cursor-pointer text-teal-700 text-sm font-bold flex items-center justify-center shadow-sm" title="${n}" onclick="toggleProjectMemberDropdown(event)">${initial}</div>`;
+                    projectMembersDiv.innerHTML += `<div class="w-8 h-8 rounded-full bg-teal-100 border-2 border-white ${cursorClass} text-teal-700 text-sm font-bold flex items-center justify-center shadow-sm" title="${n}" onclick="toggleProjectMemberDropdown(event)">${initial}</div>`;
                 });
                 if (names.length > 5) {
-                    projectMembersDiv.innerHTML += `<div class="w-8 h-8 rounded-full bg-slate-100 border-2 border-white cursor-pointer text-slate-500 text-xs font-bold flex items-center justify-center shadow-sm" onclick="toggleProjectMemberDropdown(event)">+${names.length - 5}</div>`;
+                    projectMembersDiv.innerHTML += `<div class="w-8 h-8 rounded-full bg-slate-100 border-2 border-white ${cursorClass} text-slate-500 text-xs font-bold flex items-center justify-center shadow-sm" onclick="toggleProjectMemberDropdown(event)">+${names.length - 5}</div>`;
                 }
             } else {
                 window.currentProjectMemberIds = [];
+                const cursorClass = (window.currentUserProjectRole === 'viewer') ? 'cursor-default opacity-80' : 'cursor-pointer hover:bg-slate-200 transition-colors';
+
                 // Empty state avatar
                 projectMembersDiv.innerHTML = `
-                    <div class="w-8 h-8 rounded-full bg-slate-100 border-2 border-white cursor-pointer hover:bg-slate-200 transition-colors flex items-center justify-center text-slate-400 group shadow-sm" onclick="toggleProjectMemberDropdown(event)" title="Add Member">
-                        <svg class="w-4 h-4 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    <div class="w-8 h-8 rounded-full bg-slate-100 border-2 border-white ${cursorClass} flex items-center justify-center text-slate-400 group shadow-sm" onclick="toggleProjectMemberDropdown(event)" title="Manage Default Notifications">
+                        <svg class="w-4 h-4 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
                     </div>
                 `;
             }
@@ -203,11 +208,11 @@ async function loadProjectBoard(projectId) {
                 tbody.dataset.sectionId = section.id;
 
                 const secTr = document.createElement('tr');
-                secTr.className = 'bg-slate-50/80 border-b border-slate-200/60 sticky top-0 z-10 cursor-pointer hover:bg-slate-100 transition-colors section-header';
+                secTr.className = 'bg-slate-50/80 border-b border-slate-200/60 cursor-pointer hover:bg-slate-100 transition-colors section-header';
                 secTr.onclick = (e) => toggleListSection(tbody, secTr);
                 secTr.innerHTML = `
                     <td colspan="4" class="p-0">
-                        <div class="px-4 py-2 font-semibold text-slate-700 text-sm flex items-center justify-between group">
+                        <div class="sticky top-0 z-10 bg-slate-50/80 px-4 py-2 font-semibold text-slate-700 text-sm flex items-center justify-between group">
                             <div class="flex items-center">
                                 <svg class="w-4 h-4 mr-2 text-slate-400 transform transition-transform section-toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                 <span class="hover:underline cursor-text" onclick="event.stopPropagation(); promptEditSection(${section.id}, '${section.name.replace(/'/g, "\\'")}')" title="Click to rename">${section.name}</span>

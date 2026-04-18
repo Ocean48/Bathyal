@@ -27,9 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Optional: Create a new team if provided
             $teamId = null;
             if ($teamName) {
-                $stmt = $pdo->prepare("INSERT INTO teams (name) VALUES (:name)");
-                $stmt->execute([':name' => $teamName]);
-                $teamId = $pdo->lastInsertId();
+                $teamId = $db->createTeam($teamName);
             } else {
                 // For this demo context, assign to Ocean48 if no team is created so they have data
                 $teamId = 1; 

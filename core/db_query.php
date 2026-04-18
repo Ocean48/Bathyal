@@ -250,6 +250,160 @@ class DBQueries {
         return $stmt->execute();
     }
 
+    // --- NEW DB QUERIES ---
+
+    public function getProjectDefaultNotifyIds($projectId) {
+        $stmtNotify = $this->pdo->prepare("SELECT user_id FROM project_default_notify WHERE project_id = :pid");
+        $stmtNotify->execute(['pid' => (int)$projectId]);
+        return $stmtNotify->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    public function getProjectDefaultNotifyNames($projectId) {
+        $stmtNotifyInfo = $this->pdo->prepare("SELECT GROUP_CONCAT(u.name SEPARATOR ',') as names FROM project_default_notify pdn JOIN users u ON pdn.user_id = u.id WHERE pdn.project_id = :pid");
+        $stmtNotifyInfo->execute(['pid' => (int)$projectId]);
+        return $stmtNotifyInfo->fetchColumn();
+    }
+
+    public function updateProjectDefaultNotify($projectId, $memberIds) {
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare("DELETE FROM project_default_notify WHERE project_id = :pid");
+            $stmt->execute(['pid' => (int)$projectId]);
+
+            if (!empty($memberIds)) {
+                $memberIds = array_unique(array_filter($memberIds, function($id) { return (int)$id > 0; }));
+                $insertStmt = $this->pdo->prepare("INSERT INTO project_default_notify (project_id, user_id) VALUES (:pid, :uid)");
+                foreach ($memberIds as $uid) {
+                    $insertStmt->execute(['pid' => (int)$projectId, 'uid' => (int)$uid]);
+                }
+            }
+            $this->pdo->commit();
+            return true;
+        } catch (\PDOException $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public function getProjectMemberRole($projectId, $userId) {
+        $stmt = $this->pdo->prepare("SELECT role FROM project_members WHERE project_id = :pid AND user_id = :uid");
+        $stmt->execute(['pid' => (int)$projectId, 'uid' => (int)$userId]);
+        return $stmt->fetchColumn();
+    }
+
+    public function updateProjectMemberRole($projectId, $userId, $role) {
+        $stmt = $this->pdo->prepare("UPDATE project_members SET role = :role WHERE project_id = :pid AND user_id = :uid");
+        return $stmt->execute(['role' => $role, 'pid' => (int)$projectId, 'uid' => (int)$userId]);
+    }
+
+    public function removeProjectMember($projectId, $userId) {
+        $stmt = $this->pdo->prepare("DELETE FROM project_members WHERE project_id = :pid AND user_id = :uid");
+        return $stmt->execute(['pid' => (int)$projectId, 'uid' => (int)$userId]);
+    }
+
+    public function addProjectMember($projectId, $userId, $role) {
+        $stmtCheck = $this->pdo->prepare("SELECT 1 FROM project_members WHERE project_id = :pid AND user_id = :uid");
+        $stmtCheck->execute(['pid' => (int)$projectId, 'uid' => (int)$userId]);
+        if (!$stmtCheck->fetchColumn()) {
+            $stmt = $this->pdo->prepare("INSERT INTO project_members (project_id, user_id, role) VALUES (:pid, :uid, :role)");
+            return $stmt->execute(['pid' => (int)$projectId, 'uid' => (int)$userId, 'role' => $role]);
+        }
+        return false;
+    }
+
+    public function getProjectByIdAndTeamId($projectId, $teamId) {
+        $stmt = $this->pdo->prepare("SELECT * FROM projects WHERE id = :id AND team_id = :tid");
+        $stmt->execute(['id' => (int)$projectId, 'tid' => (int)$teamId]);
+        return $stmt->fetch();
+    }
+
+    public function getProjectMembersWithRoles($projectId) {
+        $stmt = $this->pdo->prepare("
+            SELECT u.id, u.name, u.email, pm.role 
+            FROM project_members pm
+            JOIN users u ON pm.user_id = u.id
+            WHERE pm.project_id = :pid
+        ");
+        $stmt->execute(['pid' => (int)$projectId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getAvailableUsersForProject($teamId, $memberIds) {
+        $placeholders = count($memberIds) > 0 ? implode(',', array_fill(0, count($memberIds), '?')) : '0';
+        $query = "SELECT id, name, email FROM users WHERE team_id = ? AND id NOT IN ($placeholders) ORDER BY name ASC";
+        $params = array_merge([(int)$teamId], count($memberIds) > 0 ? $memberIds : []);
+
+        $stmt = $this->pdo->prepare($query);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    public function updateSection($sectionId, $name) {
+        $stmt = $this->pdo->prepare("UPDATE sections SET name = :name WHERE id = :sid");
+        return $stmt->execute(['name' => $name, 'sid' => (int)$sectionId]);
+    }
+
+    public function deleteSection($sectionId) {
+        $stmt = $this->pdo->prepare("DELETE FROM sections WHERE id = :sid");
+        return $stmt->execute(['sid' => (int)$sectionId]);
+    }
+
+    public function reorderSections($sectionIds) {
+        if (is_array($sectionIds) && count($sectionIds) > 0) {
+            $stmt = $this->pdo->prepare("UPDATE sections SET position = :pos WHERE id = :sid");
+            foreach ($sectionIds as $index => $sid) {
+                $stmt->execute(['pos' => $index + 1, 'sid' => (int)$sid]);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public function getNextSectionPosition($projectId) {
+        $stmtPos = $this->pdo->prepare("SELECT IFNULL(MAX(position), 0) + 1 FROM sections WHERE project_id = :pid");
+        $stmtPos->execute(['pid' => (int)$projectId]);
+        return (int)$stmtPos->fetchColumn();
+    }
+
+    public function searchUsers($search, $projectId = null) {
+        if ($projectId) {
+            $sql = "SELECT u.id, u.name, u.email FROM users u 
+                    INNER JOIN project_members pm ON pm.user_id = u.id 
+                    WHERE pm.project_id = :project_id";
+            $params = [':project_id' => (int)$projectId];
+            
+            if ($search !== '') {
+                $sql .= " AND (u.name LIKE :search OR u.email LIKE :search)";
+                $params[':search'] = "%$search%";
+            }
+            $sql .= " ORDER BY u.name ASC LIMIT 20";
+            
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $sql = "SELECT id, name, email FROM users";
+            $params = [];
+
+            if ($search !== '') {
+                $sql .= " WHERE name LIKE ? OR email LIKE ?";
+                $params[] = "%$search%";
+                $params[] = "%$search%";
+            }
+            $sql .= " ORDER BY name ASC LIMIT 20";
+
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    }
+
+    public function createTeam($name) {
+        $stmt = $this->pdo->prepare("INSERT INTO teams (name) VALUES (:name)");
+        $stmt->execute(['name' => $name]);
+        return $this->pdo->lastInsertId();
+    }
+
     public function reorderTasks($sectionId, $taskIds, $parentTaskId = null, $draggedTaskId = null) {
         if (!empty($draggedTaskId)) {
             // List view drag & drop

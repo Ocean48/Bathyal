@@ -2,8 +2,11 @@
 // /api/sections.php
 require_once '../core/database.php';
 require_once '../core/auth_check.php';
+require_once '../core/db_query.php';
 
 header('Content-Type: application/json');
+
+$db = new DBQueries($pdo);
 
 $input = json_decode(file_get_contents('php://input'), true);
 
@@ -24,15 +27,11 @@ try {
             throw new Exception("Project ID and Section Name are required.");
         }
 
-        // Determine next position
-        $stmtPos = $pdo->prepare("SELECT IFNULL(MAX(position), 0) + 1 FROM sections WHERE project_id = :pid");
-        $stmtPos->execute(['pid' => $projectId]);
-        $nextPos = $stmtPos->fetchColumn();
+        // Determine next position using DBQueries inside
+        $nextPos = $db->getNextSectionPosition($projectId);
+        $sectionId = $db->createSection($projectId, $name, $nextPos);
 
-        $stmt = $pdo->prepare("INSERT INTO sections (project_id, name, position) VALUES (:pid, :name, :pos)");
-        $stmt->execute(['pid' => $projectId, 'name' => $name, 'pos' => $nextPos]);
-
-        echo json_encode(['success' => true, 'section_id' => $pdo->lastInsertId()]);
+        echo json_encode(['success' => true, 'section_id' => $sectionId]);
         exit;
     }
 
@@ -44,8 +43,7 @@ try {
             throw new Exception("Section ID and new Name are required.");
         }
 
-        $stmt = $pdo->prepare("UPDATE sections SET name = :name WHERE id = :sid");
-        $stmt->execute(['name' => $name, 'sid' => $sectionId]);
+        $db->updateSection($sectionId, $name);
 
         echo json_encode(['success' => true]);
         exit;
@@ -58,8 +56,7 @@ try {
             throw new Exception("Section ID is required.");
         }
 
-        $stmt = $pdo->prepare("DELETE FROM sections WHERE id = :sid");
-        $stmt->execute(['sid' => $sectionId]);
+        $db->deleteSection($sectionId);
 
         echo json_encode(['success' => true]);
         exit;
@@ -68,12 +65,7 @@ try {
     if ($action === 'reorder') {
         $sectionIds = $input['section_ids'] ?? [];
         
-        if (is_array($sectionIds) && count($sectionIds) > 0) {
-            $stmt = $pdo->prepare("UPDATE sections SET position = :pos WHERE id = :sid");
-            foreach ($sectionIds as $index => $sid) {
-                $stmt->execute(['pos' => $index + 1, 'sid' => (int)$sid]);
-            }
-        }
+        $db->reorderSections($sectionIds);
         
         echo json_encode(['success' => true]);
         exit;
@@ -86,3 +78,4 @@ try {
     echo json_encode(['error' => $e->getMessage()]);
     exit;
 }
+

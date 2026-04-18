@@ -3,6 +3,7 @@
 
 require_once 'core/database.php';
 require_once 'core/auth_check.php';
+require_once 'core/db_query.php';
 
 $projectId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
@@ -13,9 +14,7 @@ if (!$projectId) {
 $db = new DBQueries($pdo);
 
 // Get current user's role in this project
-$stmt = $pdo->prepare("SELECT role FROM project_members WHERE project_id = :pid AND user_id = :uid");
-$stmt->execute(['pid' => $projectId, 'uid' => $currentUser['id']]);
-$userProjectRole = $stmt->fetchColumn() ?: 'viewer'; // Default to viewer if not in project (e.g. system admin observing)
+$userProjectRole = $db->getProjectMemberRole($projectId, $currentUser['id']) ?: 'viewer'; // Default to viewer if not in project (e.g. system admin observing)
 
 // Handle POST requests for settings updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -35,9 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $canUpdate = true;
             } elseif ($userProjectRole === 'member') {
                 // Check current role of target user
-                $stmtCheck = $pdo->prepare("SELECT role FROM project_members WHERE project_id = :pid AND user_id = :uid");
-                $stmtCheck->execute(['pid' => $projectId, 'uid' => $targetUserId]);
-                $targetRole = $stmtCheck->fetchColumn();
+                $targetRole = $db->getProjectMemberRole($projectId, $targetUserId);
                 
                 if ($targetRole !== 'manager') {
                     $canUpdate = true;
@@ -45,8 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($canUpdate) {
-                $stmt = $pdo->prepare("UPDATE project_members SET role = :role WHERE project_id = :pid AND user_id = :uid");
-                $stmt->execute(['role' => $newRole, 'pid' => $projectId, 'uid' => $targetUserId]);
+                $db->updateProjectMemberRole($projectId, $targetUserId, $newRole);
             }
         } elseif ($_POST['action'] === 'remove_member') {
             $targetUserId = (int)$_POST['user_id'];
@@ -56,9 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($userProjectRole === 'manager') {
                 $canRemove = true;
             } elseif ($userProjectRole === 'member') {
-                $stmtCheck = $pdo->prepare("SELECT role FROM project_members WHERE project_id = :pid AND user_id = :uid");
-                $stmtCheck->execute(['pid' => $projectId, 'uid' => $targetUserId]);
-                $targetRole = $stmtCheck->fetchColumn();
+                $targetRole = $db->getProjectMemberRole($projectId, $targetUserId);
                 
                 if ($targetRole !== 'manager') {
                     $canRemove = true;
@@ -66,8 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($canRemove) {
-                $stmt = $pdo->prepare("DELETE FROM project_members WHERE project_id = :pid AND user_id = :uid");
-                $stmt->execute(['pid' => $projectId, 'uid' => $targetUserId]);
+                $db->removeProjectMember($projectId, $targetUserId);
             }
         } elseif ($_POST['action'] === 'add_member') {
             $newUserId = (int)$_POST['user_id'];
@@ -80,12 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 // Add member if not already exists
-                $stmtCheck = $pdo->prepare("SELECT 1 FROM project_members WHERE project_id = :pid AND user_id = :uid");
-                $stmtCheck->execute(['pid' => $projectId, 'uid' => $newUserId]);
-                if (!$stmtCheck->fetchColumn()) {
-                    $stmt = $pdo->prepare("INSERT INTO project_members (project_id, user_id, role) VALUES (:pid, :uid, :role)");
-                    $stmt->execute(['pid' => $projectId, 'uid' => $newUserId, 'role' => $newRole]);
-                }
+                $db->addProjectMember($projectId, $newUserId, $newRole);
             }
         }
         
@@ -97,34 +85,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Fetch Project basics
-$stmt = $pdo->prepare("SELECT * FROM projects WHERE id = :id AND team_id = :tid");
-$stmt->execute(['id' => $projectId, 'tid' => $currentUser['team_id']]);
-$project = $stmt->fetch();
+$project = $db->getProjectByIdAndTeamId($projectId, $currentUser['team_id']);
 
 if (!$project) {
     die("<div style='padding:20px; font-family:sans-serif; color:red;'>Project not found or access denied. <a href='/bathyal'>Go back</a></div>");
 }
 
 // Fetch project members for settings UI
-$stmt = $pdo->prepare("
-    SELECT u.id, u.name, u.email, pm.role 
-    FROM project_members pm
-    JOIN users u ON pm.user_id = u.id
-    WHERE pm.project_id = :pid
-");
-$stmt->execute(['pid' => $projectId]);
-$members = $stmt->fetchAll();
+$members = $db->getProjectMembersWithRoles($projectId);
 $memberIds = array_column($members, 'id');
 
 // Fetch potential members (users not yet in this project)
 // Ensure they belong to the same team to maintain privacy boundaries.
-$placeholders = count($memberIds) > 0 ? implode(',', array_fill(0, count($memberIds), '?')) : '0';
-$query = "SELECT id, name, email FROM users WHERE team_id = ? AND id NOT IN ($placeholders) ORDER BY name ASC";
-$params = array_merge([$currentUser['team_id']], count($memberIds) > 0 ? $memberIds : []);
-
-$stmt = $pdo->prepare($query);
-$stmt->execute($params);
-$availableUsers = $stmt->fetchAll();
+$availableUsers = $db->getAvailableUsersForProject($currentUser['team_id'], $memberIds);
 
 require_once 'views/layouts/header.php';
 ?>

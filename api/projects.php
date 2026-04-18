@@ -2,6 +2,7 @@
 // /api/projects.php
 
 require_once '../core/database.php';
+require_once '../core/auth_check.php';
 require_once '../core/db_query.php';
 
 header('Content-Type: application/json');
@@ -41,6 +42,14 @@ if ($method === 'GET') {
 
         $project['sections'] = $sections;
 
+        // Fetch Default Notify Users
+        $project['default_notify_ids'] = $db->getProjectDefaultNotifyIds($projectId);
+        $project['default_notify_names'] = $db->getProjectDefaultNotifyNames($projectId);
+
+        // Fetch the current user's role in this project
+        // So the frontend can selectively hide/show management UI features
+        $project['user_role'] = $db->getProjectMemberRole($projectId, $currentUser['id']) ?: 'viewer';
+
         echo json_encode($project);
     } catch (\PDOException $e) {
         http_response_code(500);
@@ -65,32 +74,18 @@ if ($method === 'GET') {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
-    } elseif ($data['action'] === 'update_members') {
-        try {
-            $memberIds = isset($data['member_ids']) ? $data['member_ids'] : [];
-            
-            // For now, let's just make everyone 'member' role initially. 
-            // The request could optionally send roles, but we'll default to 'member'.
-            
-            $pdo->beginTransaction();
-            // Delete old members
-            $stmt = $pdo->prepare("DELETE FROM project_members WHERE project_id = :pid");
-            $stmt->execute(['pid' => $projectId]);
-
-            // Insert new ones
-            if (!empty($memberIds)) {
-                // Ensure unique IDs
-                $memberIds = array_unique(array_filter($memberIds, function($id) { return (int)$id > 0; }));
-                $insertStmt = $pdo->prepare("INSERT INTO project_members (project_id, user_id, role) VALUES (:pid, :uid, 'member')");
-                foreach ($memberIds as $uid) {
-                    $insertStmt->execute(['pid' => $projectId, 'uid' => (int)$uid]);
-                }
+    } elseif ($data['action'] === 'update_default_notify') {
+        try {            // Verify permission
+            $role = $db->getProjectMemberRole($projectId, $currentUser['id']);
+            if ($role !== 'manager' && $role !== 'member') {
+                http_response_code(403);
+                echo json_encode(['status' => 'error', 'message' => 'Permission denied']);
+                exit;
             }
-            $pdo->commit();
-            
+            $memberIds = isset($data['member_ids']) ? $data['member_ids'] : [];
+            $db->updateProjectDefaultNotify($projectId, $memberIds);
             echo json_encode(['status' => 'success']);
         } catch (\PDOException $e) {
-            $pdo->rollBack();
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }

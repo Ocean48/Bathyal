@@ -39,6 +39,14 @@ CREATE TABLE project_members (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE project_default_notify (
+    project_id INT NOT NULL,
+    user_id INT NOT NULL,
+    PRIMARY KEY (project_id, user_id),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE sections (
     id INT AUTO_INCREMENT PRIMARY KEY,
     project_id INT NOT NULL,

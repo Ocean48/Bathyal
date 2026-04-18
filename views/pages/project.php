@@ -19,8 +19,8 @@ require_once 'views/layouts/header.php';
             <span class="ml-3 px-2.5 py-0.5 rounded-full bg-slate-100 text-xs font-medium text-slate-600" id="project-status">--</span>
         </div>
         <div class="flex space-x-3 items-center relative">
-            <div class="flex -space-x-2 mr-4 cursor-pointer hover:opacity-80 transition-opacity" id="project-members" onclick="toggleProjectMemberDropdown(event)" title="Manage Project Members">
-                <!-- Avatars will be injected here -->
+            <div class="flex -space-x-2 mr-4 transition-colors" id="project-members" title="Manage Default Notifications">
+                <!-- Avatars will be injected here by app.js based on role -->
                 <div class="w-8 h-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-slate-400">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                 </div>
@@ -32,7 +32,7 @@ require_once 'views/layouts/header.php';
                     <input type="text" id="project-member-search" oninput="searchProjectMembers(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search people by name or email..." onclick="event.stopPropagation()">
                 </div>
                 <ul id="project-member-dropdown-list" class="overflow-y-auto flex-1 p-1 text-sm text-slate-600">
-                    <!-- Global users injected here -->
+                    <!-- Project-added users injected here -->
                 </ul>
             </div>
 
@@ -532,22 +532,28 @@ async function submitTaskComment() {
 
 // Global list of all available users cached
 window.allUsersCache = [];
+window.allProjectUsersCache = [];
 window.currentProjectMemberIds = [];
 
 // ==========================================
 // Project Member Assignment UI
 // ==========================================
 async function toggleProjectMemberDropdown(event) {
+    if (window.currentUserProjectRole === 'viewer') {
+        alert('You must be a manager or member of this project to edit default notifications.');
+        return;
+    }
+
     const dropdown = document.getElementById('project-member-dropdown');
     
     if (dropdown.classList.contains('hidden')) {
         dropdown.classList.remove('hidden');
         dropdown.classList.add('flex');
         
-        if (window.allUsersCache.length === 0) {
+        if (window.allProjectUsersCache.length === 0) {
             await searchProjectMembers('');
         } else {
-            renderProjectMemberList(window.allUsersCache);
+            renderProjectMemberList(window.allProjectUsersCache);
         }
         
         setTimeout(() => document.getElementById('project-member-search').focus(), 50);
@@ -568,11 +574,11 @@ async function toggleProjectMemberDropdown(event) {
 
 async function searchProjectMembers(query) {
     try {
-        const res = await fetch(`api/users.php?search=${encodeURIComponent(query)}`);
+        const res = await fetch(`api/users.php?project_id=${currentProjectId}&search=${encodeURIComponent(query)}`);
         const users = await res.json();
         
         if (query === '') {
-            window.allUsersCache = users;
+            window.allProjectUsersCache = users;
         }
         window.lastSearchedProjectUsers = users;
         renderProjectMemberList(users);
@@ -626,13 +632,13 @@ async function toggleProjectMemberAssignment(userId) {
         window.currentProjectMemberIds.splice(index, 1);
     }
     
-    renderProjectMemberList(document.getElementById('project-member-search').value ? window.lastSearchedProjectUsers : window.allUsersCache);
+    renderProjectMemberList(document.getElementById('project-member-search').value ? window.lastSearchedProjectUsers : window.allProjectUsersCache);
     
     try {
         await fetch('api/projects.php', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ action: 'update_members', project_id: currentProjectId, member_ids: window.currentProjectMemberIds })
+            body: JSON.stringify({ action: 'update_default_notify', project_id: currentProjectId, member_ids: window.currentProjectMemberIds })
         });
         
         // Soft refresh the project members stack without jittering the UI
@@ -643,8 +649,8 @@ async function toggleProjectMemberAssignment(userId) {
             const projectMembersDiv = document.getElementById('project-members');
             if (projectMembersDiv) {
                 projectMembersDiv.innerHTML = '';
-                if (project.member_names) {
-                    const names = project.member_names.split(',');
+                if (project.default_notify_names) {
+                    const names = project.default_notify_names.split(',');
                     names.slice(0, 5).forEach(n => {
                         const initial = n.trim().charAt(0).toUpperCase();
                         projectMembersDiv.innerHTML += `<div class="w-8 h-8 rounded-full bg-teal-100 border-2 border-white cursor-pointer text-teal-700 text-sm font-bold flex items-center justify-center shadow-sm" title="${n}" onclick="toggleProjectMemberDropdown(event)">${initial}</div>`;
@@ -654,8 +660,8 @@ async function toggleProjectMemberAssignment(userId) {
                     }
                 } else {
                     projectMembersDiv.innerHTML = `
-                        <div class="w-8 h-8 rounded-full bg-slate-100 border-2 border-white cursor-pointer hover:bg-slate-200 transition-colors flex items-center justify-center text-slate-400 group shadow-sm" onclick="toggleProjectMemberDropdown(event)" title="Add Member">
-                            <svg class="w-4 h-4 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        <div class="w-8 h-8 rounded-full bg-slate-100 border-2 border-white cursor-pointer hover:bg-slate-200 transition-colors flex items-center justify-center text-slate-400 group shadow-sm" onclick="toggleProjectMemberDropdown(event)" title="Add Default Notify User">
+                            <svg class="w-4 h-4 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
                         </div>
                     `;
                 }

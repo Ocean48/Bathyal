@@ -1,21 +1,16 @@
 <?php
 require_once '../core/database.php';
+require_once '../core/db_query.php';
+
 header('Content-Type: application/json');
 
+$db = new DBQueries($pdo);
+
 $search = $_GET['search'] ?? '';
+$projectId = $_GET['project_id'] ?? null;
 
-$sql = "SELECT id, name, email FROM users";
-$params = [];
-
-if ($search !== '') {
-    $sql .= " WHERE name LIKE ? OR email LIKE ?";
-    $params[] = "%$search%";
-    $params[] = "%$search%";
-}
-$sql .= " ORDER BY name ASC LIMIT 20";
-
-$stmt = $pdo->prepare($sql);
-$stmt->execute($params);
-$users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$users = $db->searchUsers($search, $projectId);
 
 echo json_encode($users);
+
+
