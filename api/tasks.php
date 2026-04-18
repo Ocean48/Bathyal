@@ -21,6 +21,10 @@ switch ($method) {
                 // Fetch subtasks strictly bound to this id
                 $task['subtasks'] = $db->getTaskSubtasks($taskId);
 
+                // Fetch time log status
+                $userId = 1; // Mock user ID for now
+                $task['time_log_status'] = $db->getTaskTimeLogStatus($taskId, $userId);
+
                 echo json_encode($task);
             } else {
                 http_response_code(404);
@@ -87,6 +91,10 @@ switch ($method) {
                     http_response_code(500);
                     echo json_encode(['status' => 'error', 'message' => 'Failed to reorder tasks']);
                 }
+            } elseif ($data['action'] === 'toggle_time_track') {
+                $userId = 1; // Mock user ID
+                $result = $db->toggleTaskTimeTrack($data['task_id'], $userId);
+                echo json_encode(['status' => 'success', 'action' => $result['action']]);
             }
         } else { // Create task
             $taskId = $db->createTask($data);

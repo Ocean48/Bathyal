@@ -153,16 +153,15 @@ require_once 'views/layouts/header.php';
         <!-- Modal Header -->
         <div class="flex justify-between items-center px-6 py-4 border-b border-slate-200">
             <div class="flex space-x-3 items-center">
-                <button class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded text-sm font-medium shadow-sm flex items-center transition-colors" onclick="toggleProgress(this)">
+                <button id="btn-start-progress" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded text-sm font-medium shadow-sm flex items-center transition-colors" onclick="toggleProgress()">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Start Progress
+                    <span>Start Progress</span>
                 </button>
-                <div class="text-sm font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded" id="time-tracker-display">00:00:00</div>
+                <div class="text-sm font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded" id="timer-display">00:00:00</div>
             </div>
             <div class="flex items-center space-x-4 text-slate-500">
-                <button class="hover:text-slate-800" title="Attach to another project" onclick="attachToProject()"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg></button>
-                <button class="hover:text-slate-800" title="Options" onclick="showTaskOptions()"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg></button>
-                <button class="hover:text-red-500" onclick="closeTaskModal()"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button class="hover:text-slate-800" title="Copy Task Link" onclick="copyTaskLink()"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg></button>
+                <button class="hover:text-red-500" title="Close" onclick="closeTaskModal()"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
         </div>
         
@@ -469,6 +468,50 @@ async function openTaskModal(taskId) {
                     </div>
                 `;
             });
+        }
+        
+        // Handle Time Tracker
+        if (task.time_log_status) {
+            const btn = document.getElementById('btn-start-progress');
+            const span = btn.querySelector('span');
+            const display = document.getElementById('timer-display');
+            
+            stopTimer(false); // Stop current interval if any
+            
+            let totalSecs = task.time_log_status.total_tracked_seconds || 0;
+            if (task.time_log_status.is_running) {
+                // Calculate elapsed since running_since
+                const start = new Date(task.time_log_status.running_since.replace(/-/g, '/'));
+                const now = new Date();
+                const diff = Math.floor((now - start) / 1000);
+                timerSeconds = totalSecs + (diff > 0 ? diff : 0);
+                
+                isProgressRunning = true;
+                btn.classList.replace('bg-emerald-500', 'bg-amber-500');
+                btn.classList.replace('hover:bg-emerald-600', 'hover:bg-amber-600');
+                span.innerText = "Pause Progress";
+                
+                timerInterval = setInterval(() => {
+                    timerSeconds++;
+                    const h = String(Math.floor(timerSeconds / 3600)).padStart(2, '0');
+                    const m = String(Math.floor((timerSeconds % 3600) / 60)).padStart(2, '0');
+                    const s = String(timerSeconds % 60).padStart(2, '0');
+                    display.innerText = `${h}:${m}:${s}`;
+                }, 1000);
+            } else {
+                timerSeconds = totalSecs;
+                
+                // Also update display immediately to avoiding waiting 1 second
+                const h = String(Math.floor(timerSeconds / 3600)).padStart(2, '0');
+                const m = String(Math.floor((timerSeconds % 3600) / 60)).padStart(2, '0');
+                const s = String(timerSeconds % 60).padStart(2, '0');
+                display.innerText = `${h}:${m}:${s}`;
+                
+                isProgressRunning = false;
+                btn.classList.replace('bg-amber-500', 'bg-emerald-500');
+                btn.classList.replace('hover:bg-amber-600', 'hover:bg-emerald-600');
+                span.innerText = "Start Progress";
+            }
         }
         
         modal.classList.remove('hidden');
@@ -814,31 +857,37 @@ async function toggleUserAssignment(userId) {
 
 function closeTaskModal() {
     document.getElementById('task-modal').classList.add('hidden');
+    stopTimer(true); // Stop timer on close
+}
+
+function copyTaskLink() {
+    const taskId = document.getElementById('task-modal-id').value;
+    if (!taskId) return;
+    const url = window.location.origin + window.location.pathname + '?id=' + currentProjectId + '&task_id=' + taskId;
+    navigator.clipboard.writeText(url).then(() => {
+        showAlert('Link Copied', 'Task link copied to your clipboard.', 'success');
+    }).catch(() => {
+        showAlert('Error', 'Failed to copy link.', 'danger');
+    });
 }
 
 function toggleProgress() {
-    isProgressRunning = !isProgressRunning;
-    const btn = document.getElementById('btn-start-progress');
-    const span = btn.querySelector('span');
-    
-    if (isProgressRunning) {
-        btn.classList.replace('bg-emerald-500', 'bg-amber-500');
-        btn.classList.replace('hover:bg-emerald-600', 'hover:bg-amber-600');
-        span.innerText = "Pause Progress";
-        
-        timerInterval = setInterval(() => {
-            timerSeconds++;
-            const h = String(Math.floor(timerSeconds / 3600)).padStart(2, '0');
-            const m = String(Math.floor((timerSeconds % 3600) / 60)).padStart(2, '0');
-            const s = String(timerSeconds % 60).padStart(2, '0');
-            document.getElementById('timer-display').innerText = `${h}:${m}:${s}`;
-        }, 1000);
-    } else {
-        btn.classList.replace('bg-amber-500', 'bg-emerald-500');
-        btn.classList.replace('hover:bg-amber-600', 'hover:bg-emerald-600');
-        span.innerText = "Start Progress";
-        clearInterval(timerInterval);
-    }
+    const taskId = document.getElementById('task-modal-id').value;
+    if (!taskId) return;
+
+    fetch('api/tasks.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ action: 'toggle_time_track', task_id: taskId })
+    }).then(res => res.json())
+      .then(data => {
+          if (data.status === 'success') {
+              // Refresh the modal to sync state from database
+              openTaskModal(taskId);
+          } else {
+              alert('Failed to toggle time track');
+          }
+      });
 }
 
 function stopTimer(reset = false) {

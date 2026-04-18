@@ -671,6 +671,50 @@ class DBQueries {
         return true;
     }
 
+    public function getTaskTimeLogStatus($taskId, $userId) {
+        $stmtRunning = $this->pdo->prepare("
+            SELECT start_time FROM task_time_logs 
+            WHERE task_id = :task_id AND user_id = :user_id AND status = 'running'
+            LIMIT 1
+        ");
+        $stmtRunning->execute([':task_id' => $taskId, ':user_id' => $userId]);
+        $runningLog = $stmtRunning->fetch();
+
+        $stmtTotal = $this->pdo->prepare("
+            SELECT SUM(TIMESTAMPDIFF(SECOND, start_time, end_time)) as total_seconds 
+            FROM task_time_logs 
+            WHERE task_id = :task_id AND user_id = :user_id AND status = 'completed' AND end_time IS NOT NULL
+        ");
+        $stmtTotal->execute([':task_id' => $taskId, ':user_id' => $userId]);
+        $totalSeconds = (int)$stmtTotal->fetchColumn();
+
+        return [
+            'is_running' => !!$runningLog,
+            'running_since' => $runningLog ? $runningLog['start_time'] : null,
+            'total_tracked_seconds' => $totalSeconds
+        ];
+    }
+
+    public function toggleTaskTimeTrack($taskId, $userId) {
+        $status = $this->getTaskTimeLogStatus($taskId, $userId);
+        if ($status['is_running']) {
+            $stmt = $this->pdo->prepare("
+                UPDATE task_time_logs 
+                SET end_time = NOW(), status = 'completed' 
+                WHERE task_id = :task_id AND user_id = :user_id AND status = 'running'
+            ");
+            $stmt->execute([':task_id' => $taskId, ':user_id' => $userId]);
+            return ['action' => 'paused'];
+        } else {
+            $stmt = $this->pdo->prepare("
+                INSERT INTO task_time_logs (task_id, user_id, start_time, status) 
+                VALUES (:task_id, :user_id, NOW(), 'running')
+            ");
+            $stmt->execute([':task_id' => $taskId, ':user_id' => $userId]);
+            return ['action' => 'started'];
+        }
+    }
+
     // --- COMMENTS ---
     public function getCommentsByTaskId($taskId) {
         $stmt = $this->pdo->prepare("
