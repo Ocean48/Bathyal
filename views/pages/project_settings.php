@@ -85,9 +85,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Fetch Project basics
-$project = $db->getProjectByIdAndTeamId($projectId, $currentUser['team_id']);
+$project = $db->getProjectById($projectId);
 
-if (!$project) {
+if (!$project || !$db->getProjectMemberRole($projectId, $currentUser['id'])) {
     die("<div style='padding:20px; font-family:sans-serif; color:red;'>Project not found or access denied. <a href='/bathyal'>Go back</a></div>");
 }
 
@@ -96,7 +96,7 @@ $members = $db->getProjectMembersWithRoles($projectId);
 $memberIds = array_column($members, 'id');
 
 // Fetch potential members (users not yet in this project)
-// Ensure they belong to the same team to maintain privacy boundaries.
+// Show any user the current user has access to see (from their teams)
 $availableUsers = $db->getAvailableUsersForProject($currentUser['team_id'], $memberIds);
 
 require_once 'views/layouts/header.php';

@@ -2,7 +2,9 @@
 CREATE TABLE teams (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE users (
@@ -16,18 +18,24 @@ CREATE TABLE users (
     FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
 );
 
+CREATE TABLE team_members (
+    team_id INT NOT NULL,
+    user_id INT NOT NULL,
+    role ENUM('owner', 'admin', 'member') DEFAULT 'member',
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (team_id, user_id),
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- PROJECTS AND SECTIONS
 CREATE TABLE projects (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    team_id INT NOT NULL,
-    admin_id INT NOT NULL,
     name VARCHAR(150) NOT NULL,
     description TEXT,
     status ENUM('active', 'planning', 'completed', 'archived') DEFAULT 'active',
     cycle VARCHAR(50), -- e.g., "Q3 2026", "Sprint 4"
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
-    FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE project_members (
@@ -193,7 +201,10 @@ CREATE TABLE task_attachments (
 -- ==========================================
 
 -- Insert a Team
-INSERT INTO teams (name) VALUES ('Ocean48 Engineering');
+INSERT INTO teams (name, created_by) VALUES ('Ocean48 Engineering', 1);
+
+INSERT INTO `team_members` (`team_id`, `user_id`, `role`, `joined_at`) VALUES
+(1, 1, 'owner', '2026-04-19 21:55:10');
 
 -- Insert Users (Passwords are set to 'user123')
 INSERT INTO users (team_id, name, email, password_hash, role) VALUES 
@@ -202,10 +213,10 @@ INSERT INTO users (team_id, name, email, password_hash, role) VALUES
 (1, 'Jane Data', 'jane@ocean48.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'data_analyst');
 
 -- Insert Projects
-INSERT INTO projects (team_id, admin_id, name, description, status, cycle) VALUES 
-(1, 1, 'Website Redesign', 'Overhaul the main site with the new Ocean theme', 'active', 'Sprint 4'),
-(1, 1, 'Marketing Q3', 'Campaign planning and execution for Q3', 'planning', 'Q3 2026'),
-(1, 1, 'Ocean Conservation App', 'Build the MVP for the new app tracking cleanups', 'active', 'Sprint 5');
+INSERT INTO projects (name, description, status, cycle) VALUES 
+('Website Redesign', 'Overhaul the main site with the new Ocean theme', 'active', 'Sprint 4'),
+('Marketing Q3', 'Campaign planning and execution for Q3', 'planning', 'Q3 2026'),
+('Ocean Conservation App', 'Build the MVP for the new app tracking cleanups', 'active', 'Sprint 5');
 
 -- Insert Sections
 INSERT INTO sections (project_id, name, position) VALUES 

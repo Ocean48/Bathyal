@@ -24,24 +24,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($db->getUserByEmail($email)) {
             $error = 'Email is already registered.';
         } else {
-            // Optional: Create a new team if provided
-            $teamId = null;
-            if ($teamName) {
-                $teamId = $db->createTeam($teamName);
-            } else {
-                // For this demo context, assign to Ocean48 if no team is created so they have data
-                $teamId = 1; 
-            }
-
+            // Register user first
             $userId = $db->createUser([
                 'name' => $name,
                 'email' => $email,
                 'password_hash' => password_hash($password, PASSWORD_DEFAULT),
-                'team_id' => $teamId,
-                'role' => $teamName ? 'admin' : 'member' // make admin if they created a new team
+                'team_id' => null,
+                'role' => $teamName ? 'admin' : 'member'
             ]);
 
             if ($userId) {
+                // Team logic
+                $teamId = null;
+                if ($teamName) {
+                    $teamId = $db->createTeam($teamName, $userId);
+                } else {
+                    // Pre-existing team
+                    $teamId = 1;
+                    $db->addTeamMember($teamId, $userId, 'member');
+                }
+                
+                // Update primary team_id for backward compatibility
+                $stmt = $pdo->prepare("UPDATE users SET team_id = :tid WHERE id = :uid");
+                $stmt->execute(['tid' => $teamId, 'uid' => $userId]);
+
                 $_SESSION['user_id'] = $userId;
                 $_SESSION['team_id'] = $teamId;
                 $_SESSION['role'] = $teamName ? 'admin' : 'member';

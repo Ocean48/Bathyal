@@ -48,6 +48,10 @@ switch ($route) {
     case 'settings':
         require 'views/pages/settings.php';
         break;
+    case 'teams.php':
+    case 'teams':
+        require 'views/pages/teams.php';
+        break;
         
     default:
         http_response_code(404);

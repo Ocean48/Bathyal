@@ -327,12 +327,6 @@ class DBQueries {
         return false;
     }
 
-    public function getProjectByIdAndTeamId($projectId, $teamId) {
-        $stmt = $this->pdo->prepare("SELECT * FROM projects WHERE id = :id AND team_id = :tid");
-        $stmt->execute(['id' => (int)$projectId, 'tid' => (int)$teamId]);
-        return $stmt->fetch();
-    }
-
     public function getProjectMembersWithRoles($projectId) {
         $stmt = $this->pdo->prepare("
             SELECT u.id, u.name, u.email, pm.role 
@@ -414,10 +408,84 @@ class DBQueries {
         }
     }
 
-    public function createTeam($name) {
-        $stmt = $this->pdo->prepare("INSERT INTO teams (name) VALUES (:name)");
-        $stmt->execute(['name' => $name]);
-        return $this->pdo->lastInsertId();
+    public function createTeam($name, $userId) {
+        $stmt = $this->pdo->prepare("INSERT INTO teams (name, created_by) VALUES (:name, :created_by)");
+        $stmt->execute(['name' => $name, 'created_by' => (int)$userId]);
+        $teamId = $this->pdo->lastInsertId();
+        
+        $this->addTeamMember($teamId, $userId, 'owner');
+        
+        return $teamId;
+    }
+
+    public function deleteTeam($teamId) {
+        $stmt = $this->pdo->prepare("DELETE FROM teams WHERE id = :id");
+        return $stmt->execute(['id' => (int)$teamId]);
+    }
+
+    public function getTeamsForUser($userId, $systemRole = null) {
+        if ($systemRole === 'admin' || $systemRole === 'member') {
+            // Can see all teams
+            $stmt = $this->pdo->prepare("
+                SELECT t.id, t.name, t.created_by, t.created_at, 
+                       COALESCE(tm.role, 'viewer') as role 
+                FROM teams t
+                LEFT JOIN team_members tm ON t.id = tm.team_id AND tm.user_id = :uid
+                ORDER BY t.name ASC
+            ");
+            $stmt->execute(['uid' => (int)$userId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            // Only see teams they are a member of
+            $stmt = $this->pdo->prepare("
+                SELECT t.id, t.name, t.created_by, t.created_at, tm.role 
+                FROM teams t
+                JOIN team_members tm ON t.id = tm.team_id
+                WHERE tm.user_id = :uid
+                ORDER BY t.name ASC
+            ");
+            $stmt->execute(['uid' => (int)$userId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    }
+
+    public function getTeamById($teamId) {
+        $stmt = $this->pdo->prepare("SELECT * FROM teams WHERE id = :id");
+        $stmt->execute(['id' => (int)$teamId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public function getTeamMembersWithRoles($teamId) {
+        $stmt = $this->pdo->prepare("
+            SELECT u.id, u.name, u.email, u.role as global_role, tm.role as team_role, tm.joined_at
+            FROM users u
+            JOIN team_members tm ON u.id = tm.user_id
+            WHERE tm.team_id = :tid
+            ORDER BY tm.role = 'owner' DESC, tm.role = 'admin' DESC, u.name ASC
+        ");
+        $stmt->execute(['tid' => (int)$teamId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function addTeamMember($teamId, $userId, $role = 'member') {
+        $stmtCheck = $this->pdo->prepare("SELECT 1 FROM team_members WHERE team_id = :tid AND user_id = :uid");
+        $stmtCheck->execute(['tid' => (int)$teamId, 'uid' => (int)$userId]);
+        if (!$stmtCheck->fetchColumn()) {
+            $stmt = $this->pdo->prepare("INSERT INTO team_members (team_id, user_id, role) VALUES (:tid, :uid, :role)");
+            return $stmt->execute(['tid' => (int)$teamId, 'uid' => (int)$userId, 'role' => $role]);
+        }
+        return false;
+    }
+
+    public function removeTeamMember($teamId, $userId) {
+        $stmt = $this->pdo->prepare("DELETE FROM team_members WHERE team_id = :tid AND user_id = :uid");
+        return $stmt->execute(['tid' => (int)$teamId, 'uid' => (int)$userId]);
+    }
+
+    public function getTeamMemberRole($teamId, $userId) {
+        $stmt = $this->pdo->prepare("SELECT role FROM team_members WHERE team_id = :tid AND user_id = :uid");
+        $stmt->execute(['tid' => (int)$teamId, 'uid' => (int)$userId]);
+        return $stmt->fetchColumn();
     }
 
     public function reorderTasks($sectionId, $taskIds, $parentTaskId = null, $draggedTaskId = null) {
