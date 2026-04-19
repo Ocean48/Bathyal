@@ -215,14 +215,21 @@ class DBQueries {
 
     public function createTask($data) {
         $stmt = $this->pdo->prepare("
-            INSERT INTO tasks (parent_task_id, title, description, status, due_date) 
-            VALUES (:parent_task_id, :title, :description, :status, :due_date)
+            INSERT INTO tasks (parent_task_id, title, description, status, due_date, start_date, completed_date) 
+            VALUES (:parent_task_id, :title, :description, :status, :due_date, :start_date, :completed_date)
         ");
         $stmt->bindValue(':parent_task_id', isset($data['parent_task_id']) ? (int)$data['parent_task_id'] : null, isset($data['parent_task_id']) ? PDO::PARAM_INT : PDO::PARAM_NULL);
         $stmt->bindValue(':title', $data['title'], PDO::PARAM_STR);
         $stmt->bindValue(':description', $data['description'] ?? null, $data['description'] ? PDO::PARAM_STR : PDO::PARAM_NULL);
-        $stmt->bindValue(':status', $data['status'] ?? 'todo', PDO::PARAM_STR);
+        
+        $status = $data['status'] ?? 'todo';
+        $stmt->bindValue(':status', $status, PDO::PARAM_STR);
+        
         $stmt->bindValue(':due_date', $data['due_date'] ?? null, $data['due_date'] ? PDO::PARAM_STR : PDO::PARAM_NULL);
+        $stmt->bindValue(':start_date', $data['start_date'] ?? null, $data['start_date'] ? PDO::PARAM_STR : PDO::PARAM_NULL);
+        
+        $completed_date = ($status === 'completed' || $status === 'done') ? date('Y-m-d H:i:s') : null;
+        $stmt->bindValue(':completed_date', $completed_date, $completed_date ? PDO::PARAM_STR : PDO::PARAM_NULL);
         
         $stmt->execute();
         $newTaskId = $this->pdo->lastInsertId();
@@ -251,8 +258,10 @@ class DBQueries {
     }
 
     public function updateTaskStatus($taskId, $status) {
-        $stmt = $this->pdo->prepare("UPDATE tasks SET status = :status WHERE id = :id");
+        $completed_date = ($status === 'completed' || $status === 'done') ? date('Y-m-d H:i:s') : null;
+        $stmt = $this->pdo->prepare("UPDATE tasks SET status = :status, completed_date = :completed_date WHERE id = :id");
         $stmt->bindValue(':status', $status, PDO::PARAM_STR);
+        $stmt->bindValue(':completed_date', $completed_date, $completed_date ? PDO::PARAM_STR : PDO::PARAM_NULL);
         $stmt->bindValue(':id', (int)$taskId, PDO::PARAM_INT);
         return $stmt->execute();
     }
@@ -636,6 +645,12 @@ class DBQueries {
         if (array_key_exists('status', $data)) {
             $setClauses[] = "status = :status";
             $params[':status'] = $data['status'];
+            $setClauses[] = "completed_date = :completed_date";
+            $params[':completed_date'] = ($data['status'] === 'completed' || $data['status'] === 'done') ? date('Y-m-d H:i:s') : null;
+        }
+        if (array_key_exists('start_date', $data)) {
+            $setClauses[] = "start_date = :start_date";
+            $params[':start_date'] = $data['start_date'] ?: null;
         }
         if (array_key_exists('due_date', $data)) {
             $setClauses[] = "due_date = :due_date";

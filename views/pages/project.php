@@ -227,8 +227,16 @@ require_once 'views/layouts/header.php';
                     </div>
                 </div>
                 <div>
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Start Date</label>
+                    <input type="date" id="task-modal-start-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
+                </div>
+                <div>
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Due Date</label>
                     <input type="date" id="task-modal-due-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
+                </div>
+                <div class="hidden" id="task-modal-completed-date-container">
+                    <label class="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-1 block">Completed On</label>
+                    <span id="task-modal-completed-date" class="text-sm font-medium text-emerald-700"></span>
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Status</label>
@@ -667,11 +675,25 @@ async function openTaskModal(taskId) {
         statusSelect.value = task.status;
         statusSelect.className = `text-sm border-none focus:ring-0 p-0 rounded bg-transparent font-medium ${window.getStatusTextClass(task.status)}`;
         
+        let startDateVal = '';
+        if(task.start_date) {
+            startDateVal = task.start_date.split(' ')[0];
+        }
+        document.getElementById('task-modal-start-date').value = startDateVal;
+
         let dateVal = '';
         if(task.due_date) {
             dateVal = task.due_date.split(' ')[0];
         }
         document.getElementById('task-modal-due-date').value = dateVal;
+        
+        const completedContainer = document.getElementById('task-modal-completed-date-container');
+        if (task.completed_date) {
+            completedContainer.classList.remove('hidden');
+            document.getElementById('task-modal-completed-date').innerText = task.completed_date;
+        } else {
+            completedContainer.classList.add('hidden');
+        }
 
         // Fetch parent tasks for dropdown cache
         const allTasksRes = await fetch('api/tasks.php');
@@ -858,6 +880,7 @@ async function updateTaskDetails() {
     const status = statusSelect.value;
     statusSelect.className = `text-sm border-none focus:ring-0 p-0 rounded bg-transparent font-medium ${window.getStatusTextClass(status)}`;
 
+    const startDate = document.getElementById('task-modal-start-date').value;
     const dueDate = document.getElementById('task-modal-due-date').value;
     
     // Get content from custom editor or code block
@@ -869,13 +892,24 @@ async function updateTaskDetails() {
     
     if(!id) return;
     
+    // Update completed date text instantly if user selected 'completed'
+    const completedContainer = document.getElementById('task-modal-completed-date-container');
+    if (status === 'completed') {
+        const d = new Date();
+        const cDate = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
+        document.getElementById('task-modal-completed-date').innerText = cDate;
+        completedContainer.classList.remove('hidden');
+    } else {
+        completedContainer.classList.add('hidden');
+    }
+
     await fetch('api/tasks.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             action: 'update_details',
             task_id: id,
-            details: { title, status, due_date: dueDate, description: desc, parent_task_id: parentId }
+            details: { title, status, start_date: startDate, due_date: dueDate, description: desc, parent_task_id: parentId }
         })
     });
     

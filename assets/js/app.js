@@ -425,6 +425,10 @@ async function loadProjectBoard(projectId) {
                 });
             }
         }
+        
+        // Refresh Timeline and Dashboard Data
+        if (typeof renderTimeline === 'function') renderTimeline();
+        if (typeof renderDashboard === 'function') renderDashboard();
 
     } catch (e) {
         console.error('Error loading project:', e);
@@ -810,14 +814,23 @@ function renderDashboard() {
     const p = window.currentProjectData;
     if (!p) return;
     let total = 0, completed = 0, in_progress = 0, todo = 0, others = 0;
-    p.sections.forEach(s => {
-        s.tasks.forEach(t => {
+
+    function countTaskStats(tasksArray) {
+        tasksArray.forEach(t => {
             total++;
             if (t.status === 'completed' || t.status === 'done') completed++;
             else if (t.status === 'in_progress') in_progress++;
             else if (t.status === 'todo') todo++;
             else others++;
+
+            if (t.subtasks && t.subtasks.length > 0) {
+                countTaskStats(t.subtasks);
+            }
         });
+    }
+
+    p.sections.forEach(s => {
+        countTaskStats(s.tasks);
     });
 
     const completionRate = total ? Math.round((completed / total) * 100) : 0;
@@ -828,7 +841,7 @@ function renderDashboard() {
                 <h2 class="text-2xl font-bold text-slate-800">Project Dashboard</h2>
                 <div class="text-sm text-slate-500 flex items-center"><svg class="w-4 h-4 mr-1 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Real-time</div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center items-center">
                     <span class="text-slate-500 text-sm font-medium mb-1">Total Tasks</span>
                     <span class="text-3xl font-bold text-slate-800">${total}</span>
@@ -850,45 +863,104 @@ function renderDashboard() {
                 </div>
             </div>
             
-            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <h3 class="text-lg font-semibold text-slate-800 mb-4">Task Breakdown</h3>
-                <div class="space-y-4">
-                    <div>
-                        <div class="flex justify-between text-sm mb-1"><span class="font-medium text-emerald-600">Completed</span><span class="text-slate-500">${completed}</span></div>
-                        <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style="width: ${total ? (completed/total)*100 : 0}%"></div></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">Task Status Distribution</h3>
+                    <div style="height: 250px;">
+                        <canvas id="dashboardStatusChart"></canvas>
                     </div>
-                    <div>
-                        <div class="flex justify-between text-sm mb-1"><span class="font-medium text-blue-600">In Progress</span><span class="text-slate-500">${in_progress}</span></div>
-                        <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-blue-500 h-2 rounded-full transition-all duration-500" style="width: ${total ? (in_progress/total)*100 : 0}%"></div></div>
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-sm mb-1"><span class="font-medium text-slate-600">To Do</span><span class="text-slate-500">${todo}</span></div>
-                        <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-slate-400 h-2 rounded-full transition-all duration-500" style="width: ${total ? (todo/total)*100 : 0}%"></div></div>
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-sm mb-1"><span class="font-medium text-amber-600">Other (Paused/Review)</span><span class="text-slate-500">${others}</span></div>
-                        <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-amber-400 h-2 rounded-full transition-all duration-500" style="width: ${total ? (others/total)*100 : 0}%"></div></div>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">Task Breakdown</h3>
+                    <div class="space-y-6 pt-2">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1.5"><span class="font-medium text-emerald-600">Completed</span><span class="text-slate-500 font-semibold">${completed}</span></div>
+                            <div class="w-full bg-slate-100 rounded-full h-2.5"><div class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style="width: ${total ? (completed/total)*100 : 0}%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1.5"><span class="font-medium text-blue-600">In Progress</span><span class="text-slate-500 font-semibold">${in_progress}</span></div>
+                            <div class="w-full bg-slate-100 rounded-full h-2.5"><div class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style="width: ${total ? (in_progress/total)*100 : 0}%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1.5"><span class="font-medium text-slate-600">To Do</span><span class="text-slate-500 font-semibold">${todo}</span></div>
+                            <div class="w-full bg-slate-100 rounded-full h-2.5"><div class="bg-slate-400 h-2.5 rounded-full transition-all duration-500" style="width: ${total ? (todo/total)*100 : 0}%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1.5"><span class="font-medium text-amber-600">Other (Paused/Review)</span><span class="text-slate-500 font-semibold">${others}</span></div>
+                            <div class="w-full bg-slate-100 rounded-full h-2.5"><div class="bg-amber-400 h-2.5 rounded-full transition-all duration-500" style="width: ${total ? (others/total)*100 : 0}%"></div></div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     `;
+
+    setTimeout(() => {
+        const ctx = document.getElementById('dashboardStatusChart');
+        if (ctx && typeof Chart !== 'undefined') {
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Completed', 'In Progress', 'To Do', 'Other'],
+                    datasets: [{
+                        data: [completed, in_progress, todo, others],
+                        backgroundColor: ['#10b981', '#3b82f6', '#94a3b8', '#fbbf24'],
+                        borderWidth: 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'left' }
+                    },
+                    cutout: '65%'
+                }
+            });
+        }
+    }, 50);
 }
 
 function renderTimeline() {
     const p = window.currentProjectData;
     if (!p) return;
     
-    let tasks = [];
+    let ganttTasks = [];
     p.sections.forEach(s => {
         s.tasks.forEach(t => {
-            if (t.due_date) tasks.push(t);
+            if (t.due_date) {
+                let endDate = new Date(t.due_date.split(' ')[0]);
+                let startDate = new Date(endDate);
+                
+                if(t.start_date) {
+                    startDate = new Date(t.start_date.split(' ')[0]);
+                } else {
+                    startDate.setDate(endDate.getDate() - 3); // mock duration if missing start date
+                }
+                
+                let progress = 0;
+                if (t.status === 'completed' || t.status === 'done') progress = 100;
+                else if (t.status === 'in_progress') progress = 50;
+
+                ganttTasks.push({
+                    id: t.id.toString(),
+                    name: t.title,
+                    start: startDate.toISOString().split('T')[0],
+                    end: endDate.toISOString().split('T')[0],
+                    progress: progress,
+                    // Pass the real DB start date (if any) and status
+                    start_val: t.start_date ? t.start_date.split(' ')[0] : null,
+                    due_val: t.due_date.split(' ')[0], 
+                    status: t.status,
+                    description: t.description,
+                    parent_task_id: t.parent_task_id,
+                    custom_class: window.getStatusBadgeClass ? window.getStatusBadgeClass(t.status).split(' ')[0] : ''
+                });
+            }
         });
     });
     
-    tasks.sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
-    
-    if (tasks.length === 0) {
+    if (ganttTasks.length === 0) {
         document.getElementById('view-timeline').innerHTML = `
             <div class="text-center text-slate-500 w-full h-full flex flex-col items-center justify-center pt-20">
                 <svg class="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -897,24 +969,79 @@ function renderTimeline() {
         return;
     }
     
-    let html = '<div class="max-w-4xl w-full mx-auto"><h2 class="text-2xl font-bold text-slate-800 mb-8 mt-2 max-w-4xl">Project Timeline</h2><div class="relative border-l-2 border-slate-200 ml-4 space-y-8">';
-    tasks.forEach(t => {
-        html += `
-        <div class="relative pl-6">
-            <div class="absolute w-4 h-4 rounded-full bg-teal-500 border-4 border-white left-[-9px] top-1"></div>
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-teal-400 transition-colors cursor-pointer group" onclick="openTaskModal(${t.id})">
-                <div class="flex justify-between items-start mb-1">
-                    <span class="text-xs font-bold text-teal-600 uppercase tracking-wider">${t.due_date.split(' ')[0]}</span>
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border ${window.getStatusBadgeClass ? window.getStatusBadgeClass(t.status) : 'bg-slate-100 text-slate-600'}">${t.status.replace('_', ' ')}</span>
+    document.getElementById('view-timeline').innerHTML = `
+        <div class="w-full flex-1 h-full mx-auto bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h2 class="text-xl font-bold text-slate-800">Project Timeline <span class="text-slate-500 text-sm font-normal ml-2">(Gantt Chart)</span></h2>
+                <div class="flex space-x-2">
+                    <button class="px-3 py-1.5 text-xs font-semibold rounded bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 shadow-sm" onclick="if(window.gantt) window.gantt.change_view_mode('Day')">Day</button>
+                    <button class="px-3 py-1.5 text-xs font-semibold rounded bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 shadow-sm" onclick="if(window.gantt) window.gantt.change_view_mode('Week')">Week</button>
+                    <button class="px-3 py-1.5 text-xs font-semibold rounded bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 shadow-sm" onclick="if(window.gantt) window.gantt.change_view_mode('Month')">Month</button>
                 </div>
-                <h4 class="text-base font-semibold text-slate-800 group-hover:text-teal-700 transition-colors">${t.title}</h4>
-                ${t.assignee_name ? '<p class="text-xs text-slate-500 mt-2 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-slate-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg> ' + t.assignee_name.split(',').join(', ') + '</p>' : ''}
             </div>
-        </div>`;
-    });
-    html += '</div></div>';
-    
-    document.getElementById('view-timeline').innerHTML = html;
+            <div class="p-4 flex-1 overflow-auto bg-slate-50/50">
+                <svg id="gantt-chart"></svg>
+            </div>
+        </div>
+    `;
+
+    setTimeout(() => {
+        const svg = document.getElementById('gantt-chart');
+        if (svg && typeof Gantt !== 'undefined') {
+            window.gantt = new Gantt("#gantt-chart", ganttTasks, {
+                header_height: 50,
+                column_width: 30,
+                step: 24,
+                view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
+                bar_height: 25,
+                bar_corner_radius: 4,
+                arrow_curve: 5,
+                padding: 18,
+                view_mode: 'Week',
+                date_format: 'YYYY-MM-DD',
+                on_date_change: async function(task, start, end) {
+                    const newStart = start.getFullYear() + '-' + String(start.getMonth() + 1).padStart(2, '0') + '-' + String(start.getDate()).padStart(2, '0');
+                    const newEnd = end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0');
+                    
+                    try {
+                        const response = await fetch('api/tasks.php', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                action: 'update_details',
+                                task_id: task.id,
+                                details: { 
+                                    title: task.name, 
+                                    status: task.status || 'todo', 
+                                    start_date: newStart, 
+                                    due_date: newEnd, 
+                                    description: task.description || '', 
+                                    parent_task_id: task.parent_task_id || null 
+                                }
+                            })
+                        });
+                        const data = await response.json();
+                        if(data.success && typeof currentProjectId !== 'undefined') {
+                            loadProjectBoard(currentProjectId); // Optional, might cause flash of UI
+                        }
+                    } catch(e) {
+                        console.error('Failed to update dates from timeline', e);
+                    }
+                },
+                custom_popup_html: function(task) {
+                    return `
+                        <div class="bg-white p-3 rounded shadow-lg border border-slate-200 text-sm w-48">
+                            <h5 class="font-bold text-slate-800 mb-1 truncate">${task.name}</h5>
+                            <p class="text-xs text-slate-500 mb-1">${task.start_val ? task.start_val : task.start} - ${task.due_val ? task.due_val : task.end}</p>
+                            <div class="w-full bg-slate-100 rounded-full h-1.5 mt-2">
+                                <div class="bg-teal-500 h-1.5 rounded-full" style="width: ${task.progress}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+        }
+    }, 50);
 }
 
 window.updateStatusWidth = function(el) {

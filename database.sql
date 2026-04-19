@@ -62,7 +62,9 @@ CREATE TABLE tasks (
     title VARCHAR(255) NOT NULL,
     description TEXT, -- Supports URL hyperlinks parsing
     status ENUM('todo', 'in_progress', 'paused', 'completed') DEFAULT 'todo',
+    start_date DATETIME NULL,
     due_date DATETIME NULL,
+    completed_date DATETIME NULL,
     estimated_minutes INT DEFAULT 0,
     position INT DEFAULT 0, -- For ordering native subtasks
     storage_location ENUM('active', 'backlog', 'archive', 'unattached') DEFAULT 'active',
@@ -282,6 +284,3 @@ INSERT INTO task_projects (task_id, project_id, section_id, position) VALUES
 INSERT INTO task_links (parent_id, subtask_id, position) VALUES
 (1, 3, 5),
 (1, 6, 1);
-C R E A T E   T A B L E   t a s k _ a t t a c h m e n t s   (   i d   I N T   A U T O _ I N C R E M E N T   P R I M A R Y   K E Y ,   t a s k _ i d   I N T   N O T   N U L L ,   u s e r _ i d   I N T   N O T   N U L L ,   f i l e _ n a m e   V A R C H A R ( 2 5 5 )   N O T   N U L L ,   f i l e _ p a t h   V A R C H A R ( 2 5 5 )   N O T   N U L L ,   f i l e _ t y p e   V A R C H A R ( 1 0 0 )   N O T   N U L L ,   c r e a t e d _ a t   T I M E S T A M P   D E F A U L T   C U R R E N T _ T I M E S T A M P ,   F O R E I G N   K E Y   ( t a s k _ i d )   R E F E R E N C E S   t a s k s ( i d )   O N   D E L E T E   C A S C A D E ,   F O R E I G N   K E Y   ( u s e r _ i d )   R E F E R E N C E S   u s e r s ( i d )   O N   D E L E T E   C A S C A D E   ) ; 
- 
- 
