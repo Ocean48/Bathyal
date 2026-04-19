@@ -3,6 +3,14 @@
 
 require_once 'core/database.php';
 require_once 'core/auth_check.php';
+require_once 'core/db_query.php';
+
+// Track recent project access for current user
+$projectId = isset($_GET['id']) ? (int)$_GET['id'] : 1;
+if (isset($currentUser['id'])) {
+    $dbQueries = new DBQueries($pdo);
+    $dbQueries->trackProjectAccess($currentUser['id'], $projectId);
+}
 
 // Include the UI wrapper
 require_once 'views/layouts/header.php';

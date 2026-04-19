@@ -196,6 +196,15 @@ CREATE TABLE task_attachments (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- RECENT PROJECTS HISTORY
+CREATE TABLE user_recent_projects (
+    user_id INT NOT NULL,
+    project_id INT NOT NULL,
+    last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, project_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
 -- ==========================================
 -- FAKE TEST DATA
 -- ==========================================
@@ -295,3 +304,4 @@ INSERT INTO task_projects (task_id, project_id, section_id, position) VALUES
 INSERT INTO task_links (parent_id, subtask_id, position) VALUES
 (1, 3, 5),
 (1, 6, 1);
+

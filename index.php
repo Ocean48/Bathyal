@@ -36,9 +36,17 @@ switch ($route) {
         break;
         
     // Pages
+    case 'tasks.php':
+    case 'tasks':
+        require 'views/pages/tasks.php';
+        break;
     case 'project.php':
     case 'project':
         require 'views/pages/project.php';
+        break;
+    case 'projects.php':
+    case 'projects':
+        require 'views/pages/projects.php';
         break;
     case 'project_settings.php':
     case 'project_settings':

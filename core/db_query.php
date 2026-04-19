@@ -8,6 +8,42 @@ class DBQueries {
         $this->pdo = $pdo;
     }
 
+    // --- RECENT PROJECTS ---
+    public function trackProjectAccess($userId, $projectId) {
+        try {
+            $stmt = $this->pdo->prepare("INSERT INTO user_recent_projects (user_id, project_id, last_accessed) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE last_accessed=NOW()");
+            $stmt->execute([(int)$userId, (int)$projectId]);
+            return true;
+        } catch (\PDOException $e) {
+            return false;
+        }
+    }
+
+    public function getRecentProjects($userId, $limit = 10) {
+        $stmt = $this->pdo->prepare("
+            SELECT p.id, p.name 
+            FROM projects p
+            JOIN user_recent_projects urp ON p.id = urp.project_id
+            WHERE urp.user_id = :userId
+            ORDER BY urp.last_accessed DESC 
+            LIMIT :limit
+        ");
+        $stmt->bindValue(':userId', (int)$userId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+        $stmt->execute();
+        $recentProjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fallback to latest created globally if user has no recent history
+        if (empty($recentProjects)) {
+            $recentProjectsStmt = $this->pdo->prepare("SELECT id, name FROM projects ORDER BY created_at DESC LIMIT :limit");
+            $recentProjectsStmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+            $recentProjectsStmt->execute();
+            $recentProjects = $recentProjectsStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        return $recentProjects;
+    }
+
     public function updateProjectStatus($projectId, $status) {
         $stmt = $this->pdo->prepare("UPDATE projects SET status = :status WHERE id = :project_id");
         $stmt->bindValue(':status', $status, PDO::PARAM_STR);
@@ -210,6 +246,33 @@ class DBQueries {
                    ) AS subtask_count
             FROM tasks t
         ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    public function getTasksByAssigneeId($userId) {
+        $stmt = $this->pdo->prepare("
+            SELECT t.*, 
+                   COALESCE(p1.name, p2.name, p3.name) AS project_name, 
+                   COALESCE(tp1.project_id, tp2.project_id, tp3.project_id) AS project_id
+            FROM tasks t
+            JOIN task_assignees ta ON t.id = ta.task_id
+            
+            LEFT JOIN task_projects tp1 ON tp1.task_id = t.id
+            LEFT JOIN projects p1 ON tp1.project_id = p1.id
+            
+            LEFT JOIN tasks t2 ON t.parent_task_id = t2.id
+            LEFT JOIN task_projects tp2 ON tp2.task_id = t2.id
+            LEFT JOIN projects p2 ON tp2.project_id = p2.id
+            
+            LEFT JOIN tasks t3 ON t2.parent_task_id = t3.id
+            LEFT JOIN task_projects tp3 ON tp3.task_id = t3.id
+            LEFT JOIN projects p3 ON tp3.project_id = p3.id
+            
+            WHERE ta.user_id = :user_id
+            ORDER BY t.due_date ASC, t.id DESC
+        ");
+        $stmt->bindValue(':user_id', (int)$userId, PDO::PARAM_INT);
+        $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 

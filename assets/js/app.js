@@ -107,7 +107,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (board) {
         const urlParams = new URLSearchParams(window.location.search);
         currentProjectId = urlParams.get('id') || 1;
-        loadProjectBoard(currentProjectId);
+        loadProjectBoard(currentProjectId).then(() => {
+            const taskId = urlParams.get('task_id');
+            if (taskId) {
+                if (typeof openTaskModal === 'function') {
+                    openTaskModal(taskId);
+                }
+            }
+        });
     }
 });
 

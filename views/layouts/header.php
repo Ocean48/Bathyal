@@ -50,51 +50,53 @@
                         Teams
                     </a>
                 </li>
+                <li>
+                    <a href="/bathyal/projects" class="flex items-center px-6 py-2 hover:bg-slate-800 hover:text-white group">
+                        <svg class="w-5 h-5 mr-3 text-slate-400 group-hover:text-teal-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                        Projects
+                    </a>
+                </li>
             </ul>
 
             <div class="px-6 mt-8 mb-2">
-                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Projects</p>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Recent Projects</p>
             </div>
-            <ul class="space-y-1">
+            <ul class="space-y-1 max-h-64 overflow-y-auto overflow-x-hidden" style="scrollbar-width: thin; scrollbar-color: #475569 transparent;">
+                <?php
+                // Fetch up to 10 most recently accessed projects for this user
+                try {
+                    require_once 'core/db_query.php';
+                    $headerDbQueries = new DBQueries($pdo);
+                    $userId = isset($currentUser['id']) ? (int)$currentUser['id'] : 1;
+                    
+                    $recentProjects = $headerDbQueries->getRecentProjects($userId, 10);
+                    
+                    $colors = ['bg-teal-400', 'bg-cyan-500', 'bg-blue-500', 'bg-emerald-500', 'bg-indigo-500'];
+                    $colorIndex = 0;
+                    
+                    foreach ($recentProjects as $rp) {
+                        $circleColor = $colors[$colorIndex % count($colors)];
+                        $colorIndex++;
+                ?>
                 <li>
                     <div class="flex items-center justify-between px-6 py-2 hover:bg-slate-800 group text-sm transition-colors">
-                        <a href="/bathyal/project?id=1" class="flex items-center flex-1 hover:text-white">
-                            <span class="w-2 h-2 rounded-full bg-teal-400 mr-3"></span>
-                            Website Redesign
+                        <a href="/bathyal/project?id=<?= $rp['id'] ?>" class="flex items-center flex-1 hover:text-white">
+                            <span class="w-2 h-2 rounded-full <?= $circleColor ?> mr-3"></span>
+                            <?= htmlspecialchars($rp['name']) ?>
                         </a>
-                        <a href="/bathyal/project_settings?id=1" class="text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" title="Project Settings">
+                        <a href="/bathyal/project_settings?id=<?= $rp['id'] ?>" class="text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" title="Project Settings">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
                             </svg>
                         </a>
                     </div>
                 </li>
-                <li>
-                    <div class="flex items-center justify-between px-6 py-2 hover:bg-slate-800 group text-sm transition-colors">
-                        <a href="/bathyal/project?id=2" class="flex items-center flex-1 hover:text-white">
-                            <span class="w-2 h-2 rounded-full bg-cyan-500 mr-3"></span>
-                            Marketing Q3
-                        </a>
-                        <a href="/bathyal/project_settings?id=2" class="text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" title="Project Settings">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
-                            </svg>
-                        </a>
-                    </div>
-                </li>
-                <li>
-                    <div class="flex items-center justify-between px-6 py-2 hover:bg-slate-800 group text-sm transition-colors">
-                        <a href="/bathyal/project?id=3" class="flex items-center flex-1 hover:text-white">
-                            <span class="w-2 h-2 rounded-full bg-blue-500 mr-3"></span>
-                            Ocean Conservation App
-                        </a>
-                        <a href="/bathyal/project_settings?id=3" class="text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" title="Project Settings">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
-                            </svg>
-                        </a>
-                    </div>
-                </li>
+                <?php 
+                    }
+                } catch (\PDOException $e) {
+                    echo "<li class='px-6 py-2 text-xs text-rose-400'>Error loading projects</li>";
+                }
+                ?>
             </ul>
         </nav>
         
