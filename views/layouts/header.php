@@ -116,7 +116,7 @@
                 </div>
             </div>
             <!-- Logout dropdown overlay -->
-            <div class="absolute bottom-full left-0 w-full p-2 mb-2 hidden group-hover:block transition-all z-50">
+            <div class="absolute bottom-full left-0 w-full p-2 pb-4 hidden group-hover:block transition-all z-50">
                 <div class="bg-slate-800 rounded-lg shadow-lg border border-slate-700 py-1">
                     <a href="/bathyal/settings" class="block px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-700 flex items-center">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -135,7 +135,7 @@
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50">
         
         <!-- Top header / Search & actions -->
-        <header class="bg-white border-b border-slate-200 h-14 flex items-center justify-between px-6 z-10 shrink-0">
+        <header class="bg-white border-b border-slate-200 h-14 flex items-center justify-between px-6 z-40 shrink-0 relative">
             <!-- Search -->
             <div class="flex-1 max-w-xl">
                 <div class="relative">
@@ -146,15 +146,62 @@
                 </div>
             </div>
 
-            <!-- Actions -->
-            <div class="ml-4 flex items-center space-x-3" style="display: none;">
-                <button class="text-sm bg-teal-500 hover:bg-teal-600 text-white font-medium py-1.5 px-3 rounded-full transition-colors flex items-center">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                    New
-                </button>
-                <button class="p-1.5 text-slate-400 hover:text-teal-600 rounded-full hover:bg-slate-100 transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-                </button>
+            <!-- Global Actions & Notifications -->
+            <div class="ml-4 flex items-center space-x-3 relative z-50">
+                <div class="relative">
+                    <button onclick="document.getElementById('global-notifications-dropdown').classList.toggle('hidden')" class="relative p-2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors group">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                        <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white"></span>
+                    </button>
+
+                    <!-- Notifications Dropdown -->
+                    <div id="global-notifications-dropdown" class="hidden absolute top-full right-0 mt-2 w-80 bg-white border border-slate-200 shadow-xl rounded-xl overflow-hidden flex flex-col transform origin-top-right">
+                        <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 relative">
+                            <h3 class="text-sm font-semibold text-slate-800">Notifications</h3>
+                            <button class="text-xs text-teal-600 hover:text-teal-700 font-medium">Mark all as read</button>
+                        </div>
+                        <div class="max-h-80 overflow-y-auto w-full p-2 space-y-1 bg-white">
+                            <!-- Notification Item -->
+                            <div class="px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors relative border border-transparent hover:border-slate-200">
+                                <span class="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-teal-500 rounded-full"></span>
+                                <div class="pl-3">
+                                    <p class="text-sm text-slate-800 font-medium leading-snug">System Alert</p>
+                                    <p class="text-xs text-slate-500 truncate mt-0.5">Welcome to Bathyal! Your workspace is ready.</p>
+                                    <p class="text-[10px] text-slate-400 mt-1">Just now</p>
+                                </div>
+                            </div>
+                            <!-- Secondary Item -->
+                            <div class="px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors border border-transparent hover:border-slate-200">
+                                <div class="pl-3">
+                                    <p class="text-sm text-slate-600 font-medium leading-snug">New feature released</p>
+                                    <p class="text-xs text-slate-500 truncate mt-0.5">Check out the new layout designed for you.</p>
+                                    <p class="text-[10px] text-slate-400 mt-1">2 hours ago</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="px-4 py-2 border-t border-slate-100 text-center bg-slate-50/50">
+                            <a href="#" class="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors">View all notifications</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Avatar -->
+                <div class="relative group">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-r from-teal-400 to-cyan-500 flex items-center justify-center text-white font-medium text-sm shadow-sm ring-2 ring-white cursor-pointer hover:shadow-md transition-all" title="Profile">
+                        <?php 
+                            $name = $currentUser['name'] ?? 'User';
+                            $initials = strtoupper(substr($name, 0, 1));
+                            echo $initials;
+                        ?>
+                    </div>
+                    <!-- Quick Profile Dropdown -->
+                    <div class="absolute right-0 top-full pt-2 w-48 hidden group-hover:block z-50">
+                        <div class="bg-white border border-slate-200 shadow-xl rounded-xl overflow-hidden flex flex-col transform origin-top-right">
+                            <a href="/bathyal/settings" class="px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">Settings</a>
+                            <a href="/bathyal/logout" class="px-4 py-2 text-sm text-rose-600 hover:bg-slate-50 transition-colors">Logout</a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
 

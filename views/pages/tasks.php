@@ -27,7 +27,7 @@ $tasks = $db->getTasksByAssigneeId($userId);
 <div class="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50 relative">
 
     <!-- Top Navigation / Toolbar -->
-    <header class="h-16 flex items-center justify-between px-6 border-b border-slate-200 bg-white shrink-0 z-10">
+    <header class="h-16 flex items-center justify-between px-6 border-b border-slate-200 bg-white shrink-0 z-10 relative">
         <div class="flex items-center">
             <h1 class="text-xl font-semibold text-slate-800 tracking-tight flex items-center">
                 <span class="bg-indigo-100 text-indigo-700 p-1.5 rounded-lg mr-3">
@@ -39,45 +39,7 @@ $tasks = $db->getTasksByAssigneeId($userId);
 
         <!-- Global Actions -->
         <div class="flex items-center space-x-3 relative z-30">
-            <div class="relative">
-                <button onclick="document.getElementById('notifications-dropdown').classList.toggle('hidden')" class="relative p-2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors group">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-                    <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white"></span>
-                </button>
-
-                <!-- Notifications Dropdown -->
-                <div id="notifications-dropdown" class="hidden absolute top-full right-0 mt-2 w-80 bg-white border border-slate-200 shadow-xl rounded-xl overflow-hidden flex flex-col transform origin-top-right">
-                    <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 relative">
-                        <h3 class="text-sm font-semibold text-slate-800">Notifications</h3>
-                        <button class="text-xs text-teal-600 hover:text-teal-700 font-medium">Mark all as read</button>
-                    </div>
-                    <div class="max-h-80 overflow-y-auto w-full p-2 space-y-1 bg-white">
-                        <!-- Notification Item -->
-                        <div class="px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors relative border border-transparent hover:border-slate-200">
-                            <span class="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-teal-500 rounded-full"></span>
-                            <div class="pl-3">
-                                <p class="text-sm text-slate-800 font-medium leading-snug">System Alert</p>
-                                <p class="text-xs text-slate-500 truncate mt-0.5">Welcome to Bathyal! Your workspace is ready.</p>
-                                <p class="text-[10px] text-slate-400 mt-1">Just now</p>
-                            </div>
-                        </div>
-                        <!-- Secondary Item -->
-                        <div class="px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors border border-transparent hover:border-slate-200">
-                            <div class="pl-3">
-                                <p class="text-sm text-slate-600 font-medium leading-snug">New feature released</p>
-                                <p class="text-xs text-slate-500 truncate mt-0.5">Check out the new My Tasks layout designed for you.</p>
-                                <p class="text-[10px] text-slate-400 mt-1">2 hours ago</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="px-4 py-2 border-t border-slate-100 text-center bg-slate-50/50">
-                        <a href="#" class="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors">View all notifications</a>
-                    </div>
-                </div>
-            </div>
-            <div class="w-8 h-8 rounded-full bg-gradient-to-r from-teal-400 to-cyan-500 flex items-center justify-center text-white font-medium text-sm shadow-sm ring-2 ring-white cursor-pointer hover:shadow-md transition-all">
-                AS
-            </div>
+            <!-- Space reserved for future local task actions if needed -->
         </div>
     </header>
 

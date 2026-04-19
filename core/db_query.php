@@ -96,6 +96,19 @@ class DBQueries {
         return $stmt->execute();
     }
 
+    public function getAllSystemUsers() {
+        $stmt = $this->pdo->prepare("SELECT id, name, email, role, created_at, team_id FROM users ORDER BY role ASC, name ASC");
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function updateSystemUserRole($userId, $role) {
+        $stmt = $this->pdo->prepare("UPDATE users SET role = :role WHERE id = :user_id");
+        $stmt->bindValue(':role', $role, PDO::PARAM_STR);
+        $stmt->bindValue(':user_id', (int)$userId, PDO::PARAM_INT);
+        return $stmt->execute();
+    }
+
     // --- PROJECTS AND SECTIONS ---
     public function getProjectById($projectId) {
         $stmt = $this->pdo->prepare("
