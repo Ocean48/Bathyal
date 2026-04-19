@@ -1269,24 +1269,40 @@ async function toggleProjectMemberAssignment(userId) {
 // Task Assignee UI
 // ==========================================
 
+window.activeAssigneeTaskId = null;
+window.assigneeDropdownContext = 'modal'; // 'modal' or 'list'
+
 async function toggleAssigneeDropdown(event) {
+    window.assigneeDropdownContext = 'modal';
+    window.activeAssigneeTaskId = document.getElementById('task-modal-id').value || null;
+
     const dropdown = document.getElementById('assignee-dropdown');
     
+    // Move dropdown back to modal if it was moved to body
+    const originalContainer = event.currentTarget.parentElement;
+    if (dropdown.parentElement !== originalContainer) {
+        dropdown.style.position = 'absolute';
+        dropdown.style.top = '100%';
+        dropdown.style.left = '0px';
+        dropdown.style.transform = '';
+        originalContainer.appendChild(dropdown);
+    }
+
     // Toggle visibility
     if (dropdown.classList.contains('hidden')) {
         dropdown.classList.remove('hidden');
         dropdown.classList.add('flex');
-        
+
         // Fetch or render users
         if (window.allUsersCache.length === 0) {
             await searchAssignees('');
         } else {
             renderAssigneeList(window.allUsersCache);
         }
-        
+
         // Focus search box
         setTimeout(() => document.getElementById('assignee-search').focus(), 50);
-        
+
         // Setup outside click listener to close
         const outsideClickListener = (e) => {
             if (!dropdown.contains(e.target) && !e.target.closest('[onclick="toggleAssigneeDropdown(event)"]')) {
@@ -1302,6 +1318,46 @@ async function toggleAssigneeDropdown(event) {
         dropdown.classList.remove('flex');
     }
 }
+
+window.openListViewAssigneeDropdown = async function(event, taskId, assigneeIdsStr) {
+    event.stopPropagation();
+    window.assigneeDropdownContext = 'list';
+    window.activeAssigneeTaskId = taskId;
+    window.currentTaskAssigneeIds = assigneeIdsStr ? String(assigneeIdsStr).split(',').map(id => parseInt(id)) : [];
+
+    const dropdown = document.getElementById('assignee-dropdown');
+    
+    // Move dropdown to body for absolute positioning avoiding table clipping
+    if (dropdown.parentElement !== document.body) {
+        document.body.appendChild(dropdown);
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    dropdown.style.position = 'fixed';
+    dropdown.style.top = (rect.bottom + 4) + 'px';
+    dropdown.style.left = rect.left + 'px';
+    
+    dropdown.classList.remove('hidden');
+    dropdown.classList.add('flex');
+
+    if (window.allUsersCache.length === 0) {
+        await searchAssignees('');
+    } else {
+        renderAssigneeList(window.allUsersCache);
+    }
+
+    setTimeout(() => document.getElementById('assignee-search').focus(), 50);
+
+    const triggerElement = event.currentTarget;
+    const outsideClickListener = (e) => {
+        if (!dropdown.contains(e.target) && !triggerElement.contains(e.target)) {
+            dropdown.classList.add('hidden');
+            dropdown.classList.remove('flex');
+            document.removeEventListener('click', outsideClickListener);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', outsideClickListener), 10);
+};
 
 async function searchAssignees(query) {
     try {
@@ -1366,7 +1422,8 @@ async function toggleUserAssignment(userId) {
     // Re-render the dropdown list with new selection states
     renderAssigneeList(document.getElementById('assignee-search').value ? window.lastSearchedUsers : window.allUsersCache);
     
-    const taskId = document.getElementById('task-modal-id').value;
+    const taskId = window.activeAssigneeTaskId || document.getElementById('task-modal-id').value;
+    if (!taskId) return;
     
     try {
         await fetch('api/tasks.php', {
@@ -1375,31 +1432,34 @@ async function toggleUserAssignment(userId) {
             body: JSON.stringify({ action: 'update_details', task_id: taskId, details: { assignee_ids: window.currentTaskAssigneeIds } })
         });
         
-        // Soft refresh without entirely flickering the modal context
-        const res = await fetch(`api/tasks.php?id=${taskId}`);
-        const task = await res.json();
-        if(!task.error) {
-            document.getElementById('task-modal-assignee-name').innerText = task.assignee_name || 'Unassigned';
-            const stack = document.getElementById('task-modal-assignees-stack');
-            if (stack) {
-                stack.innerHTML = '';
-                if (task.assignee_name) {
-                    stack.classList.remove('hidden');
-                    const names = task.assignee_name.split(',');
-                    names.slice(0, 3).forEach(n => {
-                        const initial = n.trim().charAt(0).toUpperCase();
-                        stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-teal-100 border-2 border-white text-teal-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
-                    });
-                    if (names.length > 3) {
-                        stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${names.length - 3}</div>`;
+        if (window.assigneeDropdownContext === 'list') {
+            if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
+        } else {
+            // Soft refresh without entirely flickering the modal context
+            const res = await fetch(`api/tasks.php?id=${taskId}`);
+            const task = await res.json();
+            if(!task.error) {
+                document.getElementById('task-modal-assignee-name').innerText = task.assignee_name || 'Unassigned';
+                const stack = document.getElementById('task-modal-assignees-stack');
+                if (stack) {
+                    stack.innerHTML = '';
+                    if (task.assignee_name) {
+                        stack.classList.remove('hidden');
+                        const names = task.assignee_name.split(',');
+                        names.slice(0, 3).forEach(n => {
+                            const initial = n.trim().charAt(0).toUpperCase();
+                            stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-teal-100 border-2 border-white text-teal-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+                        });
+                        if (names.length > 3) {
+                            stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${names.length - 3}</div>`;
+                        }
+                    } else {
+                        stack.classList.add('hidden');
                     }
-                } else {
-                    stack.classList.add('hidden');
                 }
             }
+            if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
         }
-        
-        if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
     } catch (e) {
         console.error('Error updating assignees:', e);
     }

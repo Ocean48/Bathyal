@@ -542,7 +542,9 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
             <span class="truncate block max-w-sm">${titleWithCount}</span>
         </td>
         <td class="px-4 py-3">
-            ${assigneesHtml}
+            <div class="cursor-pointer inline-flex items-center p-1 hover:bg-slate-100 rounded transition-colors -ml-1" onclick="if(window.openListViewAssigneeDropdown) window.openListViewAssigneeDropdown(event, ${task.id}, '${task.assignee_ids || ''}')">
+                ${assigneesHtml}
+            </div>
         </td>
         <td class="px-4 py-3 text-slate-500 text-sm whitespace-nowrap">${task.due_date ? task.due_date.split(' ')[0] : '-'}</td>
         <td class="px-4 py-3 whitespace-nowrap">
