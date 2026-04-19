@@ -34,8 +34,15 @@
                 </li>
                 <li>
                     <a href="/bathyal/inbox" class="flex items-center px-6 py-2 hover:bg-slate-800 hover:text-white group">
-                        <svg class="w-5 h-5 mr-3 text-slate-400 group-hover:text-teal-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-                        Inbox Menu
+                        <svg class="w-5 h-5 mr-3 text-slate-400 group-hover:text-teal-400 transition-colors" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                        Inbox
+                        <?php 
+                        $headerDbQueries = $headerDbQueries ?? new DBQueries($pdo);
+                        $unreadCount = $headerDbQueries->getUnreadNotificationCount($currentUser['id'] ?? 1); 
+                        if ($unreadCount > 0): 
+                        ?>
+                        <span class="ml-auto bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full"><?= $unreadCount ?></span>
+                        <?php endif; ?>
                     </a>
                 </li>
                 <li>
@@ -148,42 +155,58 @@
 
             <!-- Global Actions & Notifications -->
             <div class="ml-4 flex items-center space-x-3 relative z-50">
+                <!-- Notifications dropdown trigger handled via script below -->
                 <div class="relative">
-                    <button onclick="document.getElementById('global-notifications-dropdown').classList.toggle('hidden')" class="relative p-2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors group">
+                    <button id="header-bell-btn" class="relative p-2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors group">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                        <?php if ($unreadCount > 0): ?>
                         <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white"></span>
+                        <?php endif; ?>
                     </button>
 
                     <!-- Notifications Dropdown -->
-                    <div id="global-notifications-dropdown" class="hidden absolute top-full right-0 mt-2 w-80 bg-white border border-slate-200 shadow-xl rounded-xl overflow-hidden flex flex-col transform origin-top-right">
+                    <div id="global-notifications-dropdown" class="hidden absolute top-full right-0 mt-2 w-80 bg-white border border-slate-200 shadow-xl rounded-xl flex flex-col transform origin-top-right z-[100] max-h-[85vh]">
                         <div class="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 relative">
                             <h3 class="text-sm font-semibold text-slate-800">Notifications</h3>
-                            <button class="text-xs text-teal-600 hover:text-teal-700 font-medium">Mark all as read</button>
                         </div>
-                        <div class="max-h-80 overflow-y-auto w-full p-2 space-y-1 bg-white">
-                            <!-- Notification Item -->
-                            <div class="px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors relative border border-transparent hover:border-slate-200">
+                        <div class="overflow-y-auto w-full p-2 space-y-1 bg-white">
+                            <?php 
+                            $recentNotifications = $headerDbQueries->getUserNotifications($currentUser['id'] ?? 1, 5); 
+                            if (empty($recentNotifications)): ?>
+                                <div class="px-3 py-4 text-center text-slate-500 text-sm">No new notifications</div>
+                            <?php else: foreach ($recentNotifications as $rn): ?>
+                            <a href="<?= $rn['task_id'] ? '/bathyal/tasks?id='.$rn['task_id'] : '/bathyal/inbox' ?>" class="block px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors relative border border-transparent hover:border-slate-200">
+                                <?php if (!$rn['is_read']): ?>
                                 <span class="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-teal-500 rounded-full"></span>
+                                <?php endif; ?>
                                 <div class="pl-3">
-                                    <p class="text-sm text-slate-800 font-medium leading-snug">System Alert</p>
-                                    <p class="text-xs text-slate-500 truncate mt-0.5">Welcome to Bathyal! Your workspace is ready.</p>
-                                    <p class="text-[10px] text-slate-400 mt-1">Just now</p>
+                                    <p class="text-sm <?= !$rn['is_read'] ? 'text-slate-800 font-medium' : 'text-slate-600' ?> leading-snug break-words">
+                                        <?= htmlspecialchars($rn['message']) ?>
+                                    </p>
+                                    <p class="text-[10px] text-slate-400 mt-1"><?= date('M j, g:i A', strtotime($rn['created_at'])) ?></p>
                                 </div>
-                            </div>
-                            <!-- Secondary Item -->
-                            <div class="px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors border border-transparent hover:border-slate-200">
-                                <div class="pl-3">
-                                    <p class="text-sm text-slate-600 font-medium leading-snug">New feature released</p>
-                                    <p class="text-xs text-slate-500 truncate mt-0.5">Check out the new layout designed for you.</p>
-                                    <p class="text-[10px] text-slate-400 mt-1">2 hours ago</p>
-                                </div>
-                            </div>
+                            </a>
+                            <?php endforeach; endif; ?>
                         </div>
-                        <div class="px-4 py-2 border-t border-slate-100 text-center bg-slate-50/50">
-                            <a href="#" class="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors">View all notifications</a>
+                        <div class="px-4 py-2 border-t border-slate-100 text-center bg-slate-50/50 rounded-b-xl">
+                            <a href="/bathyal/inbox" class="text-xs font-semibold text-teal-600 hover:text-teal-800 transition-colors">Open Inbox</a>
                         </div>
                     </div>
                 </div>
+
+                <script>
+                    document.getElementById('header-bell-btn').addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        document.getElementById('global-notifications-dropdown').classList.toggle('hidden');
+                    });
+                    document.addEventListener('click', function(e) {
+                        const dropdown = document.getElementById('global-notifications-dropdown');
+                        const btn = document.getElementById('header-bell-btn');
+                        if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
+                            dropdown.classList.add('hidden');
+                        }
+                    });
+                </script>
 
                 <!-- Avatar -->
                 <div class="relative group">

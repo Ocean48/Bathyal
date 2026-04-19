@@ -339,10 +339,111 @@ class DBQueries {
         $stmt->bindValue(':status', $status, PDO::PARAM_STR);
         $stmt->bindValue(':completed_date', $completed_date, $completed_date ? PDO::PARAM_STR : PDO::PARAM_NULL);
         $stmt->bindValue(':id', (int)$taskId, PDO::PARAM_INT);
-        return $stmt->execute();
+        $res = $stmt->execute();
+
+        if ($res) {
+            $this->checkAndFireTaskTriggers($taskId, 'on_status_change');
+            if ($completed_date) {
+                $this->checkAndFireTaskTriggers($taskId, 'on_complete');
+            }
+        }
+        return $res;
+    }
+
+    public function checkAndFireTaskTriggers($taskId, $event) {
+        try {
+            $stmt = $this->pdo->prepare("SELECT * FROM task_triggers WHERE source_task_id = :id AND trigger_event = :event");
+            $stmt->execute(['id' => $taskId, 'event' => $event]);
+            $triggers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($triggers as $trigger) {
+                if ($trigger['action'] === 'notify_assignee' || $trigger['action'] === 'notify_admin') {
+                    $this->sendTaskNotification($taskId, "Task automation trigger: " . $event, 'system');
+                } elseif ($trigger['action'] === 'start_next_task' && $trigger['target_task_id']) {
+                    $this->updateTaskStatus($trigger['target_task_id'], 'in_progress');
+                }
+            }
+        } catch (\PDOException $e) {
+            error_log("Trigger error: " . $e->getMessage());
+        }
+    }
+
+    public function sendTaskNotification($taskId, $message, $category = 'task_update') {
+        try {
+            // Find assignees
+            $stmtAsg = $this->pdo->prepare("SELECT u.id, u.email, u.name FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE ta.task_id = :tid");
+            $stmtAsg->execute(['tid' => $taskId]);
+            $assignees = $stmtAsg->fetchAll(PDO::FETCH_ASSOC);
+
+            $notifyUsers = [];
+            if (!empty($assignees)) {
+                $notifyUsers = $assignees;
+            } else {
+                // Find project default notifiers
+                $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
+                $stmtProj->execute(['tid' => $taskId]);
+                $projectId = $stmtProj->fetchColumn();
+
+                if ($projectId) {
+                    $stmtDef = $this->pdo->prepare("SELECT u.id, u.email, u.name FROM project_default_notify pdn JOIN users u ON pdn.user_id = u.id WHERE pdn.project_id = :pid");
+                    $stmtDef->execute(['pid' => $projectId]);
+                    $notifyUsers = $stmtDef->fetchAll(PDO::FETCH_ASSOC);
+                }
+            }
+
+            if (empty($notifyUsers)) return;
+
+            $stmtInsertNotif = $this->pdo->prepare("INSERT INTO notifications (user_id, task_id, category, message, is_read) VALUES (:uid, :tid, :cat, :msg, 0)");
+
+            foreach ($notifyUsers as $u) {
+                // Insert DB notification
+                $stmtInsertNotif->execute([
+                    'uid' => $u['id'],
+                    'tid' => $taskId,
+                    'cat' => $category,
+                    'msg' => $message
+                ]);
+
+                // Send email
+                $to = $u['email'];
+                $subject = "App Notification: Task {$taskId}";
+                $body = "Hello {$u['name']},\n\n{$message}\n\nTask ID: {$taskId}\n";
+                $headers = "From: no-reply@bathyal.local";
+                @mail($to, $subject, $body, $headers);
+            }
+        } catch (\PDOException $e) {
+            error_log("Notification error: " . $e->getMessage());
+        }
     }
 
     // --- NEW DB QUERIES ---
+
+    public function getUserNotifications($userId, $limit = 50, $category = null) {
+        $sql = "SELECT * FROM notifications WHERE user_id = :uid";
+        $params = ['uid' => (int)$userId];
+        
+        if ($category && $category !== 'all') {
+            $sql .= " AND category = :cat";
+            $params['cat'] = $category;
+        }
+        
+        $sql .= " ORDER BY created_at DESC LIMIT " . (int)$limit;
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    public function markNotificationRead($notificationId, $userId) {
+        $stmt = $this->pdo->prepare("UPDATE notifications SET is_read = 1 WHERE id = :id AND user_id = :uid");
+        return $stmt->execute(['id' => (int)$notificationId, 'uid' => (int)$userId]);
+    }
+
+    public function getUnreadNotificationCount($userId) {
+        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = :uid AND is_read = 0");
+        $stmt->execute(['uid' => (int)$userId]);
+        return (int)$stmt->fetchColumn();
+    }
 
     public function getProjectDefaultNotifyIds($projectId) {
         $stmtNotify = $this->pdo->prepare("SELECT user_id FROM project_default_notify WHERE project_id = :pid");
@@ -817,6 +918,10 @@ class DBQueries {
             $stmt->execute();
         }
 
+        if (array_key_exists('due_date', $data)) {
+            $this->sendTaskNotification($taskId, "Task due date was updated to: " . ($data['due_date'] ?: 'None'), 'task_update');
+        }
+
         if (array_key_exists('assignee_ids', $data)) {
             // Delete existing
             $stmtDel = $this->pdo->prepare("DELETE FROM task_assignees WHERE task_id = :id");
@@ -832,6 +937,7 @@ class DBQueries {
                     $stmtIns->execute();
                 }
             }
+            $this->sendTaskNotification($taskId, "Task assignees updated", 'task_update');
         }
         
         return true;

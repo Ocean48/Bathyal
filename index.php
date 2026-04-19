@@ -56,6 +56,10 @@ switch ($route) {
     case 'settings':
         require 'views/pages/settings.php';
         break;
+    case 'inbox.php':
+    case 'inbox':
+        require 'views/pages/inbox.php';
+        break;
     case 'teams.php':
     case 'teams':
         require 'views/pages/teams.php';
