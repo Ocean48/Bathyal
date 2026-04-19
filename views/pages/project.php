@@ -15,8 +15,13 @@ require_once 'views/layouts/header.php';
             <div class="w-8 h-8 rounded bg-teal-100 flex items-center justify-center text-teal-700 font-bold mr-3 shadow-sm">
                 <svg class="w-4 h-4" auto fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
             </div>
-            <h1 class="text-xl font-semibold text-slate-800" id="project-title">Loading...</h1>
-            <span class="ml-3 px-2.5 py-0.5 rounded-full bg-slate-100 text-xs font-medium text-slate-600" id="project-status">--</span>
+            <h1 class="text-xl font-semibold text-slate-800 leading-none" id="project-title">Loading...</h1>
+            <select id="project-status" onchange="updateProjectStatus(this.value)" class="ml-3 px-4 py-1 mt-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase border focus:outline-none focus:ring-2 focus:ring-teal-500 appearance-none cursor-pointer bg-slate-100 text-slate-600 border-slate-200 text-center" style="text-align-last: center; width: 95px;">
+                <option value="planning">PLANNING</option>
+                <option value="active">ACTIVE</option>
+                <option value="completed">COMPLETED</option>
+                <option value="archived">ARCHIVED</option>
+            </select>
         </div>
         <div class="flex space-x-3 items-center relative">
             <div class="flex -space-x-2 mr-4 transition-colors" id="project-members" title="Manage Default Notifications">
@@ -108,6 +113,34 @@ require_once 'views/layouts/header.php';
 
         <!-- List View -->
         <div id="view-list" class="flex-1 overflow-auto p-6 hidden view-panel">
+            <!-- Filter Bar -->
+            <div class="mb-4 flex flex-wrap gap-3 items-center bg-white px-4 py-3 rounded-lg shadow-sm border border-slate-200">
+                <span class="text-sm font-semibold text-slate-700 flex items-center shrink-0">
+                    <svg class="w-4 h-4 mr-1.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                    Filters
+                </span>
+                
+                <input type="text" id="filter-search-list" oninput="applyListFilters()" placeholder="Search tasks..." class="text-sm border border-slate-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500 w-48 sm:w-64 transition-shadow placeholder-slate-400">
+                
+                <select id="filter-status-list" onchange="applyListFilters()" class="text-sm border border-slate-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-slate-50 text-slate-600 appearance-none cursor-pointer pr-8 bg-no-repeat bg-[right_0.5rem_center] bg-[length:1em_1em] hover:bg-slate-100 transition-colors" style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')">
+                    <option value="">All Statuses</option>
+                    <option value="todo">To Do</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="paused">Paused</option>
+                    <option value="completed">Completed</option>
+                </select>
+
+                <select id="filter-assignee-list" onchange="applyListFilters()" class="text-sm border border-slate-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-slate-50 text-slate-600 appearance-none cursor-pointer pr-8 bg-no-repeat bg-[right_0.5rem_center] bg-[length:1em_1em] hover:bg-slate-100 transition-colors" style="background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')">
+                    <option value="">All Assignees</option>
+                    <!-- Populated dynamically via loadProjectBoard in app.js -->
+                </select>
+                
+                <button onclick="clearListFilters()" class="text-slate-400 hover:text-rose-500 text-xs font-medium ml-auto transition-colors flex items-center">
+                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    Clear
+                </button>
+            </div>
+
             <div class="bg-white rounded-lg shadow-sm border border-slate-200 mb-4">
                 <table class="w-full text-left text-sm text-slate-600" id="list-table">
                     <thead class="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
@@ -153,6 +186,10 @@ require_once 'views/layouts/header.php';
         <!-- Modal Header -->
         <div class="flex justify-between items-center px-6 py-4 border-b border-slate-200">
             <div class="flex space-x-3 items-center">
+                <button id="btn-back-task" class="hidden text-slate-500 hover:bg-slate-100 hover:text-slate-800 p-1.5 rounded transition-colors -ml-2" title="Go Back to Previous Task" onclick="goBackToPreviousTask()">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </button>
+                <div class="h-6 border-l border-slate-300 mx-1 hidden" id="task-modal-divider"></div>
                 <button id="btn-start-progress" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded text-sm font-medium shadow-sm flex items-center transition-colors" onclick="toggleProgress()">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     <span>Start Progress</span>
@@ -195,7 +232,7 @@ require_once 'views/layouts/header.php';
                 </div>
                 <div>
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Status</label>
-                    <select id="task-modal-status" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 rounded bg-transparent font-medium text-emerald-600">
+                    <select id="task-modal-status" onchange="updateTaskDetails()" class="text-sm border-none focus:ring-0 p-0 rounded bg-transparent font-medium text-emerald-600">
                         <option value="todo">To Do</option>
                         <option value="in_progress">In Progress</option>
                         <option value="paused">Paused</option>
@@ -232,24 +269,24 @@ require_once 'views/layouts/header.php';
                 <div class="border border-slate-300 rounded bg-white overflow-hidden flex flex-col min-h-[200px]">
                     <!-- RTE Toolbar -->
                     <div class="bg-slate-50 border-b border-slate-200 px-2 py-1.5 flex flex-wrap gap-1 items-center">
-                        <button type="button" onclick="formatText('bold', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bold">
+                        <button type="button" onmousedown="event.preventDefault(); formatText('bold', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bold">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z"></path></svg>
                         </button>
-                        <button type="button" onclick="formatText('italic', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Italic">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4-4-4-4M6 16l-4 4 4 4"></path></svg>
+                        <button type="button" onmousedown="event.preventDefault(); formatText('italic', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Italic">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 6h6M12 6v12M9 18h6"></path></svg>
                         </button>
-                        <button type="button" onclick="formatText('underline', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Underline">
+                        <button type="button" onmousedown="event.preventDefault(); formatText('underline', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Underline">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3m-9 18h6"></path></svg>
                         </button>
                         <div class="w-px h-5 bg-slate-300 mx-1"></div>
-                        <button type="button" onclick="formatText('insertUnorderedList', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bullet List">
+                        <button type="button" onmousedown="event.preventDefault(); formatText('insertUnorderedList', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bullet List">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                         </button>
-                        <button type="button" onclick="formatText('insertOrderedList', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Numbered List">
+                        <button type="button" onmousedown="event.preventDefault(); formatText('insertOrderedList', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Numbered List">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 6h11M9 12h11M9 18h11M5 6v.01M5 12v.01M5 18v.01"></path></svg>
                         </button>
                         <div class="w-px h-5 bg-slate-300 mx-1"></div>
-                        <button type="button" onclick="insertTable('task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Table">
+                        <button type="button" onmousedown="event.preventDefault(); insertTable('task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Table">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm2 4h12M12 10v10"></path></svg>
                         </button>
                         <button type="button" onclick="document.getElementById('rte-image-upload-desc').click()" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Image">
@@ -257,21 +294,18 @@ require_once 'views/layouts/header.php';
                         </button>
                         <input type="file" id="rte-image-upload-desc" accept="image/*" class="hidden" onchange="uploadRteImage(this, 'task-modal-desc')">
                         <div class="w-px h-5 bg-slate-300 mx-1"></div>
-                        <button type="button" onclick="editTable('addRow', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Row">+Row</button>
-                        <button type="button" onclick="editTable('addCol', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Column">+Col</button>
-                        <button type="button" onclick="editTable('delRow', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Row">-Row</button>
-                        <button type="button" onclick="editTable('delCol', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Column">-Col</button>
+                        <button type="button" onmousedown="event.preventDefault(); editTable('addRow', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Row">+Row</button>
+                        <button type="button" onmousedown="event.preventDefault(); editTable('addCol', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Column">+Col</button>
+                        <button type="button" onmousedown="event.preventDefault(); editTable('delRow', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Row">-Row</button>
+                        <button type="button" onmousedown="event.preventDefault(); editTable('delCol', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Column">-Col</button>
                         <div class="flex-1"></div>
                         <button type="button" onclick="toggleCodeView('task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Toggle Code View">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4-4-4-4M6 16l-4 4 4 4"></path></svg>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l-4 3 4 3m8-6l4 3-4 3"></path></svg>
                         </button>
                     </div>
-                    <div id="task-modal-desc" class="prose prose-sm text-slate-600 p-4 outline-none flex-1 max-w-none break-words min-h-[100px] border border-transparent focus:border-slate-200" contenteditable="true" onblur="updateTaskDetails()">
+                    <div id="task-modal-desc" class="prose prose-sm text-slate-600 p-4 outline-none flex-1 max-w-none break-words min-h-[100px] border border-transparent focus:border-slate-200" contenteditable="true" onkeydown="handleRteTab(event)" onblur="updateTaskDetails()">
                     </div>
                     <textarea id="task-modal-desc-code" class="hidden font-mono text-sm p-4 w-full flex-1 outline-none text-slate-700 bg-slate-50 break-words min-h-[100px]" onblur="updateTaskDetails()"></textarea>
-                </div>
-                <div class="mt-2 flex justify-end">
-                    <button onclick="updateTaskDetails()" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded text-xs font-medium shadow-sm transition-colors">Save Description</button>
                 </div>
             </div>
 
@@ -323,24 +357,24 @@ require_once 'views/layouts/header.php';
                         <div class="border border-slate-300 rounded bg-white mb-2 overflow-hidden flex flex-col min-h-[120px]">
                             <!-- RTE Toolbar -->
                             <div class="bg-slate-50 border-b border-slate-200 px-2 py-1.5 flex flex-wrap gap-1 items-center">
-                                <button type="button" onclick="formatText('bold', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bold">
+                                <button type="button" onmousedown="event.preventDefault(); formatText('bold', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bold">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z"></path></svg>
                                 </button>
-                                <button type="button" onclick="formatText('italic', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Italic">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4-4-4-4M6 16l-4 4 4 4"></path></svg>
+                                <button type="button" onmousedown="event.preventDefault(); formatText('italic', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Italic">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 6h6M12 6v12M9 18h6"></path></svg>
                                 </button>
-                                <button type="button" onclick="formatText('underline', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Underline">
+                                <button type="button" onmousedown="event.preventDefault(); formatText('underline', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Underline">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3m-9 18h6"></path></svg>
                                 </button>
                                 <div class="w-px h-5 bg-slate-300 mx-1"></div>
-                                <button type="button" onclick="formatText('insertUnorderedList', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bullet List">
+                                <button type="button" onmousedown="event.preventDefault(); formatText('insertUnorderedList', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bullet List">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                                 </button>
-                                <button type="button" onclick="formatText('insertOrderedList', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Numbered List">
+                                <button type="button" onmousedown="event.preventDefault(); formatText('insertOrderedList', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Numbered List">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 6h11M9 12h11M9 18h11M5 6v.01M5 12v.01M5 18v.01"></path></svg>
                                 </button>
                                 <div class="w-px h-5 bg-slate-300 mx-1"></div>
-                                <button type="button" onclick="insertTable('task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Table">
+                                <button type="button" onmousedown="event.preventDefault(); insertTable('task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Table">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm2 4h12M12 10v10"></path></svg>
                                 </button>
                                 <button type="button" onclick="document.getElementById('rte-image-upload-comment').click()" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Image">
@@ -348,25 +382,22 @@ require_once 'views/layouts/header.php';
                                 </button>
                                 <input type="file" id="rte-image-upload-comment" accept="image/*" class="hidden" onchange="uploadRteImage(this, 'task-modal-new-comment')">
                                 <div class="w-px h-5 bg-slate-300 mx-1"></div>
-                                <button type="button" onclick="editTable('addRow', 'task-modal-new-comment')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Row">+Row</button>
-                                <button type="button" onclick="editTable('addCol', 'task-modal-new-comment')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Column">+Col</button>
-                                <button type="button" onclick="editTable('delRow', 'task-modal-new-comment')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Row">-Row</button>
-                                <button type="button" onclick="editTable('delCol', 'task-modal-new-comment')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Column">-Col</button>
+                                <button type="button" onmousedown="event.preventDefault(); editTable('addRow', 'task-modal-new-comment')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Row">+Row</button>
+                                <button type="button" onmousedown="event.preventDefault(); editTable('addCol', 'task-modal-new-comment')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Column">+Col</button>
+                                <button type="button" onmousedown="event.preventDefault(); editTable('delRow', 'task-modal-new-comment')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Row">-Row</button>
+                                <button type="button" onmousedown="event.preventDefault(); editTable('delCol', 'task-modal-new-comment')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Column">-Col</button>
                                 <div class="flex-1"></div>
                                 <button type="button" onclick="toggleCodeView('task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Toggle Code View">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4-4-4-4M6 16l-4 4 4 4"></path></svg>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l-4 3 4 3m8-6l4 3-4 3"></path></svg>
                                 </button>
                             </div>
                             
-                            <div id="task-modal-new-comment" class="prose prose-sm text-slate-600 p-3 outline-none flex-1 max-w-none break-words" contenteditable="true" data-placeholder="Ask a question or post an update..." onfocus="if(this.innerHTML==='<p><br></p>') this.innerHTML='';" onblur="if(this.innerHTML==='') this.innerHTML='<p><br></p>';"></div>
+                            <div id="task-modal-new-comment" class="prose prose-sm text-slate-600 p-3 outline-none flex-1 max-w-none break-words" contenteditable="true" data-placeholder="Ask a question or post an update..." onkeydown="handleRteTab(event)" onfocus="if(this.innerHTML==='<p><br></p>') this.innerHTML='';" onblur="if(this.innerHTML==='') this.innerHTML='<p><br></p>';"></div>
                             <textarea id="task-modal-new-comment-code" class="hidden font-mono text-sm p-3 w-full flex-1 outline-none text-slate-700 bg-slate-50 break-words min-h-[100px]"></textarea>
                         </div>
                         <div class="mt-2 flex justify-end flex-wrap gap-2">
-                            <button onclick="document.getElementById('task-comment-attachment').click()" class="text-xs text-slate-500 font-medium hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded transition">Attach File</button>
-                            <input type="file" id="task-comment-attachment" class="hidden" multiple onchange="queueCommentAttachments(this)">
                             <button onclick="submitTaskComment()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium shadow-sm transition-colors">Comment</button>
                         </div>
-                        <div id="comment-attachment-preview" class="flex flex-wrap gap-2 mt-2"></div>
                     </div>
                 </div>
 
@@ -424,9 +455,47 @@ require_once 'views/layouts/header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script>
+window.getStatusBadgeClass = function(status) {
+    const s = (status || 'todo').toLowerCase();
+    if (s === 'completed' || s === 'done') {
+        return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+    } else if (s === 'in_progress' || s === 'ongoing' || s === 'active') {
+        return 'text-blue-700 bg-blue-50 border-blue-200';
+    } else if (s === 'paused' || s === 'planning') {
+        return 'text-amber-700 bg-amber-50 border-amber-200';
+    } else if (s === 'in_review') {
+        return 'text-purple-700 bg-purple-50 border-purple-200';
+    } else if (s === 'cancelled' || s === 'archived') {
+        return 'text-rose-700 bg-rose-50 border-rose-200';
+    } else {
+        return 'text-slate-600 bg-slate-50 border-slate-200';
+    }
+};
+
+window.getStatusTextClass = function(status) {
+    const s = (status || 'todo').toLowerCase();
+    if (s === 'completed' || s === 'done') return 'text-emerald-600';
+    if (s === 'in_progress' || s === 'ongoing' || s === 'active') return 'text-blue-600';
+    if (s === 'paused' || s === 'planning') return 'text-amber-500';
+    if (s === 'in_review') return 'text-purple-600';
+    if (s === 'cancelled' || s === 'archived') return 'text-rose-500';
+    return 'text-slate-600';
+};
+
 let timerInterval;
 
 // Custom Rich Text Editor Functions
+function handleRteTab(event) {
+    if (event.key === 'Tab') {
+        event.preventDefault();
+        if (event.shiftKey) {
+            document.execCommand('outdent', false, null);
+        } else {
+            document.execCommand('indent', false, null);
+        }
+    }
+}
+
 function formatText(command, editorId) {
     document.getElementById(editorId).focus();
     document.execCommand(command, false, null);
@@ -539,7 +608,8 @@ async function uploadRteImage(input, editorId) {
             document.getElementById(editorId).focus();
             document.execCommand('insertImage', false, data.location);
         } else {
-            alert('Image upload failed');
+            console.error("Upload response data:", data);
+            alert('Image upload failed. Error details: ' + JSON.stringify(data));
         }
     } catch(e) {
         console.error(e);
@@ -574,6 +644,12 @@ function switchView(viewName) {
     if(activeView) {
         activeView.classList.remove('hidden');
     }
+
+    if (viewName === 'timeline' && typeof renderTimeline === 'function') {
+        renderTimeline();
+    } else if (viewName === 'dashboard' && typeof renderDashboard === 'function') {
+        renderDashboard();
+    }
 }
 
 async function openTaskModal(taskId) {
@@ -587,7 +663,9 @@ async function openTaskModal(taskId) {
         
         document.getElementById('task-modal-id').value = task.id;
         document.getElementById('task-modal-title').value = task.title;
-        document.getElementById('task-modal-status').value = task.status;
+        const statusSelect = document.getElementById('task-modal-status');
+        statusSelect.value = task.status;
+        statusSelect.className = `text-sm border-none focus:ring-0 p-0 rounded bg-transparent font-medium ${window.getStatusTextClass(task.status)}`;
         
         let dateVal = '';
         if(task.due_date) {
@@ -683,8 +761,8 @@ async function openTaskModal(taskId) {
                     <div class="flex flex-col mb-1 group items-start justify-between bg-white border border-transparent hover:bg-slate-50 hover:border-slate-200 rounded px-2 py-1.5 transition-colors">
                         <div class="flex items-center space-x-3 w-full">
                             <input type="checkbox" ${sub.status==='completed'?'checked':''} onchange="updateSubtaskStatus(${sub.id}, this)" class="rounded text-teal-500 focus:ring-teal-500 focus:ring-offset-0 w-4 h-4 cursor-pointer">
-                            <span class="flex-1 text-sm text-slate-700 cursor-pointer truncate" onclick="openTaskModal(${sub.id})" title="${sub.title}">${sub.title}</span>
-                            <span class="text-[10px] items-center text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-medium tracking-wide uppercase shadow-sm border border-slate-200/50">${sub.status}</span>
+                            <span class="flex-1 text-sm cursor-pointer truncate ${sub.status==='completed'?'line-through text-slate-400':'text-slate-700'}" onclick="openTaskModal(${sub.id})" title="${sub.title}">${sub.title}</span>
+                            <span class="text-[10px] items-center px-1.5 py-0.5 rounded font-medium tracking-wide uppercase shadow-sm border ${window.getStatusBadgeClass(sub.status)}">${sub.status.replace('_', ' ')}</span>
                             ${unlinkBtn}
                         </div>
                     </div>
@@ -699,15 +777,23 @@ async function openTaskModal(taskId) {
             task.comments.forEach(comment => {
                 const dt = new Date(comment.created_at).toLocaleString();
                 const initials = comment.user_name ? comment.user_name.substring(0, 2) : 'U';
+                
+                // Assumes mock user ID 1 OR user can edit their own comment
+                const isOwner = parseInt(comment.user_id) === 1;
+                const editBtn = isOwner ? `<button type="button" onclick="enableCommentEdit(${comment.id})" class="text-[11px] text-teal-600 hover:text-teal-800 ml-2 font-medium">Edit</button>` : '';
+
                 commentsContainer.innerHTML += `
-                    <div class="flex space-x-3">
+                    <div class="flex space-x-3" id="comment-${comment.id}">
                         <div class="w-8 h-8 rounded-full bg-teal-100 text-teal-700 text-xs font-bold flex items-center justify-center flex-shrink-0" title="${comment.user_name}">${initials}</div>
                         <div class="flex-1 bg-slate-50 p-3 rounded-lg rounded-tl-none border border-slate-100">
                             <div class="flex justify-between items-start mb-1">
-                                <span class="font-medium text-slate-800 text-sm">${comment.user_name}</span>
+                                <div>
+                                    <span class="font-medium text-slate-800 text-sm">${comment.user_name}</span>
+                                    ${editBtn}
+                                </div>
                                 <span class="text-xs text-slate-400">${dt}</span>
                             </div>
-                            <div class="text-sm text-slate-600 prose prose-sm max-w-none">${comment.content}</div>
+                            <div class="text-sm text-slate-600 prose prose-sm max-w-none comment-content">${comment.content}</div>
                         </div>
                     </div>
                 `;
@@ -768,7 +854,10 @@ async function openTaskModal(taskId) {
 async function updateTaskDetails() {
     const id = document.getElementById('task-modal-id').value;
     const title = document.getElementById('task-modal-title').value;
-    const status = document.getElementById('task-modal-status').value;
+    const statusSelect = document.getElementById('task-modal-status');
+    const status = statusSelect.value;
+    statusSelect.className = `text-sm border-none focus:ring-0 p-0 rounded bg-transparent font-medium ${window.getStatusTextClass(status)}`;
+
     const dueDate = document.getElementById('task-modal-due-date').value;
     
     // Get content from custom editor or code block
@@ -802,6 +891,26 @@ async function updateSubtaskStatus(id, checkbox) {
         body: JSON.stringify({ action: 'update_status', task_id: id, status })
     });
     if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
+
+    // Dynamically update the UI
+    const subtaskContainer = checkbox.closest('.group');
+    if (subtaskContainer) {
+        const titleSpan = subtaskContainer.querySelector('.truncate');
+        const statusSpan = subtaskContainer.querySelector('.text-\\[10px\\]');
+        if (titleSpan) {
+            if (checkbox.checked) {
+                titleSpan.classList.add('line-through', 'text-slate-400');
+                titleSpan.classList.remove('text-slate-700');
+            } else {
+                titleSpan.classList.remove('line-through', 'text-slate-400');
+                titleSpan.classList.add('text-slate-700');
+            }
+        }
+        if (statusSpan) {
+            statusSpan.textContent = status.replace('_', ' ');
+            statusSpan.className = `text-[10px] items-center px-1.5 py-0.5 rounded font-medium tracking-wide uppercase shadow-sm border ${window.getStatusBadgeClass(status)}`;
+        }
+    }
 }
 
 async function submitTaskComment() {
@@ -810,11 +919,6 @@ async function submitTaskComment() {
     if (content === '<p><br></p>') content = '';
     
     if(!id || !content) return;
-    
-    // Check if we have attachments to upload first
-    const fileInput = document.getElementById('task-comment-attachment');
-    const files = fileInput.files;
-    let commentId = null;
 
     const res = await fetch('api/tasks.php', {
         method: 'POST',
@@ -823,43 +927,116 @@ async function submitTaskComment() {
     });
     
     if(res.ok) {
-        const data = await res.json();
-        commentId = data.comment_id;
-        
-        // Handle attachments if any
-        if (files.length > 0) {
-            for (let i = 0; i < files.length; i++) {
-                const formData = new FormData();
-                formData.append('action', 'add_attachment');
-                formData.append('task_id', id);
-                formData.append('file', files[i]);
-                await fetch('api/tasks.php', {
-                    method: 'POST',
-                    body: formData
-                });
-            }
-        }
-
+        // clear comment input
+        const editor = document.getElementById('task-modal-new-comment');
         if (editor) {
             editor.innerHTML = '<p><br></p>';
         }
-        
-        // clear attachment input
-        fileInput.value = '';
-        document.getElementById('comment-attachment-preview').innerHTML = '';
+        const editorCode = document.getElementById('task-modal-new-comment-code');
+        if (editorCode) {
+            editorCode.value = '';
+        }
         
         openTaskModal(id); // Reload modal to show new comment and attachments
     }
 }
 
-let pendingCommentFiles = [];
-function queueCommentAttachments(input) {
-    const preview = document.getElementById('comment-attachment-preview');
-    preview.innerHTML = '';
-    if (input.files.length > 0) {
-        Array.from(input.files).forEach(f => {
-            preview.innerHTML += `<span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs inline-block">${f.name}</span>`;
-        });
+function enableCommentEdit(commentId) {
+    const parent = document.getElementById('comment-' + commentId);
+    if (!parent) return;
+
+    const contentDiv = parent.querySelector('.comment-content');
+    const existingHtml = contentDiv.innerHTML;
+
+    // Use dataset to store original content for cancellation
+    contentDiv.dataset.originalHtml = escape(existingHtml);
+
+    contentDiv.innerHTML = `
+        <div class="mt-2 w-full">
+            <div class="flex flex-col border border-slate-200 rounded-lg overflow-hidden focus-within:border-teal-500 focus-within:ring-1 focus-within:ring-teal-500 transition-all bg-white mb-2">
+                <div class="bg-slate-50 border-b border-slate-200 px-2 py-1.5 flex flex-wrap gap-1 items-center" id="edit-toolbar-${commentId}">
+                    <button type="button" onmousedown="event.preventDefault(); formatText('bold', 'edit-comment-area-${commentId}')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bold">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z"></path></svg>
+                    </button>
+                    <button type="button" onmousedown="event.preventDefault(); formatText('italic', 'edit-comment-area-${commentId}')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Italic">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 6h6M12 6v12M9 18h6"></path></svg>
+                    </button>
+                    <button type="button" onmousedown="event.preventDefault(); formatText('underline', 'edit-comment-area-${commentId}')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Underline">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3m-9 18h6"></path></svg>
+                    </button>
+                    <div class="w-px h-5 bg-slate-300 mx-1"></div>
+                    <button type="button" onmousedown="event.preventDefault(); formatText('insertUnorderedList', 'edit-comment-area-${commentId}')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bullet List">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    </button>
+                    <button type="button" onmousedown="event.preventDefault(); formatText('insertOrderedList', 'edit-comment-area-${commentId}')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Numbered List">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 6h11M9 12h11M9 18h11M5 6v.01M5 12v.01M5 18v.01"></path></svg>
+                    </button>
+                    <div class="w-px h-5 bg-slate-300 mx-1"></div>
+                    <button type="button" onmousedown="event.preventDefault(); insertTable('edit-comment-area-${commentId}')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Table">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm2 4h12M12 10v10"></path></svg>
+                    </button>
+                    <button type="button" onclick="document.getElementById('rte-image-upload-editcomment-${commentId}').click()" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Image">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    </button>
+                    <input type="file" id="rte-image-upload-editcomment-${commentId}" accept="image/*" class="hidden" onchange="uploadRteImage(this, 'edit-comment-area-${commentId}')">
+                    <div class="w-px h-5 bg-slate-300 mx-1"></div>
+                    <button type="button" onmousedown="event.preventDefault(); editTable('addRow', 'edit-comment-area-${commentId}')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Row">+Row</button>
+                    <button type="button" onmousedown="event.preventDefault(); editTable('addCol', 'edit-comment-area-${commentId}')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Column">+Col</button>
+                    <button type="button" onmousedown="event.preventDefault(); editTable('delRow', 'edit-comment-area-${commentId}')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Row">-Row</button>
+                    <button type="button" onmousedown="event.preventDefault(); editTable('delCol', 'edit-comment-area-${commentId}')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Delete Column">-Col</button>
+                    <div class="flex-1"></div>
+                    <button type="button" onclick="toggleCodeView('edit-comment-area-${commentId}')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Toggle Code View">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l-4 3 4 3m8-6l4 3-4 3"></path></svg>
+                    </button>
+                </div>
+                <div 
+                    id="edit-comment-area-${commentId}" 
+                    contenteditable="true" 
+                    onkeydown="handleRteTab(event)"
+                    class="p-3 min-h-[60px] max-h-48 overflow-y-auto focus:outline-none text-sm text-slate-700 bg-white list-disc list-inside prose prose-sm max-w-none"
+                    style="outline: none;"
+                >${existingHtml}</div>
+                <textarea 
+                    id="edit-comment-area-${commentId}-code" 
+                    class="hidden font-mono text-sm p-3 w-full flex-1 outline-none text-slate-700 bg-slate-50 break-words min-h-[100px] resize-y"
+                ></textarea>
+            </div>
+            <div class="flex justify-end space-x-2">
+                <button type="button" onclick="cancelCommentEdit(${commentId})" class="px-3 py-1.5 text-xs text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 rounded shadow-sm font-medium transition-colors">Cancel</button>
+                <button type="button" onclick="submitEditedComment(${commentId})" class="px-3 py-1.5 text-xs text-white bg-teal-600 hover:bg-teal-700 rounded shadow-sm font-medium transition-colors">Save</button>
+            </div>
+        </div>
+    `;
+}
+
+function cancelCommentEdit(commentId) {
+    const parent = document.getElementById('comment-' + commentId);
+    if (!parent) return;
+
+    const contentDiv = parent.querySelector('.comment-content');
+    contentDiv.innerHTML = unescape(contentDiv.dataset.originalHtml);
+}
+
+async function submitEditedComment(commentId) {
+    let content = getEditorContent('edit-comment-area-' + commentId).trim();
+    if (content === '<p><br></p>') content = '';
+    
+    if (!content) {
+        alert('Comment cannot be empty.');
+        return;
+    }
+
+    const res = await fetch('api/tasks.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ action: 'edit_comment', comment_id: commentId, content })
+    });
+
+    if(res.ok) {
+        const taskId = document.getElementById('task-modal-id').value;
+        openTaskModal(taskId); // refresh task modal
+    } else {
+        alert('Failed to edit comment. Ensure you have permission.');
     }
 }
 

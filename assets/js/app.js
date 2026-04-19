@@ -115,27 +115,53 @@ async function loadProjectBoard(projectId) {
     try {
         const response = await fetch(`api/projects.php?id=${projectId}`);
         const project = await response.json();
-        
+        window.currentProjectData = project; // Store for timeline/dashboard
+
         if (project.error) {
             document.getElementById('kanban-board').innerHTML = `<p class="text-red-500 p-4">${project.error}</p>`;
             return;
         }
 
         document.getElementById('project-title').textContent = project.name;
-        document.getElementById('project-status').textContent = project.status.toUpperCase();
+        const projectStatusEl = document.getElementById('project-status');
+        if (projectStatusEl.tagName === 'SELECT') {
+            projectStatusEl.value = project.status;
+            projectStatusEl.className = `ml-3 px-3 py-1 mt-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase border focus:outline-none focus:ring-2 focus:ring-teal-500 appearance-none cursor-pointer transition-colors ${window.getStatusBadgeClass ? window.getStatusBadgeClass(project.status) : 'bg-slate-100 text-slate-600 border-slate-200'}`;
+            if (window.updateStatusWidth) window.updateStatusWidth(projectStatusEl);
+        } else {
+            projectStatusEl.textContent = project.status.replace('_', ' ').toUpperCase();
+            projectStatusEl.className = `ml-3 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase border ${window.getStatusBadgeClass ? window.getStatusBadgeClass(project.status) : 'bg-slate-100 text-slate-600 border-slate-200'}`;
+        }
         window.currentUserProjectRole = project.user_role || 'viewer';
-        
+
         // Render project default notify members setup
         const projectMembersDiv = document.getElementById('project-members');
         if (projectMembersDiv) {
             projectMembersDiv.innerHTML = '';
+            
+            const assigneeFilterDropdown = document.getElementById('filter-assignee-list');
+            if (assigneeFilterDropdown) {
+                assigneeFilterDropdown.innerHTML = '<option value="">All Assignees</option>';
+            }
+
+            // Populate the dropdown with ALL project members, not just the default notify members
+            if (project.member_names && assigneeFilterDropdown) {
+                const mNames = project.member_names.split(',');
+                const mIds = String(project.member_ids).split(',');
+                mNames.forEach((n, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = mIds[idx].trim();
+                    opt.textContent = n.trim();
+                    assigneeFilterDropdown.appendChild(opt);
+                });
+            }
+
             if (project.default_notify_names) {
                 const names = project.default_notify_names.split(',');
                 const ids = project.default_notify_ids;
-                
-                // Keep track of current project default notify members for the dropdown
+
                 window.currentProjectMemberIds = ids.map(id => parseInt(id));
-                
+
                 const cursorClass = (window.currentUserProjectRole === 'viewer') ? 'cursor-default opacity-80' : 'cursor-pointer hover:bg-slate-200 transition-colors';
 
                 names.slice(0, 5).forEach(n => {
@@ -445,9 +471,9 @@ const totalSubtasks = parseInt(task.subtask_count || 0, 10);
             ${task.description ? `<p class="text-xs text-slate-500 line-clamp-2 mb-3 mt-1">${task.description}</p>` : ''}
             
             <div class="flex justify-between items-center text-xs mt-3 pt-3 border-t border-slate-50 relative pointer-events-none">
-                <div class="flex items-center space-x-2 text-slate-400 font-medium">
-                    <svg class="w-3.5 h-3.5 ${statusColor}" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                    <span>${task.status}</span>
+                  <div class="flex items-center space-x-1.5 font-medium">
+                      ${(task.status.toLowerCase() === 'completed' || task.status.toLowerCase() === 'done') ? `<svg class="w-3.5 h-3.5 ${window.getStatusTextClass ? window.getStatusTextClass(task.status) : statusColor}" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>` : `<svg class="w-3.5 h-3.5 ${window.getStatusTextClass ? window.getStatusTextClass(task.status) : statusColor}" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="4"></circle></svg>`}
+                      <span class="${window.getStatusTextClass ? window.getStatusTextClass(task.status) : 'text-slate-400'} uppercase tracking-wider text-[10px] font-bold">${task.status.replace('_', ' ')}</span>
                 </div>
                 ${subtaskBadge}
             </div>
@@ -459,8 +485,10 @@ const totalSubtasks = parseInt(task.subtask_count || 0, 10);
 function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
     const tr = document.createElement('tr');
     tr.className = `hover:bg-slate-50 cursor-pointer border-b border-slate-100 task-row ${parentId ? 'hidden child-of-' + parentId : ''} task-row-${task.id}`;
-    tr.dataset.taskId = task.id;
-    tr.onclick = (e) => {
+    tr.dataset.taskId = task.id;    tr.dataset.status = task.status || '';
+    tr.dataset.assigneeIds = task.assignee_ids || '';
+    tr.dataset.title = task.title || '';
+    tr.dataset.parentId = parentId || '';    tr.onclick = (e) => {
         // Prevent modal open if clicking explicitly on the tree expand toggle or drag handle
         if (e.target.closest('.subtask-toggle') || e.target.closest('.cursor-grab-list')) return;
         openTaskModal(task.id);
@@ -514,7 +542,12 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
         </td>
         <td class="px-4 py-3 text-slate-500 text-sm whitespace-nowrap">${task.due_date ? task.due_date.split(' ')[0] : '-'}</td>
         <td class="px-4 py-3 whitespace-nowrap">
-            <span class="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-600 border border-slate-200/60">${task.status}</span>
+            <select onchange="window.quickUpdateTaskStatus(${task.id}, this.value)" onclick="event.stopPropagation()" class="px-2 py-0.5 pr-6 rounded text-[10px] font-bold tracking-wider uppercase border border-slate-200/60 focus:outline-none focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer transition-colors ${window.getStatusBadgeClass ? window.getStatusBadgeClass(task.status) : 'bg-slate-100 text-slate-600'}">
+                <option value="todo" ${task.status === 'todo' ? 'selected' : ''}>TO DO</option>
+                <option value="in_progress" ${task.status === 'in_progress' ? 'selected' : ''}>IN PROGRESS</option>
+                <option value="paused" ${task.status === 'paused' ? 'selected' : ''}>PAUSED</option>
+                <option value="completed" ${task.status === 'completed' ? 'selected' : ''}>COMPLETED</option>
+            </select>
             <button onclick="event.stopPropagation(); promptAddSubtask(${task.id})" class="ml-2 text-xs text-teal-600 hover:underline font-medium">+ Subtask</button>
         </td>
     `;
@@ -751,3 +784,279 @@ function switchView(viewName) {
         activeTab.classList.add('border-teal-500', 'text-teal-600');
     }
 }
+async function updateProjectStatus(newStatus) {
+    if (!currentProjectId) return;
+    try {
+        const res = await fetch('api/projects.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'update_status', project_id: currentProjectId, status: newStatus })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            const projectStatusEl = document.getElementById('project-status');
+            projectStatusEl.className = `ml-3 px-4 py-1 mt-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase border focus:outline-none focus:ring-2 focus:ring-teal-500 appearance-none cursor-pointer transition-colors ${window.getStatusBadgeClass ? window.getStatusBadgeClass(newStatus) : 'bg-slate-100 text-slate-600 border-slate-200'}`;
+            if (window.updateStatusWidth) window.updateStatusWidth(projectStatusEl);
+        } else {
+            showAlert('Error', data.message || 'Could not update project status.', 'danger');
+        }
+    } catch(e) {
+        console.error(e);
+        showAlert('Error', 'Failed to update project status.', 'danger');
+    }
+}
+
+function renderDashboard() {
+    const p = window.currentProjectData;
+    if (!p) return;
+    let total = 0, completed = 0, in_progress = 0, todo = 0, others = 0;
+    p.sections.forEach(s => {
+        s.tasks.forEach(t => {
+            total++;
+            if (t.status === 'completed' || t.status === 'done') completed++;
+            else if (t.status === 'in_progress') in_progress++;
+            else if (t.status === 'todo') todo++;
+            else others++;
+        });
+    });
+
+    const completionRate = total ? Math.round((completed / total) * 100) : 0;
+    
+    document.getElementById('view-dashboard').innerHTML = `
+        <div class="max-w-4xl w-full mx-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-slate-800">Project Dashboard</h2>
+                <div class="text-sm text-slate-500 flex items-center"><svg class="w-4 h-4 mr-1 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Real-time</div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center items-center">
+                    <span class="text-slate-500 text-sm font-medium mb-1">Total Tasks</span>
+                    <span class="text-3xl font-bold text-slate-800">${total}</span>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-emerald-200 shadow-sm flex flex-col justify-center items-center">
+                    <span class="text-emerald-600 text-sm font-medium mb-1">Completed</span>
+                    <span class="text-3xl font-bold text-emerald-700">${completed}</span>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-blue-200 shadow-sm flex flex-col justify-center items-center">
+                    <span class="text-blue-600 text-sm font-medium mb-1">In Progress</span>
+                    <span class="text-3xl font-bold text-blue-700">${in_progress}</span>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center items-center w-full">
+                    <span class="text-slate-500 text-sm font-medium mb-2">Completion</span>
+                    <div class="w-full bg-slate-100 rounded-full h-2.5 mb-1">
+                        <div class="bg-teal-500 h-2.5 rounded-full" style="width: ${completionRate}%"></div>
+                    </div>
+                    <span class="text-xs font-bold text-slate-600 mt-1">${completionRate}%</span>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Task Breakdown</h3>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between text-sm mb-1"><span class="font-medium text-emerald-600">Completed</span><span class="text-slate-500">${completed}</span></div>
+                        <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style="width: ${total ? (completed/total)*100 : 0}%"></div></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-1"><span class="font-medium text-blue-600">In Progress</span><span class="text-slate-500">${in_progress}</span></div>
+                        <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-blue-500 h-2 rounded-full transition-all duration-500" style="width: ${total ? (in_progress/total)*100 : 0}%"></div></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-1"><span class="font-medium text-slate-600">To Do</span><span class="text-slate-500">${todo}</span></div>
+                        <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-slate-400 h-2 rounded-full transition-all duration-500" style="width: ${total ? (todo/total)*100 : 0}%"></div></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-1"><span class="font-medium text-amber-600">Other (Paused/Review)</span><span class="text-slate-500">${others}</span></div>
+                        <div class="w-full bg-slate-100 rounded-full h-2"><div class="bg-amber-400 h-2 rounded-full transition-all duration-500" style="width: ${total ? (others/total)*100 : 0}%"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderTimeline() {
+    const p = window.currentProjectData;
+    if (!p) return;
+    
+    let tasks = [];
+    p.sections.forEach(s => {
+        s.tasks.forEach(t => {
+            if (t.due_date) tasks.push(t);
+        });
+    });
+    
+    tasks.sort((a,b) => new Date(a.due_date) - new Date(b.due_date));
+    
+    if (tasks.length === 0) {
+        document.getElementById('view-timeline').innerHTML = `
+            <div class="text-center text-slate-500 w-full h-full flex flex-col items-center justify-center pt-20">
+                <svg class="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                No tasks with due dates to display on timeline.
+            </div>`;
+        return;
+    }
+    
+    let html = '<div class="max-w-4xl w-full mx-auto"><h2 class="text-2xl font-bold text-slate-800 mb-8 mt-2 max-w-4xl">Project Timeline</h2><div class="relative border-l-2 border-slate-200 ml-4 space-y-8">';
+    tasks.forEach(t => {
+        html += `
+        <div class="relative pl-6">
+            <div class="absolute w-4 h-4 rounded-full bg-teal-500 border-4 border-white left-[-9px] top-1"></div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:border-teal-400 transition-colors cursor-pointer group" onclick="openTaskModal(${t.id})">
+                <div class="flex justify-between items-start mb-1">
+                    <span class="text-xs font-bold text-teal-600 uppercase tracking-wider">${t.due_date.split(' ')[0]}</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border ${window.getStatusBadgeClass ? window.getStatusBadgeClass(t.status) : 'bg-slate-100 text-slate-600'}">${t.status.replace('_', ' ')}</span>
+                </div>
+                <h4 class="text-base font-semibold text-slate-800 group-hover:text-teal-700 transition-colors">${t.title}</h4>
+                ${t.assignee_name ? '<p class="text-xs text-slate-500 mt-2 flex items-center"><svg class="w-3.5 h-3.5 mr-1 text-slate-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg> ' + t.assignee_name.split(',').join(', ') + '</p>' : ''}
+            </div>
+        </div>`;
+    });
+    html += '</div></div>';
+    
+    document.getElementById('view-timeline').innerHTML = html;
+}
+
+window.updateStatusWidth = function(el) {
+    if(el && el.options) {
+        const text = el.options[el.selectedIndex].text;
+        // Text-[10px] with tracking-wider is roughly 7px per uppercase char
+        el.style.width = `calc(${text.length * 7.5}px + 32px)`;
+    }
+};
+window.clearListFilters = function() {
+    const searchE = document.getElementById('filter-search-list');
+    const statusE = document.getElementById('filter-status-list');
+    const assigneeE = document.getElementById('filter-assignee-list');
+    if (searchE) searchE.value = '';
+    if (statusE) statusE.value = '';
+    if (assigneeE) assigneeE.value = '';
+    window.applyListFilters();
+};
+
+window.applyListFilters = function() {
+    const listTable = document.getElementById('list-table');
+    if (!listTable) return;
+    
+    // Get filter values
+    const searchE = document.getElementById('filter-search-list');
+    const statusE = document.getElementById('filter-status-list');
+    const assigneeE = document.getElementById('filter-assignee-list');
+
+    const searchVal = searchE ? searchE.value.toLowerCase().trim() : '';
+    const statusVal = statusE ? statusE.value : '';
+    const assigneeVal = assigneeE ? assigneeE.value : '';
+    
+    // Process all task rows in the list view (skip section header rows)
+    const rows = listTable.querySelectorAll('tbody.sortable-section tr.task-row');
+    
+    rows.forEach(row => {
+        // Only target rows that are not section headers (our rendered task rows always have specific data attributes now)
+        if (row.classList.contains('section-header')) return;
+        
+        const title = (row.dataset.title || '').toLowerCase();
+        const status = row.dataset.status || '';
+        const assigneeIdsStr = row.dataset.assigneeIds || '';
+        const assigneeIds = assigneeIdsStr ? assigneeIdsStr.split(',').map(id => id.trim()) : [];
+        
+        let match = true;
+        
+        // Check search filter
+        if (searchVal && !title.includes(searchVal)) {
+            match = false;
+        }
+        
+        // Check status filter
+        if (statusVal && status !== statusVal) {
+            match = false;
+        }
+        
+        // Check assignee filter
+        if (assigneeVal && !assigneeIds.includes(assigneeVal.toString())) {
+            match = false;
+        }
+        
+// If a task doesn't match the filter, hide it via class with !important.
+        // Don't touch inline style.display so we don't break section collapse states!
+        if (match) {
+            row.classList.remove('hidden-by-filter');
+        } else {
+            row.classList.add('hidden-by-filter');
+        }
+    });
+};
+
+window.quickUpdateTaskStatus = async function(taskId, statusValue) {
+    if (!taskId) return;
+    
+    try {
+        const res = await fetch('api/tasks.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'update_status', task_id: taskId, status: statusValue })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            loadProjectBoard(currentProjectId); // Refresh the board quietly to sync all lists & metrics
+        } else {
+            showAlert('Error', 'Failed to update task status.', 'error');
+        }
+    } catch(e) {
+        console.error(e);
+        showAlert('Error', 'Failed to communicate with server.', 'error');
+    }
+}
+window.taskModalHistory = [];
+
+window.goBackToPreviousTask = function() {
+    if (window.taskModalHistory.length > 0) {
+        const prevId = window.taskModalHistory.pop();
+        window.openTaskModal(prevId, true);
+    }
+};
+
+const originalOpenTaskModal = window.openTaskModal;
+window.openTaskModal = async function(taskId, isBackNavigation = false) {
+    const modal = document.getElementById('task-modal');
+    
+    // Only push to history if we are opening a NEW task while the modal is already open
+    if (!isBackNavigation && !modal.classList.contains('hidden')) {
+        const currentTaskId = document.getElementById('task-modal-id').value;
+        if (currentTaskId && currentTaskId !== taskId.toString()) {
+            window.taskModalHistory.push(currentTaskId);
+        }
+    } else if (!isBackNavigation) {
+        // We opened it fresh from the board, clear history
+        window.taskModalHistory = [];
+    }
+
+    // Call the original function to load
+    await originalOpenTaskModal(taskId);
+
+    // Update the Back Button UI logic
+    const backBtn = document.getElementById('btn-back-task');
+    const divider = document.getElementById('task-modal-divider');
+    if (backBtn && divider) {
+        if (window.taskModalHistory.length > 0) {
+            backBtn.classList.remove('hidden');
+            backBtn.classList.add('flex');
+            divider.classList.remove('hidden');
+            divider.classList.add('block');
+        } else {
+            backBtn.classList.add('hidden');
+            backBtn.classList.remove('flex');
+            divider.classList.add('hidden');
+            divider.classList.remove('block');
+        }
+    }
+};
+
+const originalCloseTaskModal = window.closeTaskModal;
+window.closeTaskModal = function() {
+    window.taskModalHistory = []; // Clear history stack when clicking out / closing
+    if (typeof originalCloseTaskModal === 'function') {
+        originalCloseTaskModal();
+    } else {
+        document.getElementById('task-modal').classList.add('hidden');
+    }
+};

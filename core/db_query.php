@@ -8,6 +8,13 @@ class DBQueries {
         $this->pdo = $pdo;
     }
 
+    public function updateProjectStatus($projectId, $status) {
+        $stmt = $this->pdo->prepare("UPDATE projects SET status = :status WHERE id = :project_id");
+        $stmt->bindValue(':status', $status, PDO::PARAM_STR);
+        $stmt->bindValue(':project_id', (int)$projectId, PDO::PARAM_INT);
+        return $stmt->execute();
+    }
+
     // --- USERS & AUTH ---
     public function getUserById($userId) {
         $stmt = $this->pdo->prepare("SELECT * FROM users WHERE id = :user_id");
@@ -781,6 +788,20 @@ class DBQueries {
         
         $stmt->execute();
         return $this->pdo->lastInsertId();
+    }
+
+    public function updateComment($commentId, $userId, $content) {
+        $stmt = $this->pdo->prepare("
+            UPDATE comments 
+            SET content = :content 
+            WHERE id = :comment_id AND user_id = :user_id
+        ");
+        $stmt->bindValue(':comment_id', (int)$commentId, PDO::PARAM_INT);
+        $stmt->bindValue(':user_id', (int)$userId, PDO::PARAM_INT);
+        $stmt->bindValue(':content', $content, PDO::PARAM_STR);
+        
+        $stmt->execute();
+        return $stmt->rowCount() > 0;
     }
 
     public function linkSubtask($parentId, $subtaskId) {

@@ -83,13 +83,22 @@ switch ($method) {
                 }
             } elseif ($data['action'] === 'add_comment') {
                 // Mock user ID 1 for now (admin user)
-                $userId = 1; 
+                $userId = 1;
                 $commentId = $db->createComment($data['task_id'], $userId, $data['content']);
                 if ($commentId) {
                     echo json_encode(['status' => 'success', 'comment_id' => $commentId]);
                 } else {
                     http_response_code(500);
                     echo json_encode(['status' => 'error', 'message' => 'Failed to create comment']);
+                }
+            } elseif ($data['action'] === 'edit_comment') {
+                $userId = 1; // Assuming mock user ID 1
+                $success = $db->updateComment($data['comment_id'], $userId, $data['content']);
+                if ($success) {
+                    echo json_encode(['status' => 'success']);
+                } else {
+                    http_response_code(500);
+                    echo json_encode(['status' => 'error', 'message' => 'Failed to update comment or unauthorized']);
                 }
             } elseif ($data['action'] === 'link_subtask') {
                 $parentId = $data['parent_task_id'];

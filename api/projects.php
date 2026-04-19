@@ -89,6 +89,22 @@ if ($method === 'GET') {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
+    } elseif ($data['action'] === 'update_status') {
+        try {
+            // Verify permission
+            $role = $db->getProjectMemberRole($projectId, $currentUser['id']);
+            if ($role !== 'manager' && $role !== 'member') {
+                http_response_code(403);
+                echo json_encode(['status' => 'error', 'message' => 'Permission denied']);
+                exit;
+            }
+            $status = isset($data['status']) ? $data['status'] : 'todo';
+            $db->updateProjectStatus($projectId, $status);
+            echo json_encode(['status' => 'success']);
+        } catch (\PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
     } else {
         http_response_code(400);
         echo json_encode(['status' => 'error', 'message' => 'Invalid action']);

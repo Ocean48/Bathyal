@@ -6,7 +6,7 @@
     <title>Bathyal Project Management</title>
     <link rel="stylesheet" href="/bathyal/assets/css/style.css">
     <!-- Optional: Add Tailwind CSS via CDN for rapid UI development -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans h-screen flex overflow-hidden">
 
