@@ -64,6 +64,10 @@ switch ($route) {
     case 'teams':
         require 'views/pages/teams.php';
         break;
+    case 'reports.php':
+    case 'reports':
+        require 'views/pages/reports.php';
+        break;
         
     default:
         http_response_code(404);
