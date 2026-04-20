@@ -422,10 +422,15 @@ class DBQueries {
                 $mailSubject = $subject ? $subject : "App Notification: Task {$taskId}";
                 $mailBody = $bodyHtml ? $bodyHtml : "Hello {$u['name']},<br><br>{$message}<br><br>Task ID: {$taskId}<br>";
                 
-                $emailService->sendEmail($to, $u['name'], $mailSubject, $mailBody);
+                $emailResult = $emailService->sendEmail($to, $u['name'], $mailSubject, $mailBody);
+                if (!$emailResult['success']) {
+                    return ['success' => false, 'error' => $emailResult['error']];
+                }
             }
+            return ['success' => true];
         } catch (\PDOException $e) {
             error_log("Notification error: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 

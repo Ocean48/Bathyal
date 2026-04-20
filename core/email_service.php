@@ -56,11 +56,12 @@ class EmailService {
             $this->mail->AltBody = strip_tags($body); // Fallback plain text version
 
             $this->mail->send();
-            return true;
+            return ['success' => true];
         } catch (Exception $e) {
-            error_log("Message could not be sent. Mailer Error: {$this->mail->ErrorInfo}");
-            return false;
+            error_log("Email send error: {$this->mail->ErrorInfo}");
+            return ['success' => false, 'error' => $this->mail->ErrorInfo];
         }
     }
 }
+
 ?>

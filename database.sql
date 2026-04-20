@@ -212,16 +212,16 @@ CREATE TABLE user_recent_projects (
 -- ==========================================
 
 -- Insert a Team
-INSERT INTO teams (name, created_by) VALUES ('Ocean48 Engineering', 1);
+INSERT INTO teams (name, created_by) VALUES ('PharmAchieve Engineering', 1);
 
 INSERT INTO `team_members` (`team_id`, `user_id`, `role`, `joined_at`) VALUES
 (1, 1, 'owner', '2026-04-19 21:55:10');
 
 -- Insert Users (Passwords are set to 'user123')
 INSERT INTO users (team_id, name, email, password_hash, role) VALUES 
-(1, 'Admin User', 'admin@ocean48.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'admin'),
-(1, 'John Doe', 'john@ocean48.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
-(1, 'Jane Data', 'jane@ocean48.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'data_analyst');
+(1, 'Admin User', 'si@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'admin'),
+(1, 'John Doe', 'john@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+(1, 'Jane Data', 'jane@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'data_analyst');
 
 -- Insert Projects
 INSERT INTO projects (name, description, status, cycle) VALUES 

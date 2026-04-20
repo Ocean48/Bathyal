@@ -62,9 +62,14 @@ switch ($method) {
                     $bodyHtml = "<h2>A new attachment was added to the task: " . $taskTitle . "</h2>";
                     $bodyHtml .= "<p><strong>File:</strong> " . htmlspecialchars($file['name']) . "</p>";
                     $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
-                    $db->sendTaskNotification($taskId, "New attachment added: " . $file['name'], 'task_update', $subject, $bodyHtml);
+                    $notifResult = $db->sendTaskNotification($taskId, "New attachment added: " . $file['name'], 'task_update', $subject, $bodyHtml);
 
-                    echo json_encode(['status' => 'success', 'attachment_id' => $insertedId]);
+                    $response = ['status' => 'success', 'attachment_id' => $insertedId];
+                    if (isset($notifResult['success']) && !$notifResult['success']) {
+                        $response['email_error'] = 'Attachment uploaded, but failed to send email notification: ' . $notifResult['error'];
+                    }
+                    
+                    echo json_encode($response);
                     exit;
                 }
             }
@@ -84,9 +89,14 @@ switch ($method) {
                     $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
                     $bodyHtml .= "<p><strong>New Status:</strong> " . htmlspecialchars($data['status']) . "</p>";
                     $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
-                    $db->sendTaskNotification($data['task_id'], "Task status updated to " . $data['status'], 'task_update', $subject, $bodyHtml);
+                    $notifResult = $db->sendTaskNotification($data['task_id'], "Task status updated to " . $data['status'], 'task_update', $subject, $bodyHtml);
 
-                    echo json_encode(['status' => 'success']);
+                    $response = ['status' => 'success'];
+                    if (isset($notifResult['success']) && !$notifResult['success']) {
+                        $response['email_error'] = 'Task status updated, but failed to send email notification: ' . $notifResult['error'];
+                    }
+                    
+                    echo json_encode($response);
                 } else {
                     http_response_code(500);
                     echo json_encode(['status' => 'error', 'message' => 'Failed to update task status']);
@@ -99,9 +109,14 @@ switch ($method) {
                     $bodyHtml = "<h2>Task details were updated</h2>";
                     $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
                     $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
-                    $db->sendTaskNotification($data['task_id'], "Task details updated", 'task_update', $subject, $bodyHtml);
+                    $notifResult = $db->sendTaskNotification($data['task_id'], "Task details updated", 'task_update', $subject, $bodyHtml);
 
-                    echo json_encode(['status' => 'success']);
+                    $response = ['status' => 'success'];
+                    if (isset($notifResult['success']) && !$notifResult['success']) {
+                        $response['email_error'] = 'Task details updated, but failed to send email notification: ' . $notifResult['error'];
+                    }
+                    
+                    echo json_encode($response);
                 } else {
                     http_response_code(500);
                     echo json_encode(['status' => 'error', 'message' => 'Failed to update task details']);
@@ -117,9 +132,14 @@ switch ($method) {
                     $bodyHtml = "<h2>A new comment was added to the task: " . $taskTitle . "</h2>";
                     $bodyHtml .= "<p><strong>Comment:</strong><br>" . nl2br(htmlspecialchars($data['content'])) . "</p>";
                     $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
-                    $db->sendTaskNotification($data['task_id'], "New comment added", 'comment', $subject, $bodyHtml);
+                    $notifResult = $db->sendTaskNotification($data['task_id'], "New comment added", 'comment', $subject, $bodyHtml);
 
-                    echo json_encode(['status' => 'success', 'comment_id' => $commentId]);
+                    $response = ['status' => 'success', 'comment_id' => $commentId];
+                    if (isset($notifResult['success']) && !$notifResult['success']) {
+                        $response['email_error'] = 'Comment added, but failed to send email notification: ' . $notifResult['error'];
+                    }
+                    
+                    echo json_encode($response);
                 } else {
                     http_response_code(500);
                     echo json_encode(['status' => 'error', 'message' => 'Failed to create comment']);
@@ -191,9 +211,14 @@ switch ($method) {
                 }
                 $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
                 
-                $db->sendTaskNotification($taskId, "New task created: " . $data['title'], 'task_update', $subject, $bodyHtml);
-
-                echo json_encode(['status' => 'success', 'task_id' => $taskId]);
+                $notifResult = $db->sendTaskNotification($taskId, "New task created: " . $data['title'], 'task_update', $subject, $bodyHtml);
+                
+                $response = ['status' => 'success', 'task_id' => $taskId];
+                if (isset($notifResult['success']) && !$notifResult['success']) {
+                    $response['email_error'] = 'Task created, but failed to send email notification: ' . $notifResult['error'];
+                }
+                
+                echo json_encode($response);
             } else {
                 http_response_code(500);
                 echo json_encode(['status' => 'error', 'message' => 'Failed to create task']);

@@ -21,6 +21,15 @@ window.showConfirm = function(title, message, type = 'warning') {
     return _showGlobalModal(title, message, type, true);
 };
 
+window.handleApiError = function(result) {
+    if (result.status === 'error') {
+        showAlert('Error', result.message, 'danger');
+    }
+    if (result.email_error) {
+        showAlert('Notification Delivery Failed', 'The operation was successful, but the email notification could not be sent. Detailed error: ' + result.email_error, 'warning');
+    }
+}
+
 function _showGlobalModal(title, message, type, isConfirm) {
     return new Promise((resolve) => {
         const overlay = document.getElementById('global-modal-overlay');
@@ -299,7 +308,13 @@ async function loadProjectBoard(projectId) {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ action: 'reorder', section_ids: sectionIds })
-                        }).then(() => loadProjectBoard(currentProjectId)).catch(console.error);
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (window.handleApiError) window.handleApiError(data);
+                            loadProjectBoard(currentProjectId);
+                        })
+                        .catch(console.error);
                     }
                 });
 
@@ -332,7 +347,13 @@ async function loadProjectBoard(projectId) {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ action: 'reorder', section_id: newSectionId, task_ids: taskIds, parent_task_id: parentTaskId })
-                        }).then(() => loadProjectBoard(currentProjectId)).catch(console.error);
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (window.handleApiError) window.handleApiError(data);
+                            loadProjectBoard(currentProjectId);
+                        })
+                        .catch(console.error);
                     }
                 };
 
@@ -1059,11 +1080,13 @@ function renderTimeline() {
                             })
                         });
                         const data = await response.json();
-                        if(data.success && typeof currentProjectId !== 'undefined') {
+                        if (window.handleApiError) window.handleApiError(data);
+                        if(data.status === 'success' && typeof currentProjectId !== 'undefined') {
                             loadProjectBoard(currentProjectId); // Optional, might cause flash of UI
                         }
                     } catch(e) {
                         console.error('Failed to update dates from timeline', e);
+                        showAlert('Error', 'Failed to update dates from timeline', 'danger');
                     }
                 },
                 custom_popup_html: function(task) {

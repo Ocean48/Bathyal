@@ -1120,6 +1120,8 @@ async function uploadTaskAttachment(input) {
         });
         
         if (res.ok) {
+            const data = await res.json();
+            if (window.handleApiError) window.handleApiError(data);
             openTaskModal(id);
         } else {
             alert('Upload failed');
@@ -1491,11 +1493,13 @@ async function toggleUserAssignment(userId) {
 
     try {
         // Run network requests and await completion
-        await fetch('api/tasks.php', {
+        const resAssign = await fetch('api/tasks.php', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ action: 'update_details', task_id: taskId, details: { assignee_ids: window.currentTaskAssigneeIds } })
         });
+        const assignData = await resAssign.json();
+        if (window.handleApiError) window.handleApiError(assignData);
         
         if (window.assigneeDropdownContext === 'list') {
             if(typeof currentProjectId !== 'undefined') await loadProjectBoard(currentProjectId);
