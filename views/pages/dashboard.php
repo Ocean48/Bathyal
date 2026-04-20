@@ -7,6 +7,17 @@ require_once 'core/auth_check.php';
 // Simple routing logic could go here
 $request_uri = $_SERVER['REQUEST_URI'];
 
+// Fetch recent projects
+$recent_projects = [];
+if (isset($pdo)) {
+    try {
+        $stmt = $pdo->query("SELECT * FROM projects ORDER BY created_at DESC LIMIT 5");
+        $recent_projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (\PDOException $e) {
+        // Table might not exist yet
+    }
+}
+
 // Basic entry point
 require_once 'views/layouts/header.php';
 ?>
@@ -105,33 +116,42 @@ require_once 'views/layouts/header.php';
             </div>
             
             <div class="flex-1 overflow-y-auto p-4 space-y-3">
-                <!-- Project Item -->
-                <div class="group flex items-center p-3 border border-slate-100 rounded-lg hover:border-teal-300 hover:shadow-sm cursor-pointer transition-all" onclick="window.location.href='/bathyal/project?id=1'">
-                    <div class="w-10 h-10 rounded-lg bg-teal-100 flex items-center justify-center text-teal-700 font-bold mr-4">
-                        WR
+                <?php if (!empty($recent_projects)): ?>
+                    <?php foreach ($recent_projects as $idx => $proj): 
+                        // Generate initials
+                        $words = explode(' ', trim($proj['name']));
+                        $initials = strtoupper(substr($words[0], 0, 1));
+                        if(isset($words[1])) {
+                            $initials .= strtoupper(substr($words[1], 0, 1));
+                        }
+                        
+                        // Select colors from an array based on id for variety
+                        $colors = [
+                            ['bg-teal-100', 'text-teal-700', 'hover:border-teal-300', 'group-hover:text-teal-700'],
+                            ['bg-cyan-100', 'text-cyan-700', 'hover:border-cyan-300', 'group-hover:text-cyan-700'],
+                            ['bg-indigo-100', 'text-indigo-700', 'hover:border-indigo-300', 'group-hover:text-indigo-700'],
+                            ['bg-rose-100', 'text-rose-700', 'hover:border-rose-300', 'group-hover:text-rose-700'],
+                            ['bg-amber-100', 'text-amber-700', 'hover:border-amber-300', 'group-hover:text-amber-700']
+                        ];
+                        $theme = $colors[$idx % count($colors)];
+                    ?>
+                    <!-- Project Item -->
+                    <div class="group flex items-center p-3 border border-slate-100 rounded-lg <?= $theme[2] ?> hover:shadow-sm cursor-pointer transition-all" onclick="window.location.href='/bathyal/project?id=<?= $proj['id'] ?>'">
+                        <div class="w-10 h-10 rounded-lg <?= $theme[0] ?> flex items-center justify-center <?= $theme[1] ?> font-bold mr-4">
+                            <?= htmlspecialchars($initials) ?>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-800 truncate <?= $theme[3] ?>"><?= htmlspecialchars($proj['name']) ?></h3>
+                            <p class="text-xs text-slate-500 mt-0.5"><?= htmlspecialchars(ucfirst($proj['status'] ?? 'active')) ?></p>
+                        </div>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-800 truncate group-hover:text-teal-700">Website Redesign</h3>
-                        <p class="text-xs text-slate-500 mt-0.5">On Track &middot; 4 tasks left</p>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="flex flex-col items-center justify-center h-full text-slate-400">
+                        <svg class="w-12 h-12 mb-3 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                        <p class="text-sm font-medium">No projects created yet</p>
                     </div>
-                    <div class="bg-slate-100 w-20 h-1.5 rounded-full overflow-hidden">
-                        <div class="bg-teal-500 h-full" style="width: 65%;"></div>
-                    </div>
-                </div>
-
-                <!-- Project Item -->
-                <div class="group flex items-center p-3 border border-slate-100 rounded-lg hover:border-cyan-300 hover:shadow-sm cursor-pointer transition-all" onclick="window.location.href='/bathyal/project?id=2'">
-                    <div class="w-10 h-10 rounded-lg bg-cyan-100 flex items-center justify-center text-cyan-700 font-bold mr-4">
-                        MQ
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-sm font-medium text-slate-800 truncate group-hover:text-cyan-700">Marketing Q3</h3>
-                        <p class="text-xs text-amber-600 mt-0.5">At Risk &middot; 12 tasks left</p>
-                    </div>
-                    <div class="bg-slate-100 w-20 h-1.5 rounded-full overflow-hidden">
-                        <div class="bg-amber-400 h-full" style="width: 30%;"></div>
-                    </div>
-                </div>
+                <?php endif; ?>
             </div>
             <div class="px-5 py-3 bg-slate-50 text-center border-t border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
                 <span class="text-sm text-teal-600 font-medium">View all projects</span>
