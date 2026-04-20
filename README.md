@@ -58,16 +58,72 @@ bathyal/
 
 ## Getting Started
 
-
 ### Prerequisites
 
-TBD
-
+- **PHP 8.x** (with `pdo_mysql`, `curl`, and `mbstring` extensions enabled)
+- **MySQL 8.0+** or **MariaDB**
+- **Composer** (for managing dependencies like PHPMailer)
+- **Web Server:** WAMP (Windows/Apache) for local development, or Linux/Nginx for production.
 
 ### Installation
 
-TBD
+#### 1. Local Development (WAMP)
 
+1. **Clone the repository** into your WAMP `www` directory:
+   ```bash
+   cd c:\wamp64\www
+   git clone <repository-url> bathyal
+   cd bathyal
+   ```
+
+2. **Install dependencies** using Composer:
+   ```bash
+   composer install
+   ```
+   *Note: This will read `composer.json` and `composer.lock` to download the exact package versions into a `vendor/` folder. Do not commit the `vendor/` folder.*
+
+3. **Database Setup:**
+   - Open phpMyAdmin (usually `http://localhost/phpmyadmin`).
+   - Create a new database named `bathyal`.
+   - Import the `database.sql` file located in the root of the project to create the necessary tables.
+
+4. **Configuration:**
+   - Update `core/database.php` with your local database credentials (usually `root` for username and an empty password in WAMP).
+
+5. **Run the App:**
+   - Open your browser and navigate to `http://localhost/bathyal`.
+
+#### 2. Production Deployment (Linux / Nginx)
+
+1. **Clone the repository** to your web root (e.g., `/var/www/bathyal`):
+   ```bash
+   git clone <repository-url> /var/www/bathyal
+   cd /var/www/bathyal
+   ```
+
+2. **Install production dependencies:**
+   This command installs exact versions from `composer.lock`, skips development tools, and optimizes classes for faster loading:
+   ```bash
+   composer install --no-dev --optimize-autoloader
+   ```
+
+3. **Database Setup:**
+   - Create a production database and dedicated database user.
+   - Import the database schema via the command line:
+     ```bash
+     mysql -u your_user -p bathyal < database.sql
+     ```
+   - Update `core/database.php` with your secure production database credentials.
+
+4. **Permissions:**
+   - Ensure your web server has write permissions to any required directories (like an uploads folder, if applicable):
+     ```bash
+     chown -R www-data:www-data /var/www/bathyal
+     ```
+
+5. **Nginx Configuration:**
+   - Point your Nginx virtual host `root` to `/var/www/bathyal`.
+   - Ensure it is configured to pass `.php` files to PHP-FPM.
 
 ## API Endpoints
 

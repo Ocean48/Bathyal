@@ -146,6 +146,29 @@ switch ($method) {
         } else { // Create task
             $taskId = $db->createTask($data);
             if ($taskId) {
+                // Send Email Notification to Assignees
+                if (!empty($data['assignees'])) {
+                    require_once '../core/email_service.php';
+                    $emailService = new EmailService();
+                    foreach ($data['assignees'] as $assigneeId) {
+                        $user = $db->getUserById($assigneeId);
+                        if ($user && !empty($user['email'])) {
+                            $subject = "New Task Assigned: " . $data['title'];
+                            $body = "<h2>You have a new task assigned to you!</h2>";
+                            $body .= "<p><strong>Task:</strong> " . htmlspecialchars($data['title']) . "</p>";
+                            if (!empty($data['description'])) {
+                                $body .= "<p><strong>Description:</strong> " . nl2br(htmlspecialchars($data['description'])) . "</p>";
+                            }
+                            if (!empty($data['due_date'])) {
+                                $body .= "<p><strong>Due Date:</strong> " . htmlspecialchars($data['due_date']) . "</p>";
+                            }
+                            $body .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
+                            
+                            $emailService->sendEmail($user['email'], $user['name'], $subject, $body);
+                        }
+                    }
+                }
+
                 echo json_encode(['status' => 'success', 'task_id' => $taskId]);
             } else {
                 http_response_code(500);
