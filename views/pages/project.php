@@ -256,8 +256,8 @@ require_once 'views/layouts/header.php';
                     </select>
                 </div>
                 <div>
-                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Est. Time</label>
-                    <span id="task-modal-estimated" class="text-sm text-slate-700">0h 0m</span>
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block" title="Estimated Time in minutes">Est. Time (min)</label>
+                    <input type="number" id="task-modal-estimated" onchange="updateTaskDetails()" min="0" placeholder="0" class="text-sm text-slate-700 border border-transparent hover:border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 p-1 -ml-1 rounded cursor-pointer w-24">
                 </div>
                 <div class="relative">
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Parent Task</label>
@@ -341,10 +341,10 @@ require_once 'views/layouts/header.php';
             <div class="mb-8 relative">
                 <div class="flex justify-between items-center mb-3">
                     <label class="font-semibold text-slate-800">Subtasks</label>
-                    <div class="flex space-x-3 items-center">
-                        <div class="relative">
-                            <button onclick="toggleLinkSubtaskDropdown()" class="text-xs text-teal-600 font-medium hover:text-teal-700 focus:outline-none">Link Existing Task</button>
-                            <div id="link-subtask-dropdown" class="hidden absolute right-0 bottom-full mb-2 w-72 bg-white border border-slate-200 rounded-lg shadow-xl z-50 flex-col">
+                    <div class="flex space-x-3 items-center shrink-0">
+                        <div class="relative flex items-center">
+                            <button onclick="toggleLinkSubtaskDropdown()" class="text-xs text-teal-600 font-medium hover:text-teal-700 focus:outline-none whitespace-nowrap">Link Existing Task</button>
+                            <div id="link-subtask-dropdown" class="hidden absolute right-0 bottom-full mb-2 w-72 bg-white border border-slate-200 rounded-lg shadow-xl z-50 flex-col whitespace-normal">
                                 <div class="p-2 border-b border-slate-100 flex">
                                     <input type="text" id="link-subtask-search" oninput="searchTasksToLink(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search tasks by title..." autofocus>
                                 </div>
@@ -353,7 +353,7 @@ require_once 'views/layouts/header.php';
                                 </ul>
                             </div>
                         </div>
-                        <button onclick="promptAddSubtask(document.getElementById('task-modal-id').value)" class="text-xs text-teal-600 font-medium hover:text-teal-700">Add Subtask</button>
+                        <button onclick="promptAddSubtask(document.getElementById('task-modal-id').value)" class="text-xs text-teal-600 font-medium hover:text-teal-700 whitespace-nowrap">Add Subtask</button>
                     </div>
                 </div>
                 <div class="space-y-2" id="task-modal-subtasks">
@@ -747,7 +747,7 @@ async function openTaskModal(taskId) {
             }
         }
         
-        document.getElementById('task-modal-estimated').innerText = task.estimated_minutes ? `${Math.floor(task.estimated_minutes/60)}h ${task.estimated_minutes%60}m` : '0h 0m';
+        document.getElementById('task-modal-estimated').value = task.estimated_minutes || 0;
         
         // Render custom editor content
         document.getElementById('task-modal-desc').innerHTML = task.description || '<p><br></p>';
@@ -891,6 +891,9 @@ async function updateTaskDetails() {
     const startDate = document.getElementById('task-modal-start-date').value;
     const dueDate = document.getElementById('task-modal-due-date').value;
     
+    const estimatedMinutesInput = document.getElementById('task-modal-estimated').value;
+    const estimatedMinutes = estimatedMinutesInput ? parseInt(estimatedMinutesInput, 10) : 0;
+    
     // Get content from custom editor or code block
     let desc = getEditorContent('task-modal-desc');
     if (desc === '<p><br></p>') desc = '';
@@ -917,7 +920,7 @@ async function updateTaskDetails() {
         body: JSON.stringify({
             action: 'update_details',
             task_id: id,
-            details: { title, status, start_date: startDate, due_date: dueDate, description: desc, parent_task_id: parentId }
+            details: { title, status, start_date: startDate, due_date: dueDate, description: desc, parent_task_id: parentId, estimated_minutes: estimatedMinutes }
         })
     });
     
@@ -1280,24 +1283,80 @@ async function toggleProjectMemberAssignment(userId) {
 window.activeAssigneeTaskId = null;
 window.assigneeDropdownContext = 'modal'; // 'modal' or 'list'
 
+function closeAssigneeDropdownUI(dropdown) {
+    dropdown.classList.add('hidden');
+    dropdown.classList.remove('flex');
+    closeAssigneeBackdrop();
+}
+
+function openAssigneeBackdrop(closeCallback) {
+    let backdrop = document.getElementById('assignee-dropdown-backdrop');
+    if (!backdrop) {
+        backdrop = document.createElement('div');
+        backdrop.id = 'assignee-dropdown-backdrop';
+        backdrop.className = 'fixed inset-0 z-[60] bg-transparent';
+        document.body.appendChild(backdrop);
+    }
+    backdrop.style.display = 'block';
+    backdrop.onclick = (e) => {
+        e.stopPropagation();
+        closeAssigneeBackdrop();
+        if (closeCallback) closeCallback();
+    };
+}
+
+function closeAssigneeBackdrop() {
+    const backdrop = document.getElementById('assignee-dropdown-backdrop');
+    if (backdrop) {
+        backdrop.style.display = 'none';
+        backdrop.onclick = null;
+    }
+}
+
+function showLoadingOverlay() {
+    let loader = document.getElementById('global-loading-overlay');
+    if (!loader) {
+        loader = document.createElement('div');
+        loader.id = 'global-loading-overlay';
+        // Add absolute clear, non-grayscale background to block clicks during saving
+        loader.className = 'fixed inset-0 z-[70] bg-transparent flex items-center justify-center';
+        loader.innerHTML = `
+            <div class="bg-white px-4 py-2 rounded shadow text-slate-700 font-medium flex items-center space-x-3 border border-slate-200">
+                <svg class="animate-spin h-5 w-5 text-teal-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <span class="text-sm">Updating...</span>
+            </div>
+        `;
+        document.body.appendChild(loader);
+    }
+    loader.style.display = 'flex';
+}
+
+function hideLoadingOverlay() {
+    const loader = document.getElementById('global-loading-overlay');
+    if (loader) {
+        loader.style.display = 'none';
+    }
+}
+
 async function toggleAssigneeDropdown(event) {
     window.assigneeDropdownContext = 'modal';
     window.activeAssigneeTaskId = document.getElementById('task-modal-id').value || null;
 
     const dropdown = document.getElementById('assignee-dropdown');
     
-    // Move dropdown back to modal if it was moved to body
-    const originalContainer = event.currentTarget.parentElement;
-    if (dropdown.parentElement !== originalContainer) {
-        dropdown.style.position = 'absolute';
-        dropdown.style.top = '100%';
-        dropdown.style.left = '0px';
-        dropdown.style.transform = '';
-        originalContainer.appendChild(dropdown);
-    }
-
     // Toggle visibility
     if (dropdown.classList.contains('hidden')) {
+        // Move dropdown to body to avoid clipping and z-index issues with the transparent backdrop
+        if (dropdown.parentElement !== document.body) {
+            document.body.appendChild(dropdown);
+        }
+
+        const rect = event.currentTarget.getBoundingClientRect();
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 4) + 'px';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.zIndex = '61';
+
         dropdown.classList.remove('hidden');
         dropdown.classList.add('flex');
 
@@ -1311,19 +1370,13 @@ async function toggleAssigneeDropdown(event) {
         // Focus search box
         setTimeout(() => document.getElementById('assignee-search').focus(), 50);
 
-        // Setup outside click listener to close
-        const outsideClickListener = (e) => {
-            if (!dropdown.contains(e.target) && !e.target.closest('[onclick="toggleAssigneeDropdown(event)"]')) {
-                dropdown.classList.add('hidden');
-                dropdown.classList.remove('flex');
-                document.removeEventListener('click', outsideClickListener);
-            }
-        };
-        // Small delay to prevent the current click from immediately triggering it
-        setTimeout(() => document.addEventListener('click', outsideClickListener), 10);
+        // Open an invisible backdrop to catch clicks and prevent interaction with elements underneath
+        openAssigneeBackdrop(() => {
+            dropdown.classList.add('hidden');
+            dropdown.classList.remove('flex');
+        });
     } else {
-        dropdown.classList.add('hidden');
-        dropdown.classList.remove('flex');
+        closeAssigneeDropdownUI(dropdown);
     }
 }
 
@@ -1344,6 +1397,7 @@ window.openListViewAssigneeDropdown = async function(event, taskId, assigneeIdsS
     dropdown.style.position = 'fixed';
     dropdown.style.top = (rect.bottom + 4) + 'px';
     dropdown.style.left = rect.left + 'px';
+    dropdown.style.zIndex = '61';
     
     dropdown.classList.remove('hidden');
     dropdown.classList.add('flex');
@@ -1356,15 +1410,11 @@ window.openListViewAssigneeDropdown = async function(event, taskId, assigneeIdsS
 
     setTimeout(() => document.getElementById('assignee-search').focus(), 50);
 
-    const triggerElement = event.currentTarget;
-    const outsideClickListener = (e) => {
-        if (!dropdown.contains(e.target) && !triggerElement.contains(e.target)) {
-            dropdown.classList.add('hidden');
-            dropdown.classList.remove('flex');
-            document.removeEventListener('click', outsideClickListener);
-        }
-    };
-    setTimeout(() => document.addEventListener('click', outsideClickListener), 10);
+    // Open an invisible backdrop to catch clicks and prevent interaction with elements underneath
+    openAssigneeBackdrop(() => {
+        dropdown.classList.add('hidden');
+        dropdown.classList.remove('flex');
+    });
 };
 
 async function searchAssignees(query) {
@@ -1433,7 +1483,14 @@ async function toggleUserAssignment(userId) {
     const taskId = window.activeAssigneeTaskId || document.getElementById('task-modal-id').value;
     if (!taskId) return;
     
+    // Immediately hide dropdown in both contexts after an assignee is changed
+    const dropdown = document.getElementById('assignee-dropdown');
+    closeAssigneeDropdownUI(dropdown);
+
+    showLoadingOverlay();
+
     try {
+        // Run network requests and await completion
         await fetch('api/tasks.php', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -1441,9 +1498,8 @@ async function toggleUserAssignment(userId) {
         });
         
         if (window.assigneeDropdownContext === 'list') {
-            if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
+            if(typeof currentProjectId !== 'undefined') await loadProjectBoard(currentProjectId);
         } else {
-            // Soft refresh without entirely flickering the modal context
             const res = await fetch(`api/tasks.php?id=${taskId}`);
             const task = await res.json();
             if(!task.error) {
@@ -1466,10 +1522,12 @@ async function toggleUserAssignment(userId) {
                     }
                 }
             }
-            if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
+            if(typeof currentProjectId !== 'undefined') await loadProjectBoard(currentProjectId);
         }
     } catch (e) {
         console.error('Error updating assignees:', e);
+    } finally {
+        hideLoadingOverlay();
     }
 }
 
@@ -1588,7 +1646,8 @@ function promptAddSubtask(parentId) {
         })
     }).then(res => res.json()).then(data => {
         if(data.status === 'success') {
-            openTaskModal(parentId); // Reload
+            openTaskModal(parentId); // Reload modal
+            if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId); // Refresh board view to show new subtask expander
         } else {
             alert('Failed to create subtask');
         }

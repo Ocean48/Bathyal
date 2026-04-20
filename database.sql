@@ -78,7 +78,8 @@ CREATE TABLE tasks (
     storage_location ENUM('active', 'backlog', 'archive', 'unattached') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE
+    FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    INDEX idx_task_order (parent_task_id, position) -- indexing order to ensure sub-subtask sorting is maintained
 );
 
 -- MULTIPLE ASSIGNEES PER TASK

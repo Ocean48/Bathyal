@@ -82,6 +82,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($action === 'update_role') {
+        $teamId = (int)($_POST['team_id'] ?? 0);
+        $userId = (int)($_POST['user_id'] ?? 0);
+        $newRole = $_POST['role'] ?? 'member';
+
+        if (!in_array($newRole, ['member', 'admin', 'owner'])) {
+            echo json_encode(['success' => false, 'error' => 'Invalid role specified.']);
+            exit;
+        }
+
+        $systemRole = $currentUser['role'] ?? 'data_analyst';
+
+        // Add permission check
+        if (!in_array($systemRole, ['admin', 'member'])) {
+            $currentUserRole = $db->getTeamMemberRole($teamId, $currentUser['id']);
+            if (!in_array($currentUserRole, ['owner', 'admin'])) {
+                echo json_encode(['success' => false, 'error' => 'You do not have permission to change member roles.']);
+                exit;
+            }
+        }
+
+        // Prevent demoting the last owner
+        $currentTargetRole = $db->getTeamMemberRole($teamId, $userId);
+        if ($currentTargetRole === 'owner' && $newRole !== 'owner') {
+            $members = $db->getTeamMembersWithRoles($teamId);
+            $ownerCount = count(array_filter($members, fn($m) => $m['team_role'] === 'owner'));
+            if ($ownerCount <= 1) {
+                 echo json_encode(['success' => false, 'error' => 'Cannot change the role of the last owner of the team.']);
+                 exit;
+            }
+        }
+
+        if ($db->updateTeamMemberRole($teamId, $userId, $newRole)) {
+            echo json_encode(['success' => true]);
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Failed to update member role.']);
+        }
+        exit;
+    }
+
     if ($action === 'delete') {
         $teamId = (int)($_POST['team_id'] ?? 0);
         $systemRole = $currentUser['role'] ?? 'data_analyst';

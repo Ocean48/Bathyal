@@ -148,7 +148,7 @@ require 'views/layouts/header.php';
                 <label class="block text-xs font-medium text-slate-700 mb-1">Search User</label>
                 <input type="text" id="user-search-input" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all placeholder-slate-400" placeholder="Search by name or email..." autocomplete="off">
                 <input type="hidden" name="user_id" id="selected-user-id" required>
-                <ul id="user-search-results" class="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto hidden divide-y divide-slate-50"></ul>
+                <ul id="user-search-results" class="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-[200px] overflow-y-auto hidden divide-y divide-slate-50"></ul>
                 <div id="selected-user-display" class="hidden mt-2 p-2 bg-teal-50 border border-teal-200 rounded text-sm text-teal-800 flex items-center justify-between">
                     <span id="selected-user-name" class="font-medium"></span>
                     <button type="button" id="clear-selected-user" class="text-teal-600 hover:text-teal-800"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
@@ -228,11 +228,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 closeModal(modalCreate);
                 window.location.reload(); // Quick refresh to update list
             } else {
-                alert(json.error || 'Failed to create team');
+                showAlert('Error', json.error || 'Failed to create team', 'danger');
             }
         } catch (e) {
             console.error(e);
-            alert('An error occurred.');
+            showAlert('Error', 'An error occurred.', 'danger');
         }
     });
 
@@ -293,6 +293,30 @@ document.addEventListener('DOMContentLoaded', () => {
                         actionHtml = `<button class="text-rose-500 hover:text-rose-700 text-xs font-medium px-2 py-1 rounded hover:bg-rose-50 transition-colors" onclick="removeMember(${member.id}, ${teamId})">Remove</button>`;
                     }
                     
+                    let roleDisplayHtml = '';
+                    const canChangeRole = (['owner', 'admin'].includes(userRole) || ['admin'].includes(userSystemRole));
+                    
+                    if (canChangeRole && parseInt(member.id) !== currentUserId && !(userRole === 'admin' && member.team_role === 'owner')) {
+                        roleDisplayHtml = `
+                            <select class="bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-teal-200 outline-none w-24" 
+                                    onchange="changeMemberRole(${member.id}, ${teamId}, this.value, '${member.team_role}')">
+                                <option value="member" ${member.team_role === 'member' ? 'selected' : ''}>Member</option>
+                                <option value="admin" ${member.team_role === 'admin' ? 'selected' : ''}>Admin</option>
+                                ${['owner'].includes(userRole) || ['admin'].includes(userSystemRole) ? `<option value="owner" ${member.team_role === 'owner' ? 'selected' : ''}>Owner</option>` : ''}
+                            </select>
+                        `;
+                    } else {
+                        roleDisplayHtml = `
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                member.team_role === 'owner' ? 'bg-amber-100 text-amber-800' :
+                                member.team_role === 'admin' ? 'bg-indigo-100 text-indigo-800' :
+                                'bg-slate-100 text-slate-800'
+                            }">
+                                ${member.team_role.charAt(0).toUpperCase() + member.team_role.slice(1)}
+                            </span>
+                        `;
+                    }
+
                     tr.innerHTML = `
                         <td class="px-6 py-4">
                             <div class="flex items-center">
@@ -304,13 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </td>
                         <td class="px-6 py-4">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                member.team_role === 'owner' ? 'bg-amber-100 text-amber-800' :
-                                member.team_role === 'admin' ? 'bg-indigo-100 text-indigo-800' :
-                                'bg-slate-100 text-slate-800'
-                            }">
-                                ${member.team_role.charAt(0).toUpperCase() + member.team_role.slice(1)}
-                            </span>
+                            ${roleDisplayHtml}
                         </td>
                         <td class="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">
                             ${jDate}
@@ -331,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Assign to window to make available to onclick handlers
     window.removeMember = async function(userId, teamId) {
-        if (!confirm('Are you sure you want to remove this user from the team?')) return;
+        if (!await showConfirm('Remove Member', 'Are you sure you want to remove this user from the team?', 'danger')) return;
         
         try {
             const fd = new FormData();
@@ -349,16 +367,44 @@ document.addEventListener('DOMContentLoaded', () => {
                     loadTeamMembers(currentTeamId, currentTeamRole);
                 }
             } else {
-                alert(json.error || 'Failed to remove member');
+                showAlert('Error', json.error || 'Failed to remove member', 'danger');
             }
         } catch (e) {
-             alert('Connection error');
+             showAlert('Error', 'Connection error', 'danger');
+        }
+    };
+
+    window.changeMemberRole = async function(userId, teamId, role, originalRole) {
+        if (!await showConfirm('Change Role', `Are you sure you want to change this member's role to ${role}?`, 'warning')) {
+            // Revert select visually
+            event.target.value = originalRole;
+            return;
+        }
+
+        try {
+            const fd = new FormData();
+            fd.append('team_id', teamId);
+            fd.append('user_id', userId);
+            fd.append('role', role);
+            
+            const res = await fetch(`/bathyal/api/teams.php?action=update_role`, { method: 'POST', body: fd });
+            const json = await res.json();
+            
+            if (json.success) {
+                loadTeamMembers(currentTeamId, currentTeamRole);
+            } else {
+                showAlert('Error', json.error || 'Failed to update member role', 'danger');
+                event.target.value = originalRole;
+            }
+        } catch (e) {
+             showAlert('Error', 'Connection error', 'danger');
+             event.target.value = originalRole;
         }
     };
 
     document.getElementById('btn-delete-team').addEventListener('click', async () => {
         if (!currentTeamId) return;
-        if (!confirm('Are you sure you want to permanently delete this team? All associated sub-projects and team data will be removed. This action cannot be undone.')) return;
+        if (!await showConfirm('Delete Team', 'Are you sure you want to permanently delete this team? All associated sub-projects and team data will be removed. This action cannot be undone.', 'danger')) return;
         
         try {
             const fd = new FormData();
@@ -370,11 +416,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (json.success) {
                 window.location.href = '/bathyal/teams.php';
             } else {
-                alert(json.error || 'Failed to delete team');
+                showAlert('Error', json.error || 'Failed to delete team', 'danger');
             }
         } catch (e) {
             console.error(e);
-            alert('Connection error');
+            showAlert('Error', 'Connection error', 'danger');
         }
     });
 
@@ -462,10 +508,10 @@ document.addEventListener('DOMContentLoaded', () => {
                  closeModal(modalAdd);
                  loadTeamMembers(currentTeamId, currentTeamRole);
              } else {
-                 alert(json.error || 'Failed to add member');
+                 showAlert('Error', json.error || 'Failed to add member', 'danger');
              }
          } catch (e) {
-             alert('Connection error');
+             showAlert('Error', 'Connection error', 'danger');
          }
     });
 

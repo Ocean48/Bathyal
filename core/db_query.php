@@ -167,7 +167,7 @@ class DBQueries {
         $stmt->execute();
         $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Fetch subtasks recursively
+        // Fetch subtasks recursively (both native and linked, so their nested children are grabbed too)
         $stmtAll = $this->pdo->prepare("
             SELECT t.*, 
                    GROUP_CONCAT(u.name SEPARATOR ', ') as assignee_name,
@@ -180,10 +180,12 @@ class DBQueries {
             LEFT JOIN task_assignees ta ON t.id = ta.task_id
             LEFT JOIN users u ON ta.user_id = u.id
             WHERE t.id IN (
-                WITH RECURSIVE TaskTree AS (
+                WITH RECURSIVE TaskTree(task_id) AS (
                     SELECT task_id FROM task_projects WHERE project_id = :pid
                     UNION ALL
                     SELECT t2.id FROM tasks t2 INNER JOIN TaskTree tt ON t2.parent_task_id = tt.task_id
+                    UNION ALL
+                    SELECT tl.subtask_id FROM task_links tl INNER JOIN TaskTree tt ON tl.parent_id = tt.task_id
                 ) SELECT task_id FROM TaskTree
             ) AND t.parent_task_id IS NOT NULL
             GROUP BY t.id
@@ -206,10 +208,12 @@ class DBQueries {
             LEFT JOIN task_assignees ta ON t.id = ta.task_id
             LEFT JOIN users u ON ta.user_id = u.id
             WHERE tl.parent_id IN (
-                WITH RECURSIVE TaskTree AS (
+                WITH RECURSIVE TaskTree(task_id) AS (
                     SELECT task_id FROM task_projects WHERE project_id = :pid
                     UNION ALL
                     SELECT t2.id FROM tasks t2 INNER JOIN TaskTree tt ON t2.parent_task_id = tt.task_id
+                    UNION ALL
+                    SELECT tl2.subtask_id FROM task_links tl2 INNER JOIN TaskTree tt ON tl2.parent_id = tt.task_id
                 ) SELECT task_id FROM TaskTree
             )
             GROUP BY tl.parent_id, t.id
@@ -665,6 +669,11 @@ class DBQueries {
         return $stmt->fetchColumn();
     }
 
+    public function updateTeamMemberRole($teamId, $userId, $role) {
+        $stmt = $this->pdo->prepare("UPDATE team_members SET role = :role WHERE team_id = :tid AND user_id = :uid");
+        return $stmt->execute(['role' => $role, 'tid' => (int)$teamId, 'uid' => (int)$userId]);
+    }
+
     public function reorderTasks($sectionId, $taskIds, $parentTaskId = null, $draggedTaskId = null) {
         if (!empty($draggedTaskId)) {
             // List view drag & drop
@@ -677,17 +686,66 @@ class DBQueries {
             }
 
             if (!$isLinkedToNewParent) {
-                // Update the single dragged task's parent if it was shifted to natively belong to a parent
-                // We do NOT alter tasks table if it's already a linked subtask to this parent
-                $stmtTask = $this->pdo->prepare("UPDATE tasks SET parent_task_id = :pid WHERE id = :tid");
-                $stmtTask->execute([
-                    'pid' => $parentTaskId ?: null,
-                    'tid' => (int)$draggedTaskId
-                ]);
+                // If it is NOT a linked subtask, we need to be careful!
+                // If we are moving it to a top-level section (parentTaskId is null), we must ensure we aren't stealing a linked subtask from another project natively.
+                $stmtProj = null;
+                $currentProjectId = null;
+                if ($sectionId) {
+                    $stmtProj = $this->pdo->prepare("SELECT project_id FROM sections WHERE id = :sid");
+                    $stmtProj->execute(['sid' => (int)$sectionId]);
+                    $currentProjectId = $stmtProj->fetchColumn();
+                }
                 
-                if ($parentTaskId) {
-                    $stmtDel = $this->pdo->prepare("DELETE FROM task_projects WHERE task_id = :tid");
-                    $stmtDel->execute(['tid' => (int)$draggedTaskId]);
+                // Find if the task belongs natively to the CURRENT project BEFORE resetting parent_task_id
+                $stmtAncestor = $this->pdo->prepare("
+                    WITH RECURSIVE ancestor AS (
+                        SELECT id, parent_task_id FROM tasks WHERE id = :tid
+                        UNION ALL
+                        SELECT t.id, t.parent_task_id FROM tasks t INNER JOIN ancestor a ON a.parent_task_id = t.id
+                    )
+                    SELECT id FROM ancestor WHERE parent_task_id IS NULL
+                ");
+                $stmtAncestor->execute(['tid' => (int)$draggedTaskId]);
+                $ancestorId = $stmtAncestor->fetchColumn();
+
+                $isNativeToProject = false;
+                if ($ancestorId && $currentProjectId) {
+                    $stmtCheckNative = $this->pdo->prepare("SELECT 1 FROM task_projects WHERE task_id = :aid AND project_id = :pid");
+                    $stmtCheckNative->execute(['aid' => $ancestorId, 'pid' => $currentProjectId]);
+                    $isNativeToProject = (bool)$stmtCheckNative->fetchColumn();
+                }
+
+                // If it is NOT native to this project, and we are dragging it to the ROOT (sectionId),
+                // we should NOT change its native parent_task_id (destroying its native tree). 
+                // We should only insert it into task_projects for THIS project.
+                // ALSO, we should removing any task_links it had to parents IN THIS PROJECT so we don't duplicate!
+                if (!$isNativeToProject && !$parentTaskId && $currentProjectId) {
+                    
+                    // Link to the new project section
+                    $stmtIns = $this->pdo->prepare("INSERT IGNORE INTO task_projects (task_id, project_id, section_id, position) VALUES (:tid, :pid, :sid, 0)");
+                    $stmtIns->execute(['tid' => (int)$draggedTaskId, 'pid' => $currentProjectId, 'sid' => (int)$sectionId]);
+                    
+                    // Remove OLD linkages in this specific project so it's not shown as a subtask anymore here
+                    $stmtCleanLinks = $this->pdo->prepare("
+                        DELETE tl FROM task_links tl
+                        JOIN tasks p ON tl.parent_id = p.id
+                        JOIN task_projects tp ON p.id = tp.task_id
+                        WHERE tl.subtask_id = :tid AND tp.project_id = :pid
+                    ");
+                    $stmtCleanLinks->execute(['tid' => (int)$draggedTaskId, 'pid' => $currentProjectId]);
+                    
+                } else {
+                    // It's a native move or we are explicitly making it a subtask 
+                    $stmtTask = $this->pdo->prepare("UPDATE tasks SET parent_task_id = :pid WHERE id = :tid");
+                    $stmtTask->execute([
+                        'pid' => $parentTaskId ?: null,
+                        'tid' => (int)$draggedTaskId
+                    ]);
+                    
+                    if ($parentTaskId) {
+                        $stmtDel = $this->pdo->prepare("DELETE FROM task_projects WHERE task_id = :tid");
+                        $stmtDel->execute(['tid' => (int)$draggedTaskId]);
+                    }
                 }
             }
             
@@ -721,34 +779,29 @@ class DBQueries {
                         $isNativeToProject = (bool)$stmtCheckNative->fetchColumn();
                     }
 
-                    if ($isNativeToProject) {
-                        // Top-level / Native check
-                        $stmtCheckParent = $this->pdo->prepare("SELECT parent_task_id FROM tasks WHERE id = :tid");
-                        $stmtCheckParent->execute(['tid' => $tid]);
-                        $tData = $stmtCheckParent->fetch();
+                    // Always update position for nested subtasks globally so their order is strictly respected
+                    $stmtCheckParent = $this->pdo->prepare("SELECT parent_task_id FROM tasks WHERE id = :tid");
+                    $stmtCheckParent->execute(['tid' => $tid]);
+                    $tData = $stmtCheckParent->fetch();
+                    
+                    // Task is top-level (either naturally because parent_task_id is NULL OR it's a linked task masquerading as top-level via task_projects)
+                    $stmtCheckTP = $this->pdo->prepare("SELECT 1 FROM task_projects WHERE task_id = :tid AND project_id = :pid");
+                    $stmtCheckTP->execute(['tid' => $tid, 'pid' => $currentProjectId]);
+                    $isInTaskProjects = $stmtCheckTP->fetchColumn();
+
+                    if ($isInTaskProjects) {
+                        // It's a top level task in this project section
+                        $stmtPos = $this->pdo->prepare("UPDATE task_projects SET section_id = :sid, position = :pos WHERE task_id = :tid AND project_id = :pid");
+                        $stmtPos->execute(['sid' => (int)$sectionId, 'pos' => $posTopLevel, 'tid' => $tid, 'pid' => $currentProjectId]);
+                        $posTopLevel++;
+                    } elseif ($tData && !is_null($tData['parent_task_id'])) {
+                        // Inherently nested task (subtask, sub-subtask, etc). Enforce order structurally.
+                        $parent = $tData['parent_task_id'];
+                        if (!isset($posBySharedParent[$parent])) $posBySharedParent[$parent] = 1;
                         
-                        if ($tData && is_null($tData['parent_task_id'])) {
-                            // It's a top level task in this section
-                            $stmtPos = $this->pdo->prepare("UPDATE task_projects SET section_id = :sid, position = :pos WHERE task_id = :tid");
-                            $stmtPos->execute(['sid' => (int)$sectionId, 'pos' => $posTopLevel, 'tid' => $tid]);
-                            
-                            $stmtCheckExist = $this->pdo->prepare("SELECT COUNT(*) FROM task_projects WHERE task_id = :tid AND section_id = :sid");
-                            $stmtCheckExist->execute(['tid' => $tid, 'sid' => (int)$sectionId]);
-                            
-                            if ($stmtCheckExist->fetchColumn() == 0) {
-                                $stmtIns = $this->pdo->prepare("INSERT IGNORE INTO task_projects (task_id, project_id, section_id, position) VALUES (:tid, :pid, :sid, :pos)");
-                                $stmtIns->execute(['tid' => $tid, 'pid' => $currentProjectId, 'sid' => (int)$sectionId, 'pos' => $posTopLevel]);
-                            }
-                            $posTopLevel++;
-                        } elseif ($tData && !is_null($tData['parent_task_id'])) {
-                            // Native subtask
-                            $parent = $tData['parent_task_id'];
-                            if (!isset($posBySharedParent[$parent])) $posBySharedParent[$parent] = 1;
-                            
-                            $stmtSubPos = $this->pdo->prepare("UPDATE tasks SET position = :pos WHERE id = :tid");
-                            $stmtSubPos->execute(['pos' => $posBySharedParent[$parent], 'tid' => $tid]);
-                            $posBySharedParent[$parent]++;
-                        }
+                        $stmtSubPos = $this->pdo->prepare("UPDATE tasks SET position = :pos WHERE id = :tid");
+                        $stmtSubPos->execute(['pos' => $posBySharedParent[$parent], 'tid' => $tid]);
+                        $posBySharedParent[$parent]++;
                     }
 
                     // Also check if this task is a linked subtask ANYWHERE in the system and order it based on its appearance array
@@ -905,6 +958,11 @@ class DBQueries {
         if (array_key_exists('parent_task_id', $data)) {
             $setClauses[] = "parent_task_id = :parent_task_id";
             $params[':parent_task_id'] = $data['parent_task_id'];
+        }
+        
+        if (array_key_exists('estimated_minutes', $data)) {
+            $setClauses[] = "estimated_minutes = :estimated_minutes";
+            $params[':estimated_minutes'] = $data['estimated_minutes'];
         }
 
         if (!empty($setClauses)) {
