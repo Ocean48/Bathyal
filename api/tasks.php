@@ -24,6 +24,9 @@ switch ($method) {
                 // Fetch subtasks strictly bound to this id
                 $task['subtasks'] = $db->getTaskSubtasks($taskId);
 
+                // Fetch total time taken globally
+                $task['total_time_taken'] = $db->getTaskTotalTimeTaken($taskId);
+
                 // Fetch time log status
                 $userId = 1; // Mock user ID for now
                 $task['time_log_status'] = $db->getTaskTimeLogStatus($taskId, $userId);

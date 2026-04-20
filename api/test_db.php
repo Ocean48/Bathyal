@@ -1,0 +1,1 @@
+<?php require "c:/wamp64/www/bathyal/core/database.php"; require "c:/wamp64/www/bathyal/core/db_query.php"; $db = new DBQueries($pdo); $db->toggleTaskTimeTrack(2, 1); sleep(2); $db->toggleTaskTimeTrack(2, 1); print_r($db->getTaskTotalTimeTaken(2));

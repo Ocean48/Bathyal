@@ -259,6 +259,10 @@ require_once 'views/layouts/header.php';
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block" title="Estimated Time in minutes">Est. Time (min)</label>
                     <input type="number" id="task-modal-estimated" onchange="updateTaskDetails()" min="0" placeholder="0" class="text-sm text-slate-700 border border-transparent hover:border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 p-1 -ml-1 rounded cursor-pointer w-24">
                 </div>
+                <div>
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block" title="Current Time Taken">Time Taken</label>
+                    <span id="task-modal-time-taken" class="text-sm font-medium text-slate-700 block p-1 -ml-1">0s</span>
+                </div>
                 <div class="relative">
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Parent Task</label>
                     <div class="flex items-center justify-between cursor-pointer border border-slate-300 hover:bg-slate-50 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 p-1.5 rounded-lg bg-slate-50 w-full shadow-sm transition-colors text-sm text-slate-700 truncate" onclick="toggleParentTaskDropdown(event)" id="parent-task-display">
@@ -831,6 +835,23 @@ async function openTaskModal(taskId) {
         }
         
         // Handle Time Tracker
+        const timeTakenDisplay = document.getElementById('task-modal-time-taken');
+        let overallTotalSecs = task.total_time_taken || 0;
+        
+        const formatTimeTaken = (totalSeconds) => {
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            if (h > 0) return `${h}h ${m}m ${s}s`;
+            if (m > 0) return `${m}m ${s}s`;
+            return `${s}s`;
+        };
+        
+        // Initial setup for static time display
+        if (timeTakenDisplay) {
+            timeTakenDisplay.innerText = formatTimeTaken(overallTotalSecs);
+        }
+
         if (task.time_log_status) {
             const btn = document.getElementById('btn-start-progress');
             const span = btn.querySelector('span');
@@ -851,12 +872,22 @@ async function openTaskModal(taskId) {
                 btn.classList.replace('hover:bg-emerald-600', 'hover:bg-amber-600');
                 span.innerText = "Pause Progress";
                 
+                // Immediate update
+                const initH = String(Math.floor(timerSeconds / 3600)).padStart(2, '0');
+                const initM = String(Math.floor((timerSeconds % 3600) / 60)).padStart(2, '0');
+                const initS = String(timerSeconds % 60).padStart(2, '0');
+                display.innerText = `${initH}:${initM}:${initS}`;
+                
                 timerInterval = setInterval(() => {
                     timerSeconds++;
+                    overallTotalSecs++;
                     const h = String(Math.floor(timerSeconds / 3600)).padStart(2, '0');
                     const m = String(Math.floor((timerSeconds % 3600) / 60)).padStart(2, '0');
                     const s = String(timerSeconds % 60).padStart(2, '0');
                     display.innerText = `${h}:${m}:${s}`;
+                    if (timeTakenDisplay) {
+                        timeTakenDisplay.innerText = formatTimeTaken(overallTotalSecs);
+                    }
                 }, 1000);
             } else {
                 timerSeconds = totalSecs;
