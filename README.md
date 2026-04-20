@@ -2,6 +2,7 @@
 
 A lightweight, self-hosted project management web application built with PHP and MySQL. Bathyal helps teams organise work into projects, sections, and tasks — with time tracking, notifications, automations, and reporting built in.
 
+
 ## Features
 
 - **Projects & Sections** — Organise work into projects with drag-and-drop sections and task ordering.
@@ -15,6 +16,7 @@ A lightweight, self-hosted project management web application built with PHP and
 - **Role-Based Access** — User roles: `admin`, `member`, `data_analyst`.
 - **REST JSON API** — All data operations exposed under `/api/`.
 
+
 ## Tech Stack
 
 | Layer      | Technology          |
@@ -23,6 +25,7 @@ A lightweight, self-hosted project management web application built with PHP and
 | Database   | MySQL               |
 | Frontend   | HTML, CSS, Vanilla JS |
 | Server     | Apache (tested with WAMP) |
+
 
 ## Project Structure
 
@@ -52,40 +55,19 @@ bathyal/
     └── uploads/
 ```
 
+
 ## Getting Started
+
 
 ### Prerequisites
 
-- PHP 8.0+
-- MySQL 5.7+ / MariaDB 10.4+
-- Apache with `mod_rewrite` enabled (WAMP, XAMPP, or native)
+TBD
+
 
 ### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Ocean48/bathyal.git
-   ```
+TBD
 
-2. **Place in your web root**  
-   e.g. `C:\wamp64\www\bathyal` or `/var/www/html/bathyal`
-
-3. **Import the database schema**
-   ```bash
-   mysql -u root -p < database.sql
-   ```
-
-4. **Configure the database connection**  
-   Edit `core/database.php` with your host, database name, username, and password.
-
-5. **Set the base path** (if not hosted at the domain root)  
-   In `index.php`, update `$base_path`:
-   ```php
-   $base_path = '/bathyal'; // or '' if hosted at root
-   ```
-
-6. **Visit the app**  
-   `http://localhost/bathyal`
 
 ## API Endpoints
 
@@ -104,6 +86,7 @@ All endpoints return JSON and expect authenticated sessions.
 | GET    | `/api/users.php`      | Retrieve users               |
 | POST   | `/api/upload.php`     | Upload file attachments      |
 | GET    | `/api/info.php`       | Server / session info        |
+
 
 ## License
 
