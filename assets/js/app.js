@@ -796,30 +796,30 @@ async function handleCreateSubmit(e) {
     submitBtnText.innerText = 'Saving...';
     
     try {
+        let res;
         if (actionType === 'section') {
-            await fetch(`api/sections.php`, {
+            res = await fetch(`api/sections.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'create', project_id: currentProjectId, name: title })
-            });
-        } else if (actionType === 'edit_section') {
-            await fetch(`api/sections.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'update', section_id: targetId, name: title })
+                body: JSON.stringify({ project_id: currentProjectId, title: title })
             });
         } else if (actionType === 'task') {
-            await fetch(`api/tasks.php`, {
+            res = await fetch(`api/tasks.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ project_id: currentProjectId, section_id: targetId, title: title })
             });
         } else if (actionType === 'subtask') {
-            await fetch(`api/tasks.php`, {
+            res = await fetch(`api/tasks.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ parent_task_id: targetId, title: title })
             });
+        }
+        
+        if (res && res.ok) {
+            const data = await res.json();
+            if (window.handleApiError) window.handleApiError(data);
         }
         
         closeCreateModal();

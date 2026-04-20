@@ -372,9 +372,14 @@ class DBQueries {
         }
     }
 
-    public function sendTaskNotification($taskId, $message, $category = 'task_update', $subject = null, $bodyHtml = null) {
+    public function sendTaskNotification($taskId, $message, $category = 'task_update', $subject = null, $bodyHtml = null, $projectId = null, $excludeUserId = null) {
         try {
             $notifyUsers = [];
+
+            // If excludeUserId is not provided, try to get it from session
+            if ($excludeUserId === null && session_status() === PHP_SESSION_ACTIVE && isset($_SESSION['user_id'])) {
+                $excludeUserId = $_SESSION['user_id'];
+            }
 
             // Find assignees
             $stmtAsg = $this->pdo->prepare("SELECT u.id, u.email, u.name FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE ta.task_id = :tid");
@@ -383,30 +388,44 @@ class DBQueries {
 
             if (!empty($assignees)) {
                 foreach ($assignees as $a) {
+                    // Deduplicate by using user ID as key
+                    if ($excludeUserId && (int)$a['id'] === (int)$excludeUserId) continue;
                     $notifyUsers[$a['id']] = $a;
                 }
             }
 
-            // Find project default notifiers
-            $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
-            $stmtProj->execute(['tid' => $taskId]);
-            $projectId = $stmtProj->fetchColumn();
+            // Find project ID if not provided
+            if (!$projectId) {
+                $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
+                $stmtProj->execute(['tid' => $taskId]);
+                $projectId = $stmtProj->fetchColumn();
+
+                // If not found in task_projects, it might be a subtask, look up recursively
+                if (!$projectId) {
+                    $projectId = $this->getProjectIdRecursive($taskId);
+                }
+            }
 
             if ($projectId) {
                 $stmtDef = $this->pdo->prepare("SELECT u.id, u.email, u.name FROM project_default_notify pdn JOIN users u ON pdn.user_id = u.id WHERE pdn.project_id = :pid");
                 $stmtDef->execute(['pid' => $projectId]);
                 $defNotifiers = $stmtDef->fetchAll(PDO::FETCH_ASSOC);
                 foreach ($defNotifiers as $dn) {
+                    // Deduplicate by using user ID as key
+                    if ($excludeUserId && (int)$dn['id'] === (int)$excludeUserId) continue;
                     $notifyUsers[$dn['id']] = $dn;
                 }
             }
 
-            if (empty($notifyUsers)) return;
+            if (empty($notifyUsers)) return ['success' => true, 'message' => 'No users to notify'];
 
             $stmtInsertNotif = $this->pdo->prepare("INSERT INTO notifications (user_id, task_id, category, message, is_read) VALUES (:uid, :tid, :cat, :msg, 0)");
 
             require_once __DIR__ . '/email_service.php';
             $emailService = new EmailService();
+
+            $allSent = true;
+            $errors = [];
 
             foreach ($notifyUsers as $u) {
                 // Insert DB notification
@@ -424,14 +443,33 @@ class DBQueries {
                 
                 $emailResult = $emailService->sendEmail($to, $u['name'], $mailSubject, $mailBody);
                 if (!$emailResult['success']) {
-                    return ['success' => false, 'error' => $emailResult['error']];
+                    $allSent = false;
+                    $errors[] = $emailResult['error'];
                 }
             }
-            return ['success' => true];
+            return [
+                'success' => $allSent, 
+                'error' => $allSent ? null : implode('; ', $errors)
+            ];
         } catch (\PDOException $e) {
             error_log("Notification error: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage()];
         }
+    }
+
+    private function getProjectIdRecursive($taskId) {
+        $stmt = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
+        $stmt->execute(['tid' => $taskId]);
+        $pid = $stmt->fetchColumn();
+        if ($pid) return $pid;
+
+        $stmt = $this->pdo->prepare("SELECT parent_task_id FROM tasks WHERE id = :tid");
+        $stmt->execute(['tid' => $taskId]);
+        $parent = $stmt->fetchColumn();
+        if ($parent) {
+            return $this->getProjectIdRecursive($parent);
+        }
+        return null;
     }
 
     // --- NEW DB QUERIES ---
@@ -988,6 +1026,14 @@ class DBQueries {
                 $stmt->bindValue($key, $val, $type);
             }
             $stmt->execute();
+
+            // Fire triggers if status changed
+            if (array_key_exists('status', $data)) {
+                $this->checkAndFireTaskTriggers($taskId, 'on_status_change');
+                if ($data['status'] === 'completed' || $data['status'] === 'done') {
+                    $this->checkAndFireTaskTriggers($taskId, 'on_complete');
+                }
+            }
         }
 
         if (array_key_exists('due_date', $data)) {

@@ -1,5 +1,6 @@
 <?php
 // /api/tasks.php
+session_start();
 
 require_once '../core/database.php';
 require_once '../core/db_query.php';
@@ -25,7 +26,7 @@ switch ($method) {
                 $task['subtasks'] = $db->getTaskSubtasks($taskId);
 
                 // Fetch time log status
-                $userId = 1; // Mock user ID for now
+                $userId = $_SESSION['user_id']; // Current user ID
                 $task['time_log_status'] = $db->getTaskTimeLogStatus($taskId, $userId);
 
                 echo json_encode($task);
@@ -211,7 +212,7 @@ switch ($method) {
                 }
                 $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
                 
-                $notifResult = $db->sendTaskNotification($taskId, "New task created: " . $data['title'], 'task_update', $subject, $bodyHtml);
+                $notifResult = $db->sendTaskNotification($taskId, "New task created: " . $data['title'], 'task_update', $subject, $bodyHtml, $data['project_id'] ?? null);
                 
                 $response = ['status' => 'success', 'task_id' => $taskId];
                 if (isset($notifResult['success']) && !$notifResult['success']) {
