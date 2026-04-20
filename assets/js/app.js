@@ -299,7 +299,7 @@ async function loadProjectBoard(projectId) {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ action: 'reorder', section_ids: sectionIds })
-                        }).catch(console.error);
+                        }).then(() => loadProjectBoard(currentProjectId)).catch(console.error);
                     }
                 });
 
@@ -332,7 +332,7 @@ async function loadProjectBoard(projectId) {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ action: 'reorder', section_id: newSectionId, task_ids: taskIds, parent_task_id: parentTaskId })
-                        }).catch(console.error);
+                        }).then(() => loadProjectBoard(currentProjectId)).catch(console.error);
                     }
                 };
 
@@ -355,7 +355,7 @@ async function loadProjectBoard(projectId) {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ action: 'reorder', section_ids: sectionIds })
-                        }).catch(console.error);
+                        }).then(() => loadProjectBoard(currentProjectId)).catch(console.error);
                     }
                 });
 
@@ -368,7 +368,22 @@ async function loadProjectBoard(projectId) {
                         filter: '.section-header',
                         onMove: function(evt) {
                             // Don't allow dropping items before the section header
-                            return evt.related.className.indexOf('section-header') === -1;
+                            if (evt.related && evt.related.className.indexOf('section-header') !== -1) {
+                                return false;
+                            }
+                            
+                            const depth = parseInt(evt.dragged.dataset.depth || '0', 10);
+                            // Enforce rule: sub-subtask level and below ONLY allow the drag to reorder.
+                            // They cannot change their sub level or parent.
+                            if (depth >= 2) {
+                                if (evt.to !== evt.from) return false;
+                                if (evt.related) {
+                                    if (evt.related.dataset.parentId !== evt.dragged.dataset.parentId) {
+                                        return false;
+                                    }
+                                }
+                            }
+                            return true;
                         },
                         onEnd: function(evt) {
                             const newSectionId = evt.to.dataset.sectionId;
@@ -376,22 +391,32 @@ async function loadProjectBoard(projectId) {
                             // Get dragged task ID
                             const draggedTaskMatch = evt.item.className.match(/task-row-(\d+)/);
                             const draggedTaskId = draggedTaskMatch ? draggedTaskMatch[1] : null;
+                            const depth = parseInt(evt.item.dataset.depth || '0', 10);
 
                             // Detect hierarchy based on previous element
                             let newParentTaskId = null;
                             let newDepth = 0;
-                            const prev = evt.item.previousElementSibling;
                             
-                            if (prev && prev.classList.contains('task-row')) {
-                                const childMatch = prev.className.match(/child-of-(\d+)/);
-                                if (childMatch) {
-                                    newParentTaskId = childMatch[1];
-                                } else {
-                                    const next = evt.item.nextElementSibling;
-                                    if (next && next.classList.contains('task-row')) {
-                                        const nextChildMatch = next.className.match(/child-of-(\d+)/);
-                                        if (nextChildMatch && nextChildMatch[1] === prev.dataset.taskId) {
-                                            newParentTaskId = prev.dataset.taskId;
+                            if (depth >= 2) {
+                                // Sub-subtasks and below retain exactly their same parent and depth.
+                                newParentTaskId = evt.item.dataset.parentId || null;
+                                newDepth = depth;
+                            } else {
+                                const prev = evt.item.previousElementSibling;
+                                
+                                if (prev && prev.classList.contains('task-row')) {
+                                    const childMatch = prev.className.match(/child-of-(\d+)/);
+                                    if (childMatch) {
+                                        newParentTaskId = childMatch[1];
+                                        newDepth = parseInt(prev.dataset.depth || '0', 10); // Inherit depth of sibling
+                                    } else {
+                                        const next = evt.item.nextElementSibling;
+                                        if (next && next.classList.contains('task-row')) {
+                                            const nextChildMatch = next.className.match(/child-of-(\d+)/);
+                                            if (nextChildMatch && nextChildMatch[1] === prev.dataset.taskId) {
+                                                newParentTaskId = prev.dataset.taskId;
+                                                newDepth = parseInt(prev.dataset.depth || '0', 10) + 1; // Inherit depth + 1 from visual parent
+                                            }
                                         }
                                     }
                                 }
@@ -402,8 +427,12 @@ async function loadProjectBoard(projectId) {
                                 evt.item.className = evt.item.className.replace(/child-of-\d+/g, '').replace(/\s+/g, ' ');
                                 if (newParentTaskId) {
                                     evt.item.classList.add(`child-of-${newParentTaskId}`);
-                                    newDepth = 1;
                                 }
+                                if (newDepth === 0 && newParentTaskId) {
+                                    newDepth = 1; // Fallback if calculation failed
+                                }
+                                evt.item.dataset.depth = newDepth; // Update the dataset depth!
+                                evt.item.dataset.parentId = newParentTaskId || '';
                                 const paddingVal = newDepth * 24 + 16;
                                 const firstTd = evt.item.querySelector('td:first-child');
                                 if (firstTd) firstTd.style.paddingLeft = paddingVal + 'px';
@@ -426,7 +455,7 @@ async function loadProjectBoard(projectId) {
                                     dragged_task_id: draggedTaskId,
                                     parent_task_id: newParentTaskId 
                                 })
-                            }).catch(console.error);
+                            }).then(() => loadProjectBoard(currentProjectId)).catch(console.error);
                         }
                     });
                 });
@@ -495,11 +524,14 @@ const totalSubtasks = parseInt(task.subtask_count || 0, 10);
 
 function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
     const tr = document.createElement('tr');
-    tr.className = `hover:bg-slate-50 cursor-pointer border-b border-slate-100 task-row ${parentId ? 'hidden child-of-' + parentId : ''} task-row-${task.id}`;
-    tr.dataset.taskId = task.id;    tr.dataset.status = task.status || '';
+    tr.className = `hover:bg-slate-50 cursor-pointer border-b border-slate-100 task-row ${parentId ? 'child-of-' + parentId : ''} task-row-${task.id}`;
+    tr.dataset.taskId = task.id;
+    tr.dataset.status = task.status || '';
     tr.dataset.assigneeIds = task.assignee_ids || '';
     tr.dataset.title = task.title || '';
-    tr.dataset.parentId = parentId || '';    tr.onclick = (e) => {
+    tr.dataset.parentId = parentId || '';
+    tr.dataset.depth = depth;
+    tr.onclick = (e) => {
         // Prevent modal open if clicking explicitly on the tree expand toggle or drag handle
         if (e.target.closest('.subtask-toggle') || e.target.closest('.cursor-grab-list')) return;
         openTaskModal(task.id);
@@ -513,7 +545,7 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
     let toggleIcon = '';
     if (hasSubtasks) {
         toggleIcon = `
-            <button class="subtask-toggle mr-1.5 text-slate-400 hover:text-slate-600 transition-transform" onclick="toggleSubtasks(this, ${task.id})">
+            <button class="subtask-toggle rotate-90 mr-1.5 text-slate-400 hover:text-slate-600 transition-transform" onclick="event.stopPropagation(); toggleSubtasks(this, ${task.id})">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
             </button>
         `;
@@ -566,7 +598,7 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
     `;
     tbody.appendChild(tr);
 
-    if (hasSubtasks) {
+    if (hasSubtasks && task.subtasks && Array.isArray(task.subtasks)) {
         task.subtasks.forEach(sub => renderTaskListRow(sub, tbody, depth + 1, task.id));
     }
 }
@@ -579,13 +611,9 @@ function toggleSubtasks(btn, taskId) {
         btn.classList.remove('rotate-90');
         hideAllChildren(taskId);
     } else {
-        // Expand directly only the immediate children
+        // Expand
         btn.classList.add('rotate-90');
-        const children = document.querySelectorAll('.child-of-' + taskId);
-        children.forEach(child => {
-            child.classList.remove('hidden');
-            child.style.display = '';
-        });
+        showExpandedChildren(taskId);
     }
 }
 
@@ -593,9 +621,8 @@ function hideAllChildren(parentId) {
     const children = document.querySelectorAll('.child-of-' + parentId);
     children.forEach(child => {
         child.classList.add('hidden');
-        // Reset subtask toggle btn state manually if needed
-        const btn = child.querySelector('.subtask-toggle');
-        if(btn) btn.classList.remove('rotate-90');
+        // We only hide them, but we DONT forcibly reset their subtask toggle state.
+        // This allows them to remember their expand/collapse state when the parent is expanded again.
         const childId = child.className.match(/task-row-(\d+)/);
         if (childId && childId[1]) {
             hideAllChildren(childId[1]);
@@ -629,6 +656,7 @@ function toggleListSection(tbody, secTr) {
                 // If it's a top-level task (no child-of- class)
                 const isChild = Array.from(child.classList).some(c => c.startsWith('child-of-'));
                 if (!isChild) {
+                    child.classList.remove('hidden');
                     child.style.display = '';
                     // If this task has an expanded toggle, also show its immediate children
                     const btn = child.querySelector('.subtask-toggle');
@@ -648,6 +676,7 @@ function toggleListSection(tbody, secTr) {
 function showExpandedChildren(parentId) {
     const children = document.querySelectorAll('.child-of-' + parentId);
     children.forEach(child => {
+        child.classList.remove('hidden');
         child.style.display = '';
         const btn = child.querySelector('.subtask-toggle');
         if (btn && btn.classList.contains('rotate-90')) {

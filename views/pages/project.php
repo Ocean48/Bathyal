@@ -1588,7 +1588,8 @@ function promptAddSubtask(parentId) {
         })
     }).then(res => res.json()).then(data => {
         if(data.status === 'success') {
-            openTaskModal(parentId); // Reload
+            openTaskModal(parentId); // Reload modal
+            if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId); // Refresh board view to show new subtask expander
         } else {
             alert('Failed to create subtask');
         }
