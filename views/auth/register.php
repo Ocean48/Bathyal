@@ -71,6 +71,7 @@ $appName = $appConfig['app_name'] ?? 'Bathyal';
     <meta charset="UTF-8">
     <title>Create Account - <?= htmlspecialchars($appName) ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <?php require_once __DIR__ . '/../layouts/tailwind_config.php'; ?>
 </head>
 <body class="bg-slate-50 flex items-center justify-center min-h-screen">
     <div class="w-full max-w-sm bg-white rounded-xl shadow-md border border-slate-200 p-8 my-8">

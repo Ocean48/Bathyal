@@ -372,32 +372,41 @@ class DBQueries {
         }
     }
 
-    public function sendTaskNotification($taskId, $message, $category = 'task_update') {
+    public function sendTaskNotification($taskId, $message, $category = 'task_update', $subject = null, $bodyHtml = null) {
         try {
+            $notifyUsers = [];
+
             // Find assignees
             $stmtAsg = $this->pdo->prepare("SELECT u.id, u.email, u.name FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE ta.task_id = :tid");
             $stmtAsg->execute(['tid' => $taskId]);
             $assignees = $stmtAsg->fetchAll(PDO::FETCH_ASSOC);
 
-            $notifyUsers = [];
             if (!empty($assignees)) {
-                $notifyUsers = $assignees;
-            } else {
-                // Find project default notifiers
-                $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
-                $stmtProj->execute(['tid' => $taskId]);
-                $projectId = $stmtProj->fetchColumn();
+                foreach ($assignees as $a) {
+                    $notifyUsers[$a['id']] = $a;
+                }
+            }
 
-                if ($projectId) {
-                    $stmtDef = $this->pdo->prepare("SELECT u.id, u.email, u.name FROM project_default_notify pdn JOIN users u ON pdn.user_id = u.id WHERE pdn.project_id = :pid");
-                    $stmtDef->execute(['pid' => $projectId]);
-                    $notifyUsers = $stmtDef->fetchAll(PDO::FETCH_ASSOC);
+            // Find project default notifiers
+            $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
+            $stmtProj->execute(['tid' => $taskId]);
+            $projectId = $stmtProj->fetchColumn();
+
+            if ($projectId) {
+                $stmtDef = $this->pdo->prepare("SELECT u.id, u.email, u.name FROM project_default_notify pdn JOIN users u ON pdn.user_id = u.id WHERE pdn.project_id = :pid");
+                $stmtDef->execute(['pid' => $projectId]);
+                $defNotifiers = $stmtDef->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($defNotifiers as $dn) {
+                    $notifyUsers[$dn['id']] = $dn;
                 }
             }
 
             if (empty($notifyUsers)) return;
 
             $stmtInsertNotif = $this->pdo->prepare("INSERT INTO notifications (user_id, task_id, category, message, is_read) VALUES (:uid, :tid, :cat, :msg, 0)");
+
+            require_once __DIR__ . '/email_service.php';
+            $emailService = new EmailService();
 
             foreach ($notifyUsers as $u) {
                 // Insert DB notification
@@ -410,13 +419,10 @@ class DBQueries {
 
                 // Send email
                 $to = $u['email'];
-                $subject = "App Notification: Task {$taskId}";
-                $body = "Hello {$u['name']},\n\n{$message}\n\nTask ID: {$taskId}\n";
+                $mailSubject = $subject ? $subject : "App Notification: Task {$taskId}";
+                $mailBody = $bodyHtml ? $bodyHtml : "Hello {$u['name']},<br><br>{$message}<br><br>Task ID: {$taskId}<br>";
                 
-                $appConfig = file_exists(__DIR__ . '/../config.php') ? require __DIR__ . '/../config.php' : ['app_name' => 'Bathyal'];
-                $appNameDomain = strtolower(str_replace(' ', '', $appConfig['app_name'] ?? 'Bathyal'));
-                $headers = "From: no-reply@" . $appNameDomain . ".local";
-                @mail($to, $subject, $body, $headers);
+                $emailService->sendEmail($to, $u['name'], $mailSubject, $mailBody);
             }
         } catch (\PDOException $e) {
             error_log("Notification error: " . $e->getMessage());
