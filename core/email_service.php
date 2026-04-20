@@ -13,25 +13,21 @@ class EmailService {
         $this->mail = new PHPMailer(true);
 
         try {
-            // --- SMTP Server Settings ---
+            $appConfig = file_exists(__DIR__ . '/../config.php') ? require __DIR__ . '/../config.php' : ['app_name' => 'Bathyal'];
+            $appName = $appConfig['app_name'] ?? 'Bathyal';
+
+            // Server settings
             $this->mail->isSMTP();
-            $this->mail->Host       = 'smtp.gmail.com';
-            $this->mail->SMTPAuth   = true;
-            
-            // Read credentials from .htaccess Environment Variables
-            // getenv() or $_SERVER can be used depending on Apache's mod_env configuration
-            $smtpUser = getenv('SMTP_USER') !== false ? getenv('SMTP_USER') : ($_SERVER['SMTP_USER'] ?? '');
-            $smtpPass = getenv('SMTP_PASS') !== false ? getenv('SMTP_PASS') : ($_SERVER['SMTP_PASS'] ?? '');
+            $this->mail->Host = 'smtp.gmail.com'; 
+            $this->mail->SMTPAuth = true;
+            $this->mail->Username = 'YOUR_EMAIL@gmail.com'; 
+            $this->mail->Password = 'YOUR_APP_PASSWORD'; 
+            $this->mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            $this->mail->Port = 587;
 
-            $this->mail->Username   = $smtpUser; 
-            $this->mail->Password   = $smtpPass;
-            
-            $this->mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS; // Enables TLS encryption
-            $this->mail->Port       = 587; // TCP port to connect to
-
-            // --- Default Sender ---
-            $this->mail->setFrom('YOUR_EMAIL@gmail.com', 'Bathyal System');
-            
+            // Sender
+            $this->mail->setFrom('YOUR_EMAIL@gmail.com', $appName . ' System');
+            $this->mail->isHTML(true);
         } catch (Exception $e) {
             error_log("Email configuration error: {$this->mail->ErrorInfo}");
         }

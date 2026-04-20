@@ -1,9 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <?php
+    $appConfig = file_exists(__DIR__ . '/../../config.php') ? require __DIR__ . '/../../config.php' : ['app_name' => 'Bathyal'];
+    $appName = $appConfig['app_name'] ?? 'Bathyal';
+    ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bathyal Project Management</title>
+    <title><?= htmlspecialchars($appName) ?> Project Management</title>
     <link rel="stylesheet" href="/bathyal/assets/css/style.css">
     <!-- Optional: Add Tailwind CSS via CDN for rapid UI development -->
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
@@ -15,7 +19,7 @@
         <div class="h-16 flex items-center px-6 border-b border-white/10">
             <!-- Logo Icon (Ocean Theme) -->
             <svg class="w-6 h-6 text-teal-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            <span class="font-bold text-xl text-white tracking-wide">Bathyal</span>
+            <span class="font-bold text-xl text-white tracking-wide"><?= htmlspecialchars($appName) ?></span>
         </div>
 
         <nav class="flex-1 overflow-y-auto py-4">

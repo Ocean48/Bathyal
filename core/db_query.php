@@ -412,7 +412,10 @@ class DBQueries {
                 $to = $u['email'];
                 $subject = "App Notification: Task {$taskId}";
                 $body = "Hello {$u['name']},\n\n{$message}\n\nTask ID: {$taskId}\n";
-                $headers = "From: no-reply@bathyal.local";
+                
+                $appConfig = file_exists(__DIR__ . '/../config.php') ? require __DIR__ . '/../config.php' : ['app_name' => 'Bathyal'];
+                $appNameDomain = strtolower(str_replace(' ', '', $appConfig['app_name'] ?? 'Bathyal'));
+                $headers = "From: no-reply@" . $appNameDomain . ".local";
                 @mail($to, $subject, $body, $headers);
             }
         } catch (\PDOException $e) {

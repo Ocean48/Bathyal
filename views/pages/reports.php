@@ -224,7 +224,7 @@ function exportToJSON() {
     // Gather all PHP-generated report data into a structured payload
     const reportData = {
         metadata: {
-            title: "Bathyal Project Report",
+            title: "<?= addslashes($appName ?? 'Bathyal') ?> Project Report",
             exportedAt: new Date().toISOString()
         },
         kpis: {
@@ -259,7 +259,7 @@ function exportToJSON() {
     const tempElement = document.createElement("a");
     const url = URL.createObjectURL(blob);
     tempElement.href = url;
-    tempElement.download = "bathyal-project-report.json";
+    tempElement.download = "<?= strtolower($appName ?? 'bathyal') ?>-project-report.json";
     
     document.body.appendChild(tempElement);
     tempElement.click();

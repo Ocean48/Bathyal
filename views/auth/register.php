@@ -61,19 +61,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please fill in all required fields.';
     }
 }
+
+$appConfig = file_exists(__DIR__ . '/../../config.php') ? require __DIR__ . '/../../config.php' : ['app_name' => 'Bathyal'];
+$appName = $appConfig['app_name'] ?? 'Bathyal';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Create Account - Bathyal</title>
+    <title>Create Account - <?= htmlspecialchars($appName) ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 flex items-center justify-center min-h-screen">
     <div class="w-full max-w-sm bg-white rounded-xl shadow-md border border-slate-200 p-8 my-8">
         <div class="flex items-center justify-center mb-6">
             <svg class="w-8 h-8 text-cyan-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            <span class="font-bold text-2xl text-slate-800 tracking-wide">Bathyal</span>
+            <span class="font-bold text-2xl text-slate-800 tracking-wide"><?= htmlspecialchars($appName) ?></span>
         </div>
         <h2 class="text-xl font-semibold text-slate-700 text-center mb-6">Create your account</h2>
         
