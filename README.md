@@ -24,7 +24,7 @@ A lightweight, self-hosted project management web application built with PHP and
 | Backend    | PHP (front-controller pattern) |
 | Database   | MySQL               |
 | Frontend   | HTML, CSS, Vanilla JS |
-| Server     | Apache (tested with WAMP) |
+| Server     | Apache/Nginx |
 
 
 ## Project Structure
