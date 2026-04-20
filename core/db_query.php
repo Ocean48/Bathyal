@@ -1036,10 +1036,6 @@ class DBQueries {
             }
         }
 
-        if (array_key_exists('due_date', $data)) {
-            $this->sendTaskNotification($taskId, "Task due date was updated to: " . ($data['due_date'] ?: 'None'), 'task_update');
-        }
-
         if (array_key_exists('assignee_ids', $data)) {
             // Delete existing
             $stmtDel = $this->pdo->prepare("DELETE FROM task_assignees WHERE task_id = :id");
@@ -1055,7 +1051,6 @@ class DBQueries {
                     $stmtIns->execute();
                 }
             }
-            $this->sendTaskNotification($taskId, "Task assignees updated", 'task_update');
         }
         
         return true;
