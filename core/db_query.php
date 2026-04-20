@@ -669,6 +669,11 @@ class DBQueries {
         return $stmt->fetchColumn();
     }
 
+    public function updateTeamMemberRole($teamId, $userId, $role) {
+        $stmt = $this->pdo->prepare("UPDATE team_members SET role = :role WHERE team_id = :tid AND user_id = :uid");
+        return $stmt->execute(['role' => $role, 'tid' => (int)$teamId, 'uid' => (int)$userId]);
+    }
+
     public function reorderTasks($sectionId, $taskIds, $parentTaskId = null, $draggedTaskId = null) {
         if (!empty($draggedTaskId)) {
             // List view drag & drop
@@ -953,6 +958,11 @@ class DBQueries {
         if (array_key_exists('parent_task_id', $data)) {
             $setClauses[] = "parent_task_id = :parent_task_id";
             $params[':parent_task_id'] = $data['parent_task_id'];
+        }
+        
+        if (array_key_exists('estimated_minutes', $data)) {
+            $setClauses[] = "estimated_minutes = :estimated_minutes";
+            $params[':estimated_minutes'] = $data['estimated_minutes'];
         }
 
         if (!empty($setClauses)) {
