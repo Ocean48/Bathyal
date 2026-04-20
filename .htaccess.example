@@ -10,6 +10,10 @@ SetEnv DB_USER xxxxxx
 SetEnv DB_PASS xxxxxx
 SetEnv DB_CHARSET utf8mb4
 
+# Set Environment Variables for SMTP Email Configuration
+SetEnv SMTP_USER Youremaril@gmail.com
+SetEnv SMTP_PASS YOURAPPPASSWORD
+
 # Basic routing (if you want all traffic through index.php later)
 <IfModule mod_rewrite.c>
     RewriteEngine On

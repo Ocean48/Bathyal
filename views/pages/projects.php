@@ -23,6 +23,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $userId = isset($currentUser['id']) ? $currentUser['id'] : 1; 
             $stmtMember->execute([$newProjectId, $userId]);
 
+            // Send Email Notification to the Creator
+            require_once 'core/email_service.php';
+            $emailService = new EmailService();
+            // We need to fetch the creator's email
+            $stmtUser = $pdo->prepare("SELECT name, email FROM users WHERE id = ?");
+            $stmtUser->execute([$userId]);
+            $creator = $stmtUser->fetch();
+            
+            if ($creator && !empty($creator['email'])) {
+                $subject = "New Project Created: " . $name;
+                $body = "<h2>Your project was created successfully!</h2>";
+                $body .= "<p><strong>Project Name:</strong> " . htmlspecialchars($name) . "</p>";
+                if (!empty($description)) {
+                    $body .= "<p><strong>Description:</strong> " . nl2br(htmlspecialchars($description)) . "</p>";
+                }
+                $body .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $newProjectId . "'>Click here to view your new project</a></p>";
+                
+                $emailService->sendEmail($creator['email'], $creator['name'], $subject, $body);
+            }
+
             $pdo->commit();
             header("Location: /bathyal/projects");
             exit;

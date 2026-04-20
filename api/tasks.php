@@ -59,6 +59,14 @@ switch ($method) {
                 $filePath = 'assets/uploads/' . $filename;
                 $insertedId = $db->createTaskAttachment($taskId, $userId, $file['name'], $filePath, $file['type']);
                 if ($insertedId) {
+                    $taskDetails = $db->getTaskById($taskId);
+                    $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $taskId;
+                    $subject = "New Attachment on Task: " . $taskTitle;
+                    $bodyHtml = "<h2>A new attachment was added to the task: " . $taskTitle . "</h2>";
+                    $bodyHtml .= "<p><strong>File:</strong> " . htmlspecialchars($file['name']) . "</p>";
+                    $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
+                    $db->sendTaskNotification($taskId, "New attachment added: " . $file['name'], 'task_update', $subject, $bodyHtml);
+
                     echo json_encode(['status' => 'success', 'attachment_id' => $insertedId]);
                     exit;
                 }
@@ -72,6 +80,15 @@ switch ($method) {
         if (isset($data['action'])) {
             if ($data['action'] === 'update_status') {
                 if ($db->updateTaskStatus($data['task_id'], $data['status'])) {
+                    $taskDetails = $db->getTaskById($data['task_id']);
+                    $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $data['task_id'];
+                    $subject = "Task Status Updated: " . $taskTitle;
+                    $bodyHtml = "<h2>Task status was updated</h2>";
+                    $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
+                    $bodyHtml .= "<p><strong>New Status:</strong> " . htmlspecialchars($data['status']) . "</p>";
+                    $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
+                    $db->sendTaskNotification($data['task_id'], "Task status updated to " . $data['status'], 'task_update', $subject, $bodyHtml);
+
                     echo json_encode(['status' => 'success']);
                 } else {
                     http_response_code(500);
@@ -79,6 +96,14 @@ switch ($method) {
                 }
             } elseif ($data['action'] === 'update_details') {
                 if ($db->updateTaskDetails($data['task_id'], $data['details'])) {
+                    $taskDetails = $db->getTaskById($data['task_id']);
+                    $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $data['task_id'];
+                    $subject = "Task Details Updated: " . $taskTitle;
+                    $bodyHtml = "<h2>Task details were updated</h2>";
+                    $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
+                    $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
+                    $db->sendTaskNotification($data['task_id'], "Task details updated", 'task_update', $subject, $bodyHtml);
+
                     echo json_encode(['status' => 'success']);
                 } else {
                     http_response_code(500);
@@ -89,6 +114,14 @@ switch ($method) {
                 $userId = 1;
                 $commentId = $db->createComment($data['task_id'], $userId, $data['content']);
                 if ($commentId) {
+                    $taskDetails = $db->getTaskById($data['task_id']);
+                    $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $data['task_id'];
+                    $subject = "New Comment on Task: " . $taskTitle;
+                    $bodyHtml = "<h2>A new comment was added to the task: " . $taskTitle . "</h2>";
+                    $bodyHtml .= "<p><strong>Comment:</strong><br>" . nl2br(htmlspecialchars($data['content'])) . "</p>";
+                    $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
+                    $db->sendTaskNotification($data['task_id'], "New comment added", 'comment', $subject, $bodyHtml);
+
                     echo json_encode(['status' => 'success', 'comment_id' => $commentId]);
                 } else {
                     http_response_code(500);
@@ -149,6 +182,20 @@ switch ($method) {
         } else { // Create task
             $taskId = $db->createTask($data);
             if ($taskId) {
+                // Send Email Notification using the centralized notification method
+                $subject = "New Task Created: " . $data['title'];
+                $bodyHtml = "<h2>A new task was created!</h2>";
+                $bodyHtml .= "<p><strong>Task:</strong> " . htmlspecialchars($data['title']) . "</p>";
+                if (!empty($data['description'])) {
+                    $bodyHtml .= "<p><strong>Description:</strong> " . nl2br(htmlspecialchars($data['description'])) . "</p>";
+                }
+                if (!empty($data['due_date'])) {
+                    $bodyHtml .= "<p><strong>Due Date:</strong> " . htmlspecialchars($data['due_date']) . "</p>";
+                }
+                $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
+                
+                $db->sendTaskNotification($taskId, "New task created: " . $data['title'], 'task_update', $subject, $bodyHtml);
+
                 echo json_encode(['status' => 'success', 'task_id' => $taskId]);
             } else {
                 http_response_code(500);
