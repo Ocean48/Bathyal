@@ -598,7 +598,7 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
                 ${assigneesHtml}
             </div>
         </td>
-        <td class="px-4 py-3 text-slate-500 text-sm whitespace-nowrap">${task.due_date ? task.due_date.split(' ')[0] : '-'}</td>
+        <td class="px-4 py-3 text-slate-500 text-sm whitespace-nowrap">${task.completed_date ? task.completed_date.split(' ')[0] : '-'}</td>
         <td class="px-4 py-3 whitespace-nowrap">
             <select onchange="window.quickUpdateTaskStatus(${task.id}, this.value)" onclick="event.stopPropagation()" class="px-2 py-0.5 pr-6 rounded text-[10px] font-bold tracking-wider uppercase border border-slate-200/60 focus:outline-none focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer transition-colors ${window.getStatusBadgeClass ? window.getStatusBadgeClass(task.status) : 'bg-slate-100 text-slate-600'}">
                 <option value="todo" ${task.status === 'todo' ? 'selected' : ''}>TO DO</option>
@@ -986,11 +986,13 @@ function renderTimeline() {
     let ganttTasks = [];
     p.sections.forEach(s => {
         s.tasks.forEach(t => {
-            if (t.due_date) {
-                let endDate = new Date(t.due_date.split(' ')[0]);
+            if (t.expected_due_date) {
+                let endDate = new Date(t.expected_due_date.split(' ')[0]);
                 let startDate = new Date(endDate);
                 
-                if(t.start_date) {
+                if(t.expected_start_date) {
+                    startDate = new Date(t.expected_start_date.split(' ')[0]);
+                } else if(t.start_date) {
                     startDate = new Date(t.start_date.split(' ')[0]);
                 } else {
                     startDate.setDate(endDate.getDate() - 3); // mock duration if missing start date
@@ -1008,7 +1010,7 @@ function renderTimeline() {
                     progress: progress,
                     // Pass the real DB start date (if any) and status
                     start_val: t.start_date ? t.start_date.split(' ')[0] : null,
-                    due_val: t.due_date.split(' ')[0], 
+                    due_val: t.expected_due_date.split(' ')[0], 
                     status: t.status,
                     description: t.description,
                     parent_task_id: t.parent_task_id,
@@ -1072,7 +1074,8 @@ function renderTimeline() {
                                     title: task.name, 
                                     status: task.status || 'todo', 
                                     start_date: newStart, 
-                                    due_date: newEnd, 
+                                    expected_start_date: newStart, 
+                                    expected_due_date: newEnd, 
                                     description: task.description || '', 
                                     parent_task_id: task.parent_task_id || null 
                                 }

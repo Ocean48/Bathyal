@@ -71,7 +71,6 @@ CREATE TABLE tasks (
     description TEXT, -- Supports URL hyperlinks parsing
     status ENUM('todo', 'in_progress', 'paused', 'completed') DEFAULT 'todo',
     start_date DATETIME NULL,
-    due_date DATETIME NULL,
     expected_start_date DATETIME NULL,
     expected_due_date DATETIME NULL,
     completed_date DATETIME NULL,
@@ -157,7 +156,7 @@ CREATE TABLE task_triggers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     source_task_id INT NOT NULL,     -- The task that triggers the event (e.g., when this finishes)
     target_task_id INT NULL,         -- The task to start/create (if applicable)
-    trigger_event ENUM('on_complete', 'on_status_change', 'on_due_date') NOT NULL,
+    trigger_event ENUM('on_complete', 'on_status_change', 'on_expected_due_date') NOT NULL,
     action ENUM('start_next_task', 'notify_assignee', 'notify_admin', 'create_task') NOT NULL,
     FOREIGN KEY (source_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
     FOREIGN KEY (target_task_id) REFERENCES tasks(id) ON DELETE CASCADE

@@ -155,7 +155,7 @@ require_once 'views/layouts/header.php';
                         <tr>
                             <th class="px-4 py-3 font-medium">Tasks</th>
                             <th class="px-4 py-3 font-medium">Assignees</th>
-                            <th class="px-4 py-3 font-medium">Due Date</th>
+                            <th class="px-4 py-3 font-medium">Completed On</th>
                             <th class="px-4 py-3 font-medium">Status / Actions</th>
                         </tr>
                     </thead>
@@ -234,21 +234,36 @@ require_once 'views/layouts/header.php';
                         </ul>
                     </div>
                 </div>
+
+                <div class="relative">
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Collaborators</label>
+                    <div class="flex items-center space-x-2 cursor-pointer hover:bg-slate-50 p-1.5 -ml-1.5 rounded-md transition-colors" onclick="toggleCollaboratorDropdown(event)">
+                        <div id="task-modal-collaborators-stack" class="flex -space-x-2 overflow-hidden items-center hidden">
+                        </div>
+                        <span class="text-sm text-slate-700 ml-2" id="task-modal-collaborator-name">No collaborators</span>
+                    </div>
+                    <!-- Dropdown for collaborators -->
+                    <div id="collaborator-dropdown" class="hidden absolute top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-64 flex-col">
+                        <div class="p-2 border-b border-slate-100">
+                            <input type="text" id="collaborator-search" oninput="searchCollaborators(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search people by name or email..." onclick="event.stopPropagation()">
+                        </div>
+                        <ul id="collaborator-dropdown-list" class="overflow-y-auto flex-1 p-1 text-sm text-slate-600">
+                            <!-- Items here -->
+                        </ul>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Expected Start Date</label>
+                    <input type="date" id="task-modal-expected-start-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Expected End Date</label>
+                    <input type="date" id="task-modal-expected-due-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
+                </div>
                 <div>
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Start Date</label>
                     <input type="date" id="task-modal-start-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
-                </div>
-                <div>
-                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Due Date</label>
-                    <input type="date" id="task-modal-due-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
-                </div>
-                <div>
-                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Expected Start Time</label>
-                    <input type="datetime-local" id="task-modal-expected-start-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
-                </div>
-                <div>
-                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Expected End Time</label>
-                    <input type="datetime-local" id="task-modal-expected-due-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
                 </div>
                 <div class="hidden" id="task-modal-completed-date-container">
                     <label class="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-1 block">Completed On</label>
@@ -266,24 +281,6 @@ require_once 'views/layouts/header.php';
                 <div>
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block" title="Estimated Time in minutes">Est. Time (min)</label>
                     <input type="number" id="task-modal-estimated" onchange="updateTaskDetails()" min="0" placeholder="0" class="text-sm text-slate-700 border border-transparent hover:border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 p-1 -ml-1 rounded cursor-pointer w-24">
-                </div>
-                
-                <div class="relative">
-                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Collaborators</label>
-                    <div class="flex items-center space-x-2 cursor-pointer hover:bg-slate-50 p-1.5 -ml-1.5 rounded-md transition-colors" onclick="toggleCollaboratorDropdown(event)">
-                        <div id="task-modal-collaborators-stack" class="flex -space-x-2 overflow-hidden items-center hidden">
-                        </div>
-                        <span class="text-sm text-slate-700 ml-2" id="task-modal-collaborator-name">No collaborators</span>
-                    </div>
-                    <!-- Dropdown for collaborators -->
-                    <div id="collaborator-dropdown" class="hidden absolute top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-64 flex-col">
-                        <div class="p-2 border-b border-slate-100">
-                            <input type="text" id="collaborator-search" oninput="searchCollaborators(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search people by name or email..." onclick="event.stopPropagation()">
-                        </div>
-                        <ul id="collaborator-dropdown-list" class="overflow-y-auto flex-1 p-1 text-sm text-slate-600">
-                            <!-- Items here -->
-                        </ul>
-                    </div>
                 </div>
                 <!-- Parent Task Selection Removed -->
             </div>
@@ -722,21 +719,15 @@ async function openTaskModal(taskId) {
         }
         document.getElementById('task-modal-start-date').value = startDateVal;
 
-        let dateVal = '';
-        if(task.due_date) {
-            dateVal = task.due_date.split(' ')[0];
-        }
-        document.getElementById('task-modal-due-date').value = dateVal;
-        
         let expectedStartDateVal = '';
         if(task.expected_start_date) {
-            expectedStartDateVal = task.expected_start_date.substring(0, 16).replace(' ', 'T'); // format: YYYY-MM-DDThh:mm
+            expectedStartDateVal = task.expected_start_date.split(' ')[0]; // format: YYYY-MM-DD
         }
         document.getElementById('task-modal-expected-start-date').value = expectedStartDateVal;
 
         let expectedDueDateVal = '';
         if(task.expected_due_date) {
-            expectedDueDateVal = task.expected_due_date.substring(0, 16).replace(' ', 'T'); // format: YYYY-MM-DDThh:mm
+            expectedDueDateVal = task.expected_due_date.split(' ')[0]; // format: YYYY-MM-DD
         }
         document.getElementById('task-modal-expected-due-date').value = expectedDueDateVal;
         
@@ -1018,12 +1009,11 @@ async function updateTaskDetails() {
     statusSelect.className = `text-sm border-none focus:ring-0 p-0 rounded bg-transparent font-medium ${window.getStatusTextClass(status)}`;
 
     const startDate = document.getElementById('task-modal-start-date').value;
-    const dueDate = document.getElementById('task-modal-due-date').value;
     
     let expectedStartDate = document.getElementById('task-modal-expected-start-date').value;
-    if (expectedStartDate) { expectedStartDate = expectedStartDate.replace('T', ' ') + ':00'; }
+    if (expectedStartDate) { expectedStartDate = expectedStartDate + ' 00:00:00'; }
     let expectedDueDate = document.getElementById('task-modal-expected-due-date').value;
-    if (expectedDueDate) { expectedDueDate = expectedDueDate.replace('T', ' ') + ':00'; }
+    if (expectedDueDate) { expectedDueDate = expectedDueDate + ' 00:00:00'; }
     
     const estimatedMinutesInput = document.getElementById('task-modal-estimated').value;
     const estimatedMinutes = estimatedMinutesInput ? parseInt(estimatedMinutesInput, 10) : 0;
@@ -1051,7 +1041,7 @@ async function updateTaskDetails() {
         body: JSON.stringify({
             action: 'update_details',
             task_id: id,
-            details: { title, status, start_date: startDate, due_date: dueDate, expected_start_date: expectedStartDate, expected_due_date: expectedDueDate, description: desc, estimated_minutes: estimatedMinutes },
+            details: { title, status, start_date: startDate, expected_start_date: expectedStartDate, expected_due_date: expectedDueDate, description: desc, estimated_minutes: estimatedMinutes },
             project_id: typeof currentProjectId !== 'undefined' ? currentProjectId : null
         })
     });
@@ -1272,6 +1262,8 @@ async function uploadTaskAttachment(input) {
 window.allUsersCache = [];
 window.allProjectUsersCache = [];
 window.currentProjectMemberIds = [];
+window.allCollaboratorsCache = [];
+window.lastSearchedCollaborators = [];
 
 // ==========================================
 // Project Member Assignment UI
@@ -1530,7 +1522,8 @@ window.openListViewAssigneeDropdown = async function(event, taskId, assigneeIdsS
 
 async function searchAssignees(query) {
     try {
-        const res = await fetch(`api/users.php?search=${encodeURIComponent(query)}`);
+        const projectIdParam = (typeof currentProjectId !== 'undefined') ? `&project_id=${currentProjectId}` : '';
+        const res = await fetch(`api/users.php?search=${encodeURIComponent(query)}${projectIdParam}`);
         const users = await res.json();
         
         if (query === '') {
@@ -1553,7 +1546,7 @@ function renderAssigneeList(users) {
     }
     
     users.forEach(user => {
-        const isSelected = window.currentTaskAssigneeIds.includes(user.id);
+        const isSelected = window.currentTaskAssigneeIds.includes(Number(user.id));
         const checkIcon = isSelected 
             ? `<svg class="w-4 h-4 text-indigo-500 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>` 
             : `<div class="w-4 h-4 ml-auto"></div>`;
@@ -1562,7 +1555,7 @@ function renderAssigneeList(users) {
         li.className = 'p-1.5 hover:bg-slate-100 rounded flex justify-between items-center cursor-pointer transition-colors mt-0.5';
         li.onclick = (e) => {
             e.stopPropagation(); // prevent closing
-            toggleUserAssignment(user.id);
+            toggleUserAssignment(Number(user.id));
         };
         li.innerHTML = `
             <div class="flex items-center space-x-2">
@@ -1593,15 +1586,46 @@ async function toggleUserAssignment(userId) {
     
     const taskId = window.activeAssigneeTaskId || document.getElementById('task-modal-id').value;
     if (!taskId) return;
+
+    // Immediately update modal UI locally if in modal context
+    if (window.assigneeDropdownContext !== 'list') {
+        const nameEl = document.getElementById('task-modal-assignee-name');
+        const stack = document.getElementById('task-modal-assignees-stack');
+        if (window.currentTaskAssigneeIds.length === 0) {
+            nameEl.innerText = 'Unassigned';
+            if (stack) {
+                stack.innerHTML = '';
+                stack.classList.add('hidden');
+            }
+        } else {
+            if (stack) {
+                stack.classList.remove('hidden');
+                stack.innerHTML = '';
+            }
+            
+            const allPossibleUsers = [...window.allUsersCache, ...window.lastSearchedUsers];
+            const selectedUsers = [];
+            window.currentTaskAssigneeIds.forEach(id => {
+                const u = allPossibleUsers.find(user => Number(user.id) === id);
+                if (u && !selectedUsers.find(su => su.id === u.id)) selectedUsers.push(u);
+            });
+            
+            nameEl.innerText = selectedUsers.map(u => u.name).join(', ') || 'Unassigned';
+            
+            if (stack) {
+                selectedUsers.slice(0, 3).forEach(u => {
+                    const initial = u.name.charAt(0).toUpperCase();
+                    stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-teal-100 border-2 border-white text-teal-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+                });
+                if (selectedUsers.length > 3) {
+                    stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${selectedUsers.length - 3}</div>`;
+                }
+            }
+        }
+    }
     
-    // Immediately hide dropdown in both contexts after an assignee is changed
-    const dropdown = document.getElementById('assignee-dropdown');
-    closeAssigneeDropdownUI(dropdown);
-
-    showLoadingOverlay();
-
     try {
-        // Run network requests and await completion
+        // Run network requests and await completion without blocking UI
         const resAssign = await fetch('api/tasks.php', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -1610,37 +1634,171 @@ async function toggleUserAssignment(userId) {
         const assignData = await resAssign.json();
         if (window.handleApiError) window.handleApiError(assignData);
         
-        if (window.assigneeDropdownContext === 'list') {
-            if(typeof currentProjectId !== 'undefined') await loadProjectBoard(currentProjectId);
-        } else {
-            const res = await fetch(`api/tasks.php?id=${taskId}`);
-            const task = await res.json();
-            if(!task.error) {
-                document.getElementById('task-modal-assignee-name').innerText = task.assignee_name || 'Unassigned';
-                const stack = document.getElementById('task-modal-assignees-stack');
-                if (stack) {
-                    stack.innerHTML = '';
-                    if (task.assignee_name) {
-                        stack.classList.remove('hidden');
-                        const names = task.assignee_name.split(',');
-                        names.slice(0, 3).forEach(n => {
-                            const initial = n.trim().charAt(0).toUpperCase();
-                            stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-teal-100 border-2 border-white text-teal-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
-                        });
-                        if (names.length > 3) {
-                            stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${names.length - 3}</div>`;
-                        }
-                    } else {
-                        stack.classList.add('hidden');
-                    }
-                }
-            }
-            if(typeof currentProjectId !== 'undefined') await loadProjectBoard(currentProjectId);
-        }
+        if (typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
     } catch (e) {
         console.error('Error updating assignees:', e);
-    } finally {
-        hideLoadingOverlay();
+    }
+}
+
+// ==========================================
+// Task Collaborator UI
+// ==========================================
+
+window.activeCollaboratorTaskId = null;
+
+async function toggleCollaboratorDropdown(event) {
+    window.activeCollaboratorTaskId = document.getElementById('task-modal-id').value || null;
+
+    const dropdown = document.getElementById('collaborator-dropdown');
+    
+    // Toggle visibility
+    if (dropdown.classList.contains('hidden')) {
+        if (dropdown.parentElement !== document.body) {
+            document.body.appendChild(dropdown);
+        }
+
+        const rect = event.currentTarget.getBoundingClientRect();
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 4) + 'px';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.zIndex = '61';
+
+        dropdown.classList.remove('hidden');
+        dropdown.classList.add('flex');
+
+        if (!window.allCollaboratorsCache || window.allCollaboratorsCache.length === 0) {
+            await searchCollaborators('');
+        } else {
+            renderCollaboratorList(window.allCollaboratorsCache);
+        }
+
+        setTimeout(() => document.getElementById('collaborator-search').focus(), 50);
+
+        openAssigneeBackdrop(() => {
+            dropdown.classList.add('hidden');
+            dropdown.classList.remove('flex');
+        });
+    } else {
+        dropdown.classList.add('hidden');
+        dropdown.classList.remove('flex');
+        closeAssigneeBackdrop();
+    }
+}
+
+async function searchCollaborators(query) {
+    try {
+        const projectIdParam = (typeof currentProjectId !== 'undefined') ? `&project_id=${currentProjectId}` : '';
+        const res = await fetch(`api/users.php?search=${encodeURIComponent(query)}${projectIdParam}`);
+        const users = await res.json();
+        
+        if (query === '') {
+            window.allCollaboratorsCache = users;
+        }
+        window.lastSearchedCollaborators = users;
+        renderCollaboratorList(users);
+    } catch(e) {
+        console.error('Failed to search collaborators', e);
+    }
+}
+
+function renderCollaboratorList(users) {
+    const ul = document.getElementById('collaborator-dropdown-list');
+    ul.innerHTML = '';
+    
+    if (users.length === 0) {
+        ul.innerHTML = '<li class="p-2 text-slate-400 italic">No users found</li>';
+        return;
+    }
+    
+    users.forEach(user => {
+        const isSelected = window.currentTaskCollaboratorIds.includes(Number(user.id));
+        const checkIcon = isSelected 
+            ? `<svg class="w-4 h-4 text-indigo-500 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>` 
+            : `<div class="w-4 h-4 ml-auto"></div>`;
+            
+        const li = document.createElement('li');
+        li.className = 'p-1.5 hover:bg-slate-100 rounded flex justify-between items-center cursor-pointer transition-colors mt-0.5';
+        li.onclick = (e) => {
+            e.stopPropagation(); // prevent closing
+            toggleCollaboratorAssignment(Number(user.id));
+        };
+        li.innerHTML = `
+            <div class="flex items-center space-x-2">
+                <div class="w-6 h-6 rounded-full bg-slate-200 border-2 border-white text-slate-600 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                    ${user.name.charAt(0).toUpperCase()}
+                </div>
+                <div class="flex flex-col text-left">
+                    <span class="font-medium text-slate-700 leading-tight">${user.name}</span>
+                    <span class="text-[10px] text-slate-400 leading-tight">${user.email}</span>
+                </div>
+            </div>
+            ${checkIcon}
+        `;
+        ul.appendChild(li);
+    });
+}
+
+async function toggleCollaboratorAssignment(userId) {
+    const index = window.currentTaskCollaboratorIds.indexOf(userId);
+    if (index === -1) {
+        window.currentTaskCollaboratorIds.push(userId);
+    } else {
+        window.currentTaskCollaboratorIds.splice(index, 1);
+    }
+    
+    // Re-render the dropdown list with new selection states
+    renderCollaboratorList(document.getElementById('collaborator-search').value ? window.lastSearchedCollaborators : window.allCollaboratorsCache);
+    
+    const taskId = window.activeCollaboratorTaskId || document.getElementById('task-modal-id').value;
+    if (!taskId) return;
+
+    // Immediately update modal UI locally
+    const nameEl = document.getElementById('task-modal-collaborator-name');
+    const stack = document.getElementById('task-modal-collaborators-stack');
+    if (window.currentTaskCollaboratorIds.length === 0) {
+        nameEl.innerText = 'No collaborators';
+        if (stack) {
+            stack.innerHTML = '';
+            stack.classList.add('hidden');
+        }
+    } else {
+        if (stack) {
+            stack.classList.remove('hidden');
+            stack.innerHTML = '';
+        }
+        
+        const allPossibleUsers = [...window.allCollaboratorsCache, ...window.lastSearchedCollaborators];
+        const selectedUsers = [];
+        window.currentTaskCollaboratorIds.forEach(id => {
+            const u = allPossibleUsers.find(user => Number(user.id) === id);
+            if (u && !selectedUsers.find(su => su.id === u.id)) selectedUsers.push(u);
+        });
+        
+        nameEl.innerText = selectedUsers.map(u => u.name).join(', ') || 'No collaborators';
+        
+        if (stack) {
+            selectedUsers.slice(0, 3).forEach(u => {
+                const initial = u.name.charAt(0).toUpperCase();
+                stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white text-indigo-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+            });
+            if (selectedUsers.length > 3) {
+                stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${selectedUsers.length - 3}</div>`;
+            }
+        }
+    }
+    
+    try {
+        const resAssign = await fetch('api/tasks.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'update_details', task_id: taskId, details: { collaborator_ids: window.currentTaskCollaboratorIds } })
+        });
+        const assignData = await resAssign.json();
+        if (window.handleApiError) window.handleApiError(assignData);
+        
+        if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
+    } catch (e) {
+        console.error('Error updating collaborators:', e);
     }
 }
 

@@ -108,17 +108,23 @@ switch ($method) {
             } elseif ($data['action'] === 'update_details') {
                 $projectId = isset($data['project_id']) ? $data['project_id'] : null;
                 if ($db->updateTaskDetails($data['task_id'], $data['details'], $projectId)) {
-                    $taskDetails = $db->getTaskById($data['task_id']);
-                    $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $data['task_id'];
-                    $subject = "Task Details Updated: " . $taskTitle;
-                    $bodyHtml = "<h2>Task details were updated</h2>";
-                    $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
-                    $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
-                    $notifResult = $db->sendTaskNotification($data['task_id'], "Task details updated", 'task_update', $subject, $bodyHtml);
-
                     $response = ['status' => 'success'];
-                    if (isset($notifResult['success']) && !$notifResult['success']) {
-                        $response['email_error'] = 'Task details updated, but failed to send email notification: ' . $notifResult['error'];
+                    
+                    $detailsKeys = array_keys($data['details']);
+                    $onlyAssigneesOrCollabs = count(array_diff($detailsKeys, ['assignee_ids', 'collaborator_ids'])) === 0;
+
+                    if (!$onlyAssigneesOrCollabs) {
+                        $taskDetails = $db->getTaskById($data['task_id']);
+                        $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $data['task_id'];
+                        $subject = "Task Details Updated: " . $taskTitle;
+                        $bodyHtml = "<h2>Task details were updated</h2>";
+                        $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
+                        $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
+                        $notifResult = $db->sendTaskNotification($data['task_id'], "Task details updated", 'task_update', $subject, $bodyHtml);
+
+                        if (isset($notifResult['success']) && !$notifResult['success']) {
+                            $response['email_error'] = 'Task details updated, but failed to send email notification: ' . $notifResult['error'];
+                        }
                     }
                     
                     echo json_encode($response);
@@ -234,8 +240,8 @@ switch ($method) {
                 if (!empty($data['description'])) {
                     $bodyHtml .= "<p><strong>Description:</strong> " . nl2br(htmlspecialchars($data['description'])) . "</p>";
                 }
-                if (!empty($data['due_date'])) {
-                    $bodyHtml .= "<p><strong>Due Date:</strong> " . htmlspecialchars($data['due_date']) . "</p>";
+                if (!empty($data['expected_due_date'])) {
+                    $bodyHtml .= "<p><strong>Expected End Date:</strong> " . htmlspecialchars(explode(' ', $data['expected_due_date'])[0]) . "</p>";
                 }
                 $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
                 

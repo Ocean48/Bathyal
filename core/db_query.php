@@ -297,7 +297,7 @@ class DBQueries {
             LEFT JOIN projects p3 ON tp3.project_id = p3.id
             
             WHERE ta.user_id = :user_id
-            ORDER BY t.due_date ASC, t.id DESC
+            ORDER BY t.id DESC
         ");
         $stmt->bindValue(':user_id', (int)$userId, PDO::PARAM_INT);
         $stmt->execute();
@@ -306,8 +306,8 @@ class DBQueries {
 
     public function createTask($data) {
         $stmt = $this->pdo->prepare("
-            INSERT INTO tasks (parent_task_id, title, description, status, due_date, start_date, completed_date) 
-            VALUES (:parent_task_id, :title, :description, :status, :due_date, :start_date, :completed_date)
+            INSERT INTO tasks (parent_task_id, title, description, status, start_date, completed_date) 
+            VALUES (:parent_task_id, :title, :description, :status, :start_date, :completed_date)
         ");
         $stmt->bindValue(':parent_task_id', isset($data['parent_task_id']) ? (int)$data['parent_task_id'] : null, isset($data['parent_task_id']) ? PDO::PARAM_INT : PDO::PARAM_NULL);
         $stmt->bindValue(':title', $data['title'], PDO::PARAM_STR);
@@ -317,9 +317,6 @@ class DBQueries {
         
         $status = isset($data['status']) ? $data['status'] : 'todo';
         $stmt->bindValue(':status', $status, PDO::PARAM_STR);
-        
-        $due = isset($data['due_date']) ? $data['due_date'] : null;
-        $stmt->bindValue(':due_date', $due, $due !== null ? PDO::PARAM_STR : PDO::PARAM_NULL);
         
         $start = isset($data['start_date']) ? $data['start_date'] : null;
         $stmt->bindValue(':start_date', $start, $start !== null ? PDO::PARAM_STR : PDO::PARAM_NULL);
@@ -1188,10 +1185,6 @@ class DBQueries {
             $setClauses[] = "start_date = :start_date";
             $params[':start_date'] = $data['start_date'] ?: null;
         }
-        if (array_key_exists('due_date', $data)) {
-            $setClauses[] = "due_date = :due_date";
-            $params[':due_date'] = $data['due_date'] ?: null;
-        }
         if (array_key_exists('expected_start_date', $data)) {
             $setClauses[] = "expected_start_date = :expected_start_date";
             $params[':expected_start_date'] = $data['expected_start_date'] ?: null;
@@ -1271,6 +1264,11 @@ class DBQueries {
         }
         
         if (array_key_exists('collaborator_ids', $data)) {
+            // Get existing collaborators before deleting
+            $stmtOldCollab = $this->pdo->prepare("SELECT user_id FROM task_collaborators WHERE task_id = :id");
+            $stmtOldCollab->execute([':id' => (int)$taskId]);
+            $oldCollaborators = $stmtOldCollab->fetchAll(PDO::FETCH_COLUMN);
+
             // Delete existing
             $stmtDelCollab = $this->pdo->prepare("DELETE FROM task_collaborators WHERE task_id = :id");
             $stmtDelCollab->bindValue(':id', (int)$taskId, PDO::PARAM_INT);
@@ -1283,6 +1281,10 @@ class DBQueries {
                     $stmtInsCollab->bindValue(':tid', (int)$taskId, PDO::PARAM_INT);
                     $stmtInsCollab->bindValue(':uid', (int)$uid, PDO::PARAM_INT);
                     $stmtInsCollab->execute();
+
+                    if (!in_array($uid, $oldCollaborators)) {
+                        $this->sendCollaboratorNotification($taskId, $uid);
+                    }
                 }
             }
         }
@@ -1380,6 +1382,46 @@ class DBQueries {
             return true;
         } catch (Exception $e) {
             error_log("Failed to send assignee notification: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function sendCollaboratorNotification($taskId, $userId) {
+        try {
+            // Get Task details
+            $taskDetails = $this->getTaskById($taskId);
+            $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $taskId;
+            
+            // Get User details
+            $stmtUser = $this->pdo->prepare("SELECT email, name FROM users WHERE id = :uid");
+            $stmtUser->execute(['uid' => $userId]);
+            $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user) return false;
+            
+            // Insert DB notification
+            $stmtInsertNotif = $this->pdo->prepare("INSERT INTO notifications (user_id, task_id, category, message, is_read) VALUES (:uid, :tid, :cat, :msg, 0)");
+            $stmtInsertNotif->execute([
+                'uid' => $userId,
+                'tid' => $taskId,
+                'cat' => 'task_assigned',
+                'msg' => "You have been added as a collaborator to: " . $taskTitle
+            ]);
+            
+            // Send Email
+            require_once __DIR__ . '/email_service.php';
+            $emailService = new EmailService();
+            
+            $subject = "You have been added as a collaborator to: " . $taskTitle;
+            $bodyHtml = "<h2>You have been added as a collaborator</h2>";
+            $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
+            $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
+            
+            $emailService->sendEmail($user['email'], $user['name'], $subject, $bodyHtml);
+            
+            return true;
+        } catch (Exception $e) {
+            error_log("Failed to send collaborator notification: " . $e->getMessage());
             return false;
         }
     }

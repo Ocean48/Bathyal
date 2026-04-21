@@ -66,7 +66,7 @@ try {
     $stmtOverdue = $pdo->prepare("
         SELECT COUNT(*) as count 
         FROM tasks 
-        WHERE due_date < NOW() 
+        WHERE expected_due_date < NOW() 
         AND status != 'completed'
     ");
     $stmtOverdue->execute();

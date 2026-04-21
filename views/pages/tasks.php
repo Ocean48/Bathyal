@@ -73,7 +73,7 @@ $tasks = $db->getTasksByAssigneeId($userId);
                             <div class="flex items-center text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-2 border-b border-slate-100">
                                 <div class="flex-1 min-w-[200px]">Task Name</div>
                                 <div class="w-48 shrink-0 hidden md:block">Project</div>
-                                <div class="w-32 shrink-0">Due Date</div>
+                                <div class="w-32 shrink-0">Expected End Date</div>
                                 <div class="w-32 shrink-0 hidden sm:block">Status</div>
                             </div>
 
@@ -96,9 +96,9 @@ $tasks = $db->getTasksByAssigneeId($userId);
                                     // Determine if late
                                     $isLate = false;
                                     $dueDateText = '--';
-                                    if ($task['due_date']) {
-                                        $dueDateText = date('M j', strtotime($task['due_date']));
-                                        if (strtotime($task['due_date']) < time() && $task['status'] !== 'done' && $task['status'] !== 'completed') {
+                                    if ($task['expected_due_date']) {
+                                        $dueDateText = date('M j', strtotime($task['expected_due_date']));
+                                        if (strtotime($task['expected_due_date']) < time() && $task['status'] !== 'done' && $task['status'] !== 'completed') {
                                             $isLate = true;
                                         }
                                     }
@@ -128,7 +128,7 @@ $tasks = $db->getTasksByAssigneeId($userId);
                                          <?php endif; ?>
                                     </div>
 
-                                    <!-- Due Date -->
+                                    <!-- Expected End Date -->
                                     <div class="w-32 shrink-0 flex items-center">
                                         <span class="text-xs font-medium <?= $isLate ? 'text-rose-500' : ($task['status'] === 'done' ? 'text-slate-400' : 'text-slate-600') ?>">
                                             <?= $dueDateText ?>
