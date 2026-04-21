@@ -1,5 +1,71 @@
 // /assets/js/app.js
 
+window.handleTaskReorder = function(evt) {
+    const newSectionId = evt.to.dataset.sectionId || null;
+    
+    // Get dragged task ID
+    const draggedTaskMatch = evt.item.className.match(/task-row-(\d+)/);
+    const draggedTaskId = draggedTaskMatch ? draggedTaskMatch[1] : null;
+
+    let newParentTaskId = null;
+    let newDepth = 0;
+    let taskIds = [];
+
+    // Is it dropped in the modal subtasks list?
+    if (evt.to.id === 'task-modal-subtasks') {
+        newParentTaskId = document.getElementById('task-modal-id').value;
+        newDepth = 1;
+        // In modal, we don't have tr>td, we have div.task-row
+        taskIds = Array.from(evt.to.querySelectorAll('.task-row'))
+            .map(c => {
+                const match = c.className.match(/task-row-(\d+)/);
+                return match ? match[1] : null;
+            })
+            .filter(id => id != null);
+    } else {
+        // Dropped in the main board.
+        // ENFORCE RULE: Dragging in the list view CANNOT change the task's parent or depth level.
+        // It can only reorder tasks at the exact same depth/parent level.
+        const originalParentId = evt.item.dataset.parentId || null;
+        newParentTaskId = originalParentId;
+        newDepth = parseInt(evt.item.dataset.depth || '0', 10);
+        
+        // We do not allow dropping an item such that it splits another parent's contiguous child block.
+        // However, the backend will safely process the reordering among siblings.
+        // So we just grab the new order from the DOM.
+        
+        taskIds = Array.from(evt.to.querySelectorAll('.task-row:not(.section-header)'))
+            .map(c => {
+                const match = c.className.match(/task-row-(\d+)/);
+                return match ? match[1] : null;
+            })
+            .filter(id => id != null);
+    }
+    
+    fetch('api/tasks.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ 
+            action: 'reorder', 
+            section_id: newSectionId, 
+            task_ids: taskIds,
+            dragged_task_id: draggedTaskId,
+            parent_task_id: newParentTaskId 
+        })
+    }).then(() => {
+        if (typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
+        if (document.getElementById('task-modal').classList.contains('hidden') === false) {
+            // refresh modal if open
+            if (typeof openTaskModal === 'function' && document.getElementById('task-modal-id').value) {
+                openTaskModal(document.getElementById('task-modal-id').value);
+            }
+        }
+    }).catch(err => {
+        console.error(err);
+        if (typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
+    });
+};
+
 let currentProjectId = 1; // Global context
 
 // Global Modal Functions (Alert / Confirm)
@@ -383,7 +449,7 @@ async function loadProjectBoard(projectId) {
                 // List Tasks
                 listTable.querySelectorAll('tbody.sortable-section').forEach(tbody => {
                     new Sortable(tbody, {
-                        group: 'shared-list',
+                        group: 'main-board-list', // Isolated from modal subtasks
                         animation: 150,
                         handle: '.cursor-grab-list',
                         filter: '.section-header',
@@ -393,91 +459,33 @@ async function loadProjectBoard(projectId) {
                                 return false;
                             }
                             
-                            const depth = parseInt(evt.dragged.dataset.depth || '0', 10);
-                            // Enforce rule: sub-subtask level and below ONLY allow the drag to reorder.
-                            // They cannot change their sub level or parent.
-                            if (depth >= 2) {
-                                if (evt.to !== evt.from) return false;
-                                if (evt.related) {
-                                    if (evt.related.dataset.parentId !== evt.dragged.dataset.parentId) {
-                                        return false;
-                                    }
+                            // ENFORCE RULE: Only allow reordering among siblings of the SAME parent level!
+                            if (evt.to === evt.from && evt.related) {
+                                const draggedParent = evt.dragged.dataset.parentId || '';
+                                const relatedParent = evt.related.dataset.parentId || '';
+                                
+                                // Dragging past our own parent task row (e.g. dragging child UP past parent)
+                                if (evt.related.dataset.taskId === draggedParent) {
+                                    return false;
+                                }
+                                
+                                // Dragging into someone else's children, or dragging a child past its siblings into another group
+                                if (draggedParent !== relatedParent) {
+                                    return false;
                                 }
                             }
+                            
+                            // Prevent dragging entirely between main board list and sliding modal
+                            if (evt.from.id === 'task-modal-subtasks' && evt.to.id !== 'task-modal-subtasks') {
+                                return false;
+                            }
+                            if (evt.from.id !== 'task-modal-subtasks' && evt.to.id === 'task-modal-subtasks') {
+                                return false;
+                            }
+                            
                             return true;
                         },
-                        onEnd: function(evt) {
-                            const newSectionId = evt.to.dataset.sectionId;
-                            
-                            // Get dragged task ID
-                            const draggedTaskMatch = evt.item.className.match(/task-row-(\d+)/);
-                            const draggedTaskId = draggedTaskMatch ? draggedTaskMatch[1] : null;
-                            const depth = parseInt(evt.item.dataset.depth || '0', 10);
-
-                            // Detect hierarchy based on previous element
-                            let newParentTaskId = null;
-                            let newDepth = 0;
-                            
-                            if (depth >= 2) {
-                                // Sub-subtasks and below retain exactly their same parent and depth.
-                                newParentTaskId = evt.item.dataset.parentId || null;
-                                newDepth = depth;
-                            } else {
-                                const prev = evt.item.previousElementSibling;
-                                
-                                if (prev && prev.classList.contains('task-row')) {
-                                    const childMatch = prev.className.match(/child-of-(\d+)/);
-                                    if (childMatch) {
-                                        newParentTaskId = childMatch[1];
-                                        newDepth = parseInt(prev.dataset.depth || '0', 10); // Inherit depth of sibling
-                                    } else {
-                                        const next = evt.item.nextElementSibling;
-                                        if (next && next.classList.contains('task-row')) {
-                                            const nextChildMatch = next.className.match(/child-of-(\d+)/);
-                                            if (nextChildMatch && nextChildMatch[1] === prev.dataset.taskId) {
-                                                newParentTaskId = prev.dataset.taskId;
-                                                newDepth = parseInt(prev.dataset.depth || '0', 10) + 1; // Inherit depth + 1 from visual parent
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Visually update the dragged task's classes and styling
-                            if (draggedTaskId) {
-                                evt.item.className = evt.item.className.replace(/child-of-\d+/g, '').replace(/\s+/g, ' ');
-                                if (newParentTaskId) {
-                                    evt.item.classList.add(`child-of-${newParentTaskId}`);
-                                }
-                                if (newDepth === 0 && newParentTaskId) {
-                                    newDepth = 1; // Fallback if calculation failed
-                                }
-                                evt.item.dataset.depth = newDepth; // Update the dataset depth!
-                                evt.item.dataset.parentId = newParentTaskId || '';
-                                const paddingVal = newDepth * 24 + 16;
-                                const firstTd = evt.item.querySelector('td:first-child');
-                                if (firstTd) firstTd.style.paddingLeft = paddingVal + 'px';
-                            }
-                            
-                            const taskIds = Array.from(evt.to.querySelectorAll('tr.task-row:not(.section-header)'))
-                                .map(c => {
-                                    const match = c.className.match(/task-row-(\d+)/);
-                                    return match ? match[1] : null;
-                                })
-                                .filter(id => id != null);
-                            
-                            fetch('api/tasks.php', {
-                                method: 'POST',
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({ 
-                                    action: 'reorder', 
-                                    section_id: newSectionId, 
-                                    task_ids: taskIds,
-                                    dragged_task_id: draggedTaskId,
-                                    parent_task_id: newParentTaskId 
-                                })
-                            }).then(() => loadProjectBoard(currentProjectId)).catch(console.error);
-                        }
+                        onEnd: window.handleTaskReorder
                     });
                 });
             }
@@ -818,8 +826,15 @@ async function handleCreateSubmit(e) {
         }
         
         if (res && res.ok) {
-            const data = await res.json();
-            if (window.handleApiError) window.handleApiError(data);
+            const clone = res.clone();
+            try {
+                const data = await res.json();
+                if (window.handleApiError) window.handleApiError(data);
+            } catch (jsonErr) {
+                const rawText = await clone.text();
+                console.error("JSON parse failed. Raw response:", rawText);
+                throw jsonErr;
+            }
         }
         
         closeCreateModal();

@@ -50,10 +50,10 @@ require_once 'views/layouts/header.php';
             </div>
 
             <button class="text-slate-500 hover:text-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border border-slate-200 bg-white shadow-sm" onclick="copyProjectShareLink()">Share</button>
-            <button onclick="promptAddTask(null)" class="bg-teal-500 hover:bg-teal-600 text-white px-4 py-1.5 rounded-md text-sm font-medium shadow-sm transition-colors flex items-center">
+            <!-- <button onclick="promptAddTask(null)" class="bg-teal-500 hover:bg-teal-600 text-white px-4 py-1.5 rounded-md text-sm font-medium shadow-sm transition-colors flex items-center">
                 <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                 Add Task
-            </button>
+            </button> -->
         </div>
     </header>
 
@@ -188,9 +188,9 @@ require_once 'views/layouts/header.php';
 </div>
 
 <!-- Task Detail Modal Backdrop -->
-<div id="task-modal" class="fixed inset-0 bg-slate-900/50 hidden z-50 flex justify-end" onclick="if(event.target === this) closeTaskModal()">
+<div id="task-modal" class="fixed inset-0 pointer-events-none hidden z-40 flex justify-end">
     <!-- Sliding Panel -->
-    <div class="bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col animate-slide-in-right">
+    <div class="bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col animate-slide-in-right pointer-events-auto border-l border-slate-200">
         <!-- Modal Header -->
         <div class="flex justify-between items-center px-6 py-4 border-b border-slate-200">
             <div class="flex space-x-3 items-center">
@@ -278,6 +278,30 @@ require_once 'views/layouts/header.php';
                     </div>
                 </div>
             </div>
+            
+            <!-- Projects -->
+            <div class="mb-8">
+                <div class="flex justify-between items-center mb-2">
+                    <label class="font-semibold text-slate-800">Projects</label>
+                    <div class="relative">
+                        <button onclick="toggleProjectLinkDropdown()" class="text-xs text-teal-600 font-medium hover:text-teal-700 whitespace-nowrap px-2 py-1 bg-teal-50 hover:bg-teal-100 rounded transition-colors flex items-center">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                            Add to Project
+                        </button>
+                        <div id="project-link-dropdown" class="hidden absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-lg shadow-xl z-50 flex-col whitespace-normal">
+                            <div class="p-2 border-b border-slate-100 flex">
+                                <input type="text" id="project-link-search" oninput="searchProjectsToLink(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search projects..." autofocus>
+                            </div>
+                            <ul id="project-link-list" class="overflow-y-auto max-h-48 p-1 text-sm text-slate-600">
+                                <li class="p-2 text-slate-400 italic text-xs">Type to search...</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div id="task-modal-projects" class="space-y-2">
+                    <!-- Project rows added dynamically -->
+                </div>
+            </div>
 
             <!-- Description -->
             <div class="mb-8">
@@ -342,17 +366,6 @@ require_once 'views/layouts/header.php';
                 <div class="flex justify-between items-center mb-3">
                     <label class="font-semibold text-slate-800">Subtasks</label>
                     <div class="flex space-x-3 items-center shrink-0">
-                        <div class="relative flex items-center">
-                            <button onclick="toggleLinkSubtaskDropdown()" class="text-xs text-teal-600 font-medium hover:text-teal-700 focus:outline-none whitespace-nowrap">Link Existing Task</button>
-                            <div id="link-subtask-dropdown" class="hidden absolute right-0 bottom-full mb-2 w-72 bg-white border border-slate-200 rounded-lg shadow-xl z-50 flex-col whitespace-normal">
-                                <div class="p-2 border-b border-slate-100 flex">
-                                    <input type="text" id="link-subtask-search" oninput="searchTasksToLink(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search tasks by title..." autofocus>
-                                </div>
-                                <ul id="link-subtask-list" class="overflow-y-auto max-h-48 p-1 text-sm text-slate-600">
-                                    <li class="p-2 text-slate-400 italic text-xs">Type to search...</li>
-                                </ul>
-                            </div>
-                        </div>
                         <button onclick="promptAddSubtask(document.getElementById('task-modal-id').value)" class="text-xs text-teal-600 font-medium hover:text-teal-700 whitespace-nowrap">Add Subtask</button>
                     </div>
                 </div>
@@ -471,6 +484,17 @@ require_once 'views/layouts/header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script>
+document.addEventListener('click', function(event) {
+    const projDropdown = document.getElementById('project-link-dropdown');
+    const projButton = document.querySelector('button[onclick="toggleProjectLinkDropdown()"]');
+    
+    if (projDropdown && !projDropdown.classList.contains('hidden')) {
+        if (!projDropdown.contains(event.target) && (!projButton || !projButton.contains(event.target))) {
+            projDropdown.classList.add('hidden');
+        }
+    }
+});
+
 window.getStatusBadgeClass = function(status) {
     const s = (status || 'todo').toLowerCase();
     if (s === 'completed' || s === 'done') {
@@ -703,9 +727,27 @@ async function openTaskModal(taskId) {
             completedContainer.classList.add('hidden');
         }
 
-        // Fetch parent tasks for dropdown cache
-        const allTasksRes = await fetch('api/tasks.php');
-        window.allTasksParentCache = await allTasksRes.json();
+        // Build parent tasks dropdown cache from current project data to restrict linking to within the same project
+        window.allTasksParentCache = [];
+        const flattenTasks = (tasksList) => {
+            if (!tasksList) return;
+            tasksList.forEach(t => {
+                window.allTasksParentCache.push({
+                    id: t.id,
+                    title: t.title,
+                    parent_task_id: t.parent_task_id,
+                    subtask_count: t.subtask_count || (t.subtasks ? t.subtasks.length : 0),
+                    project_names: window.currentProjectData ? window.currentProjectData.name : ''
+                });
+                if (t.subtasks && t.subtasks.length > 0) {
+                    flattenTasks(t.subtasks);
+                }
+            });
+        };
+        
+        if (window.currentProjectData && window.currentProjectData.sections) {
+            window.currentProjectData.sections.forEach(sec => flattenTasks(sec.tasks));
+        }
 
         let pId = '';
         let pName = 'None';
@@ -773,6 +815,34 @@ async function openTaskModal(taskId) {
             attachmentsContainer.innerHTML = '<div class="text-sm text-slate-400 italic">No attachments</div>';
         }
         
+        // Render Projects
+        const projectsContainer = document.getElementById('task-modal-projects');
+        if (projectsContainer) {
+            projectsContainer.innerHTML = '';
+            if (task.projects && task.projects.length > 0) {
+                task.projects.forEach(p => {
+                    let options = '';
+                    if (p.all_sections) {
+                        p.all_sections.forEach(sec => {
+                            const sel = sec.id == p.section_id ? 'selected' : '';
+                            options += `<option value="${sec.id}" ${sel}>${sec.name}</option>`;
+                        });
+                    }
+                    
+                    projectsContainer.innerHTML += `
+                        <div class="flex items-center justify-between bg-slate-50 border border-slate-200 p-2 rounded">
+                            <span class="text-sm font-medium text-slate-700 truncate w-1/2">${p.project_name}</span>
+                            <select onchange="changeTaskProjectSection(${p.project_id}, this)" class="text-sm border-slate-300 focus:ring-teal-500 focus:border-teal-500 rounded p-1 w-1/2 ml-2 text-slate-600 bg-white shadow-sm">
+                                ${options}
+                            </select>
+                        </div>
+                    `;
+                });
+            } else {
+                projectsContainer.innerHTML = '<div class="text-sm text-slate-400 italic">Task is not in any project</div>';
+            }
+        }
+        
         // Render Subtasks
         const subtasksContainer = document.getElementById('task-modal-subtasks');
         subtasksContainer.innerHTML = '';
@@ -788,7 +858,7 @@ async function openTaskModal(taskId) {
                     : `<div class="w-6 h-6"></div>`;
 
                 subtasksContainer.innerHTML += `
-                    <div class="flex flex-col mb-1 group items-start justify-between bg-white border border-transparent hover:bg-slate-50 hover:border-slate-200 rounded px-2 py-1.5 transition-colors">
+                    <div class="flex flex-col mb-1 group items-start justify-between bg-white border border-transparent hover:bg-slate-50 hover:border-slate-200 rounded px-2 py-1.5 transition-colors cursor-grab task-row task-row-${sub.id}" data-task-id="${sub.id}" data-parent-id="${task.id}" data-depth="1">
                         <div class="flex items-center space-x-3 w-full">
                             <input type="checkbox" ${sub.status==='completed'?'checked':''} onchange="updateSubtaskStatus(${sub.id}, this)" class="rounded text-teal-500 focus:ring-teal-500 focus:ring-offset-0 w-4 h-4 cursor-pointer">
                             <span class="flex-1 text-sm cursor-pointer truncate ${sub.status==='completed'?'line-through text-slate-400':'text-slate-700'}" onclick="openTaskModal(${sub.id})" title="${sub.title}">${sub.title}</span>
@@ -798,6 +868,40 @@ async function openTaskModal(taskId) {
                     </div>
                 `;
             });
+            
+            // Initialize Sortable for subtasks
+            if (window.modalSubtasksSortable) {
+                window.modalSubtasksSortable.destroy();
+            }
+            if (typeof Sortable !== 'undefined') {
+                window.modalSubtasksSortable = new Sortable(subtasksContainer, {
+                    group: 'modal-subtasks', // Isolated from main board
+                    animation: 150,
+                    onEnd: function(evt) {
+                        if (typeof window.handleTaskReorder === 'function') {
+                            window.handleTaskReorder(evt);
+                        }
+                    }
+                });
+            }
+        } else {
+            subtasksContainer.innerHTML = '<div class="text-sm text-slate-400 italic">No subtasks</div>';
+            
+            // Allow dropping even if empty
+            if (window.modalSubtasksSortable) {
+                window.modalSubtasksSortable.destroy();
+            }
+            if (typeof Sortable !== 'undefined') {
+                window.modalSubtasksSortable = new Sortable(subtasksContainer, {
+                    group: 'modal-subtasks', // Isolated from main board
+                    animation: 150,
+                    onEnd: function(evt) {
+                        if (typeof window.handleTaskReorder === 'function') {
+                            window.handleTaskReorder(evt);
+                        }
+                    }
+                });
+            }
         }
         
         // Render Comments
@@ -920,7 +1024,8 @@ async function updateTaskDetails() {
         body: JSON.stringify({
             action: 'update_details',
             task_id: id,
-            details: { title, status, start_date: startDate, due_date: dueDate, description: desc, parent_task_id: parentId, estimated_minutes: estimatedMinutes }
+            details: { title, status, start_date: startDate, due_date: dueDate, description: desc, parent_task_id: parentId, estimated_minutes: estimatedMinutes },
+            project_id: typeof currentProjectId !== 'undefined' ? currentProjectId : null
         })
     });
     
@@ -1749,6 +1854,95 @@ function setParentTask(id, name) {
     updateTaskDetails(); // trigger save
 }
 
+function toggleProjectLinkDropdown() {
+    const dropdown = document.getElementById('project-link-dropdown');
+    dropdown.classList.toggle('hidden');
+    if (!dropdown.classList.contains('hidden')) {
+        document.getElementById('project-link-search').focus();
+        searchProjectsToLink('');
+    }
+}
+
+async function searchProjectsToLink(query) {
+    const list = document.getElementById('project-link-list');
+    
+    try {
+        const res = await fetch('api/projects.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'search', query: query })
+        });
+        const clone = res.clone();
+        let data;
+        try {
+            data = await res.json();
+        } catch (jsonErr) {
+            const rawText = await clone.text();
+            console.error("searchProjectsToLink JSON parse failed. Raw response:", rawText);
+            throw jsonErr;
+        }
+        if(window.handleApiError) window.handleApiError(data);
+        if(data.status !== 'success') return;
+        
+        list.innerHTML = '';
+        if(data.projects.length === 0) {
+            list.innerHTML = '<li class="p-2 text-slate-400 italic text-xs">No projects found.</li>';
+            return;
+        }
+        
+        data.projects.forEach(p => {
+            const li = document.createElement('li');
+            li.className = 'p-2 hover:bg-slate-50 cursor-pointer text-slate-700 truncate';
+            li.textContent = p.name;
+            li.onclick = () => addProjectToTask(p.id);
+            list.appendChild(li);
+        });
+    } catch (e) {
+        console.error(e);
+        list.innerHTML = '<li class="p-2 text-red-500 text-xs">Search failed.</li>';
+    }
+}
+
+async function addProjectToTask(projectId) {
+    const taskId = document.getElementById('task-modal-id').value;
+    try {
+        const res = await fetch('api/tasks.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'add_to_project', task_id: taskId, project_id: projectId })
+        });
+        const data = await res.json();
+        if(window.handleApiError) window.handleApiError(data);
+        
+        document.getElementById('project-link-dropdown').classList.add('hidden');
+        if(data.status === 'success') {
+            openTaskModal(taskId); // Refresh
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function changeTaskProjectSection(projectId, selectElem) {
+    const taskId = document.getElementById('task-modal-id').value;
+    const sectionId = selectElem.value;
+    try {
+        const res = await fetch('api/tasks.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'change_project_section', task_id: taskId, project_id: projectId, section_id: sectionId })
+        });
+        const data = await res.json();
+        if(window.handleApiError) window.handleApiError(data);
+        if (data.status === 'success' && projectId == currentProjectId) {
+            loadProjectBoard(currentProjectId); // Refresh board if it affects current view
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+// Subtasks linking (removed from UI but kept in API/logic)
 function toggleLinkSubtaskDropdown() {
     const dropdown = document.getElementById('link-subtask-dropdown');
     if (dropdown.classList.contains('hidden')) {

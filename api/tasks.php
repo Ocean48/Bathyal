@@ -29,6 +29,9 @@ switch ($method) {
                 $userId = $_SESSION['user_id']; // Current user ID
                 $task['time_log_status'] = $db->getTaskTimeLogStatus($taskId, $userId);
 
+                // Fetch projects this task belongs to
+                $task['projects'] = $db->getTaskProjects($taskId);
+
                 echo json_encode($task);
             } else {
                 http_response_code(404);
@@ -103,7 +106,8 @@ switch ($method) {
                     echo json_encode(['status' => 'error', 'message' => 'Failed to update task status']);
                 }
             } elseif ($data['action'] === 'update_details') {
-                if ($db->updateTaskDetails($data['task_id'], $data['details'])) {
+                $projectId = isset($data['project_id']) ? $data['project_id'] : null;
+                if ($db->updateTaskDetails($data['task_id'], $data['details'], $projectId)) {
                     $taskDetails = $db->getTaskById($data['task_id']);
                     $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $data['task_id'];
                     $subject = "Task Details Updated: " . $taskTitle;
@@ -196,6 +200,29 @@ switch ($method) {
                 $userId = 1; // Mock user ID
                 $result = $db->toggleTaskTimeTrack($data['task_id'], $userId);
                 echo json_encode(['status' => 'success', 'action' => $result['action']]);
+            } elseif ($data['action'] === 'add_to_project') {
+                $taskId = $data['task_id'];
+                $projectId = $data['project_id'];
+                
+                $sectionId = $db->addTaskToProject($taskId, $projectId);
+                if ($sectionId !== false) {
+                    echo json_encode(['status' => 'success', 'section_id' => $sectionId]);
+                    exit;
+                }
+                
+                http_response_code(500);
+                echo json_encode(['status' => 'error', 'message' => 'Failed to add to project']);
+            } elseif ($data['action'] === 'change_project_section') {
+                $taskId = $data['task_id'];
+                $projectId = $data['project_id'];
+                $sectionId = $data['section_id'];
+                
+                if ($db->changeTaskProjectSection($taskId, $projectId, $sectionId)) {
+                    echo json_encode(['status' => 'success']);
+                } else {
+                    http_response_code(500);
+                    echo json_encode(['status' => 'error', 'message' => 'Failed to change project section']);
+                }
             }
         } else { // Create task
             $taskId = $db->createTask($data);
@@ -231,4 +258,3 @@ switch ($method) {
         echo json_encode(['status' => 'error', 'message' => 'Method not allowed']);
         break;
 }
-?>
