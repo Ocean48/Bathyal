@@ -78,7 +78,7 @@ require_once 'views/layouts/header.php';
                         <button class="text-slate-400 hover:text-slate-600 p-1" title="Uncheck all subtasks" onclick="uncheckSectionSubtasks(this)">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                         </button>
-                        <button class="text-slate-400 hover:text-slate-600 p-1" onclick="alert('Section options open')"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg></button>
+                        <button class="text-slate-400 hover:text-slate-600 p-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg></button>
                     </div>
                 </div>
                 <div class="p-2 overflow-y-auto flex-1 space-y-2 min-h-[50px] dropzone">
@@ -242,6 +242,14 @@ require_once 'views/layouts/header.php';
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Due Date</label>
                     <input type="date" id="task-modal-due-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
                 </div>
+                <div>
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Expected Start Time</label>
+                    <input type="datetime-local" id="task-modal-expected-start-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Expected End Time</label>
+                    <input type="datetime-local" id="task-modal-expected-due-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
+                </div>
                 <div class="hidden" id="task-modal-completed-date-container">
                     <label class="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-1 block">Completed On</label>
                     <span id="task-modal-completed-date" class="text-sm font-medium text-emerald-700"></span>
@@ -258,6 +266,24 @@ require_once 'views/layouts/header.php';
                 <div>
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block" title="Estimated Time in minutes">Est. Time (min)</label>
                     <input type="number" id="task-modal-estimated" onchange="updateTaskDetails()" min="0" placeholder="0" class="text-sm text-slate-700 border border-transparent hover:border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 p-1 -ml-1 rounded cursor-pointer w-24">
+                </div>
+                
+                <div class="relative">
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Collaborators</label>
+                    <div class="flex items-center space-x-2 cursor-pointer hover:bg-slate-50 p-1.5 -ml-1.5 rounded-md transition-colors" onclick="toggleCollaboratorDropdown(event)">
+                        <div id="task-modal-collaborators-stack" class="flex -space-x-2 overflow-hidden items-center hidden">
+                        </div>
+                        <span class="text-sm text-slate-700 ml-2" id="task-modal-collaborator-name">No collaborators</span>
+                    </div>
+                    <!-- Dropdown for collaborators -->
+                    <div id="collaborator-dropdown" class="hidden absolute top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-64 flex-col">
+                        <div class="p-2 border-b border-slate-100">
+                            <input type="text" id="collaborator-search" oninput="searchCollaborators(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search people by name or email..." onclick="event.stopPropagation()">
+                        </div>
+                        <ul id="collaborator-dropdown-list" class="overflow-y-auto flex-1 p-1 text-sm text-slate-600">
+                            <!-- Items here -->
+                        </ul>
+                    </div>
                 </div>
                 <!-- Parent Task Selection Removed -->
             </div>
@@ -457,7 +483,7 @@ require_once 'views/layouts/header.php';
                     Cancel
                 </button>
                 <button type="submit" class="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 shadow-sm transition-colors flex items-center">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7m-4-4v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2z"></path></svg>
                     <span id="create-btn-text">Create</span>
                 </button>
             </div>
@@ -702,6 +728,18 @@ async function openTaskModal(taskId) {
         }
         document.getElementById('task-modal-due-date').value = dateVal;
         
+        let expectedStartDateVal = '';
+        if(task.expected_start_date) {
+            expectedStartDateVal = task.expected_start_date.substring(0, 16).replace(' ', 'T'); // format: YYYY-MM-DDThh:mm
+        }
+        document.getElementById('task-modal-expected-start-date').value = expectedStartDateVal;
+
+        let expectedDueDateVal = '';
+        if(task.expected_due_date) {
+            expectedDueDateVal = task.expected_due_date.substring(0, 16).replace(' ', 'T'); // format: YYYY-MM-DDThh:mm
+        }
+        document.getElementById('task-modal-expected-due-date').value = expectedDueDateVal;
+        
         const completedContainer = document.getElementById('task-modal-completed-date-container');
         if (task.completed_date) {
             completedContainer.classList.remove('hidden');
@@ -731,6 +769,27 @@ async function openTaskModal(taskId) {
                 }
             } else {
                 stack.classList.add('hidden');
+            }
+        }
+        
+        window.currentTaskCollaboratorIds = task.collaborator_ids ? task.collaborator_ids.split(',').map(id => parseInt(id)) : [];
+        
+        document.getElementById('task-modal-collaborator-name').innerText = task.collaborator_name || 'No collaborators';
+        const collabStack = document.getElementById('task-modal-collaborators-stack');
+        if (collabStack) {
+            collabStack.innerHTML = '';
+            if (task.collaborator_name) {
+                collabStack.classList.remove('hidden');
+                const names = task.collaborator_name.split(',');
+                names.slice(0, 3).forEach(n => {
+                    const initial = n.trim().charAt(0).toUpperCase();
+                    collabStack.innerHTML += `<div class="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white text-indigo-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+                });
+                if (names.length > 3) {
+                    collabStack.innerHTML += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${names.length - 3}</div>`;
+                }
+            } else {
+                collabStack.classList.add('hidden');
             }
         }
         
@@ -961,6 +1020,11 @@ async function updateTaskDetails() {
     const startDate = document.getElementById('task-modal-start-date').value;
     const dueDate = document.getElementById('task-modal-due-date').value;
     
+    let expectedStartDate = document.getElementById('task-modal-expected-start-date').value;
+    if (expectedStartDate) { expectedStartDate = expectedStartDate.replace('T', ' ') + ':00'; }
+    let expectedDueDate = document.getElementById('task-modal-expected-due-date').value;
+    if (expectedDueDate) { expectedDueDate = expectedDueDate.replace('T', ' ') + ':00'; }
+    
     const estimatedMinutesInput = document.getElementById('task-modal-estimated').value;
     const estimatedMinutes = estimatedMinutesInput ? parseInt(estimatedMinutesInput, 10) : 0;
     
@@ -987,7 +1051,7 @@ async function updateTaskDetails() {
         body: JSON.stringify({
             action: 'update_details',
             task_id: id,
-            details: { title, status, start_date: startDate, due_date: dueDate, description: desc, estimated_minutes: estimatedMinutes },
+            details: { title, status, start_date: startDate, due_date: dueDate, expected_start_date: expectedStartDate, expected_due_date: expectedDueDate, description: desc, estimated_minutes: estimatedMinutes },
             project_id: typeof currentProjectId !== 'undefined' ? currentProjectId : null
         })
     });
@@ -1343,6 +1407,8 @@ async function toggleProjectMemberAssignment(userId) {
         }
     } catch (e) {
         console.error('Error updating project members:', e);
+    } finally {
+        hideLoadingOverlay();
     }
 }
 
@@ -1380,31 +1446,6 @@ function closeAssigneeBackdrop() {
     if (backdrop) {
         backdrop.style.display = 'none';
         backdrop.onclick = null;
-    }
-}
-
-function showLoadingOverlay() {
-    let loader = document.getElementById('global-loading-overlay');
-    if (!loader) {
-        loader = document.createElement('div');
-        loader.id = 'global-loading-overlay';
-        // Add absolute clear, non-grayscale background to block clicks during saving
-        loader.className = 'fixed inset-0 z-[70] bg-transparent flex items-center justify-center';
-        loader.innerHTML = `
-            <div class="bg-white px-4 py-2 rounded shadow text-slate-700 font-medium flex items-center space-x-3 border border-slate-200">
-                <svg class="animate-spin h-5 w-5 text-teal-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                <span class="text-sm">Updating...</span>
-            </div>
-        `;
-        document.body.appendChild(loader);
-    }
-    loader.style.display = 'flex';
-}
-
-function hideLoadingOverlay() {
-    const loader = document.getElementById('global-loading-overlay');
-    if (loader) {
-        loader.style.display = 'none';
     }
 }
 
@@ -1514,7 +1555,7 @@ function renderAssigneeList(users) {
     users.forEach(user => {
         const isSelected = window.currentTaskAssigneeIds.includes(user.id);
         const checkIcon = isSelected 
-            ? `<svg class="w-4 h-4 text-teal-500 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>` 
+            ? `<svg class="w-4 h-4 text-indigo-500 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>` 
             : `<div class="w-4 h-4 ml-auto"></div>`;
             
         const li = document.createElement('li');
@@ -1754,6 +1795,7 @@ async function searchProjectsToLink(query) {
             throw jsonErr;
         }
         if(window.handleApiError) window.handleApiError(data);
+        
         if(data.status !== 'success') return;
         
         list.innerHTML = '';
@@ -1788,7 +1830,7 @@ async function addProjectToTask(projectId) {
         
         document.getElementById('project-link-dropdown').classList.add('hidden');
         if(data.status === 'success') {
-            openTaskModal(taskId); // Refresh
+            openTaskModal(taskId); // Reload
         }
     } catch (e) {
         console.error(e);

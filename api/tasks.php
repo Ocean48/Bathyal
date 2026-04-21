@@ -26,7 +26,7 @@ switch ($method) {
                 $task['subtasks'] = $db->getTaskSubtasks($taskId);
 
                 // Fetch time log status
-                $userId = $_SESSION['user_id']; // Current user ID
+                $userId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1; // Current user ID fallback
                 $task['time_log_status'] = $db->getTaskTimeLogStatus($taskId, $userId);
 
                 // Fetch projects this task belongs to

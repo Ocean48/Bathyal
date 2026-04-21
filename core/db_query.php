@@ -397,16 +397,16 @@ class DBQueries {
                 $excludeUserId = $_SESSION['user_id'];
             }
 
-            // Find assignees
-            $stmtAsg = $this->pdo->prepare("SELECT u.id, u.email, u.name FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE ta.task_id = :tid");
-            $stmtAsg->execute(['tid' => $taskId]);
-            $assignees = $stmtAsg->fetchAll(PDO::FETCH_ASSOC);
+            // Find collaborators (Assignees are only notified when assigned)
+            $stmtCollab = $this->pdo->prepare("SELECT u.id, u.email, u.name FROM task_collaborators tc JOIN users u ON tc.user_id = u.id WHERE tc.task_id = :tid");
+            $stmtCollab->execute(['tid' => $taskId]);
+            $collaborators = $stmtCollab->fetchAll(PDO::FETCH_ASSOC);
 
-            if (!empty($assignees)) {
-                foreach ($assignees as $a) {
+            if (!empty($collaborators)) {
+                foreach ($collaborators as $c) {
                     // Deduplicate by using user ID as key
-                    if ($excludeUserId && (int)$a['id'] === (int)$excludeUserId) continue;
-                    $notifyUsers[$a['id']] = $a;
+                    if ($excludeUserId && (int)$c['id'] === (int)$excludeUserId) continue;
+                    $notifyUsers[$c['id']] = $c;
                 }
             }
 
@@ -1120,13 +1120,12 @@ class DBQueries {
     public function getTaskById($taskId) {
         $stmt = $this->pdo->prepare("
             SELECT t.*, 
-                   GROUP_CONCAT(u.name SEPARATOR ', ') as assignee_name,
-                   GROUP_CONCAT(u.id SEPARATOR ',') as assignee_ids 
+                   (SELECT GROUP_CONCAT(u.name SEPARATOR ', ') FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE ta.task_id = t.id) as assignee_name,
+                   (SELECT GROUP_CONCAT(ta.user_id SEPARATOR ',') FROM task_assignees ta WHERE ta.task_id = t.id) as assignee_ids,
+                   (SELECT GROUP_CONCAT(u.name SEPARATOR ', ') FROM task_collaborators tc JOIN users u ON tc.user_id = u.id WHERE tc.task_id = t.id) as collaborator_name,
+                   (SELECT GROUP_CONCAT(tc.user_id SEPARATOR ',') FROM task_collaborators tc WHERE tc.task_id = t.id) as collaborator_ids
             FROM tasks t 
-            LEFT JOIN task_assignees ta ON t.id = ta.task_id
-            LEFT JOIN users u ON ta.user_id = u.id 
             WHERE t.id = :id
-            GROUP BY t.id
         ");
         $stmt->bindValue(':id', (int)$taskId, PDO::PARAM_INT);
         $stmt->execute();
@@ -1193,6 +1192,14 @@ class DBQueries {
             $setClauses[] = "due_date = :due_date";
             $params[':due_date'] = $data['due_date'] ?: null;
         }
+        if (array_key_exists('expected_start_date', $data)) {
+            $setClauses[] = "expected_start_date = :expected_start_date";
+            $params[':expected_start_date'] = $data['expected_start_date'] ?: null;
+        }
+        if (array_key_exists('expected_due_date', $data)) {
+            $setClauses[] = "expected_due_date = :expected_due_date";
+            $params[':expected_due_date'] = $data['expected_due_date'] ?: null;
+        }
 
         if (array_key_exists('parent_task_id', $data)) {
             // Did it change from subtask to top level, or top level to subtask?
@@ -1217,11 +1224,6 @@ class DBQueries {
             }
         }
         
-        if (array_key_exists('estimated_minutes', $data)) {
-            $setClauses[] = "estimated_minutes = :estimated_minutes";
-            $params[':estimated_minutes'] = $data['estimated_minutes'];
-        }
-
         if (!empty($setClauses)) {
             $sql = "UPDATE tasks SET " . implode(', ', $setClauses) . " WHERE id = :id";
             $stmt = $this->pdo->prepare($sql);
@@ -1242,18 +1244,45 @@ class DBQueries {
         }
 
         if (array_key_exists('assignee_ids', $data)) {
+            // Get existing assignees before deleting to know who is newly assigned
+            $stmtOldAsg = $this->pdo->prepare("SELECT user_id FROM task_assignees WHERE task_id = :id");
+            $stmtOldAsg->execute([':id' => (int)$taskId]);
+            $oldAssignees = $stmtOldAsg->fetchAll(PDO::FETCH_COLUMN);
+
             // Delete existing
             $stmtDel = $this->pdo->prepare("DELETE FROM task_assignees WHERE task_id = :id");
             $stmtDel->bindValue(':id', (int)$taskId, PDO::PARAM_INT);
             $stmtDel->execute();
             
-            // Insert new ones
+            // Insert new ones and notify newly assigned users
             if (!empty($data['assignee_ids']) && is_array($data['assignee_ids'])) {
                 $stmtIns = $this->pdo->prepare("INSERT INTO task_assignees (task_id, user_id) VALUES (:tid, :uid)");
                 foreach ($data['assignee_ids'] as $uid) {
                     $stmtIns->bindValue(':tid', (int)$taskId, PDO::PARAM_INT);
                     $stmtIns->bindValue(':uid', (int)$uid, PDO::PARAM_INT);
                     $stmtIns->execute();
+                    
+                    if (!in_array($uid, $oldAssignees)) {
+                        // This user is newly assigned
+                        $this->sendAssigneeNotification($taskId, $uid);
+                    }
+                }
+            }
+        }
+        
+        if (array_key_exists('collaborator_ids', $data)) {
+            // Delete existing
+            $stmtDelCollab = $this->pdo->prepare("DELETE FROM task_collaborators WHERE task_id = :id");
+            $stmtDelCollab->bindValue(':id', (int)$taskId, PDO::PARAM_INT);
+            $stmtDelCollab->execute();
+            
+            // Insert new ones
+            if (!empty($data['collaborator_ids']) && is_array($data['collaborator_ids'])) {
+                $stmtInsCollab = $this->pdo->prepare("INSERT INTO task_collaborators (task_id, user_id) VALUES (:tid, :uid)");
+                foreach ($data['collaborator_ids'] as $uid) {
+                    $stmtInsCollab->bindValue(':tid', (int)$taskId, PDO::PARAM_INT);
+                    $stmtInsCollab->bindValue(':uid', (int)$uid, PDO::PARAM_INT);
+                    $stmtInsCollab->execute();
                 }
             }
         }
@@ -1301,7 +1330,57 @@ class DBQueries {
                 VALUES (:task_id, :user_id, NOW(), 'running')
             ");
             $stmt->execute([':task_id' => $taskId, ':user_id' => $userId]);
+            
+            // Auto-populate start_date if null
+            $stmtCheck = $this->pdo->prepare("SELECT start_date FROM tasks WHERE id = :id");
+            $stmtCheck->execute([':id' => $taskId]);
+            $currentStartDate = $stmtCheck->fetchColumn();
+            if (empty($currentStartDate)) {
+                $stmtSetStart = $this->pdo->prepare("UPDATE tasks SET start_date = NOW() WHERE id = :id");
+                $stmtSetStart->execute([':id' => $taskId]);
+            }
+            
             return ['action' => 'started'];
+        }
+    }
+
+    public function sendAssigneeNotification($taskId, $userId) {
+        try {
+            // Get Task details
+            $taskDetails = $this->getTaskById($taskId);
+            $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $taskId;
+            
+            // Get User details
+            $stmtUser = $this->pdo->prepare("SELECT email, name FROM users WHERE id = :uid");
+            $stmtUser->execute(['uid' => $userId]);
+            $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user) return false;
+            
+            // Insert DB notification
+            $stmtInsertNotif = $this->pdo->prepare("INSERT INTO notifications (user_id, task_id, category, message, is_read) VALUES (:uid, :tid, :cat, :msg, 0)");
+            $stmtInsertNotif->execute([
+                'uid' => $userId,
+                'tid' => $taskId,
+                'cat' => 'task_assigned',
+                'msg' => "You have been assigned to: " . $taskTitle
+            ]);
+            
+            // Send Email
+            require_once __DIR__ . '/email_service.php';
+            $emailService = new EmailService();
+            
+            $subject = "You have been assigned to: " . $taskTitle;
+            $bodyHtml = "<h2>You have been assigned to a task</h2>";
+            $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
+            $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
+            
+            $emailService->sendEmail($user['email'], $user['name'], $subject, $bodyHtml);
+            
+            return true;
+        } catch (Exception $e) {
+            error_log("Failed to send assignee notification: " . $e->getMessage());
+            return false;
         }
     }
 

@@ -72,6 +72,8 @@ CREATE TABLE tasks (
     status ENUM('todo', 'in_progress', 'paused', 'completed') DEFAULT 'todo',
     start_date DATETIME NULL,
     due_date DATETIME NULL,
+    expected_start_date DATETIME NULL,
+    expected_due_date DATETIME NULL,
     completed_date DATETIME NULL,
     estimated_minutes INT DEFAULT 0,
     position INT DEFAULT 0, -- For ordering native subtasks
@@ -84,6 +86,15 @@ CREATE TABLE tasks (
 
 -- MULTIPLE ASSIGNEES PER TASK
 CREATE TABLE task_assignees (
+    task_id INT NOT NULL,
+    user_id INT NOT NULL,
+    PRIMARY KEY (task_id, user_id),
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- MULTIPLE COLLABORATORS PER TASK
+CREATE TABLE task_collaborators (
     task_id INT NOT NULL,
     user_id INT NOT NULL,
     PRIMARY KEY (task_id, user_id),
