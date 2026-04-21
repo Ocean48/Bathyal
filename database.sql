@@ -225,7 +225,9 @@ CREATE TABLE user_recent_projects (
 INSERT INTO teams (name, created_by) VALUES ('PharmAchieve Engineering', 1);
 
 INSERT INTO `team_members` (`team_id`, `user_id`, `role`, `joined_at`) VALUES
-(1, 1, 'owner', '2026-04-19 21:55:10');
+(1, 1, 'owner', '2026-04-19 21:55:10'),
+(1, 2, 'member', '2026-04-19 21:55:10'),
+(1, 3, 'member', '2026-04-19 21:55:10');
 
 -- Insert Users (Passwords are set to 'user123')
 INSERT INTO users (team_id, name, email, password_hash, role) VALUES 
