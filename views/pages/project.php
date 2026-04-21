@@ -259,24 +259,7 @@ require_once 'views/layouts/header.php';
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block" title="Estimated Time in minutes">Est. Time (min)</label>
                     <input type="number" id="task-modal-estimated" onchange="updateTaskDetails()" min="0" placeholder="0" class="text-sm text-slate-700 border border-transparent hover:border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 p-1 -ml-1 rounded cursor-pointer w-24">
                 </div>
-                <div class="relative">
-                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Parent Task</label>
-                    <div class="flex items-center justify-between cursor-pointer border border-slate-300 hover:bg-slate-50 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 p-1.5 rounded-lg bg-slate-50 w-full shadow-sm transition-colors text-sm text-slate-700 truncate" onclick="toggleParentTaskDropdown(event)" id="parent-task-display">
-                        <span id="parent-task-name" class="truncate">None</span>
-                        <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </div>
-                    <input type="hidden" id="task-modal-parent-id" onchange="updateTaskDetails()">
-                    
-                    <!-- Dropdown for Parent Task -->
-                    <div id="parent-task-dropdown" class="hidden absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg z-[60] max-h-64 flex-col">
-                        <div class="p-2 border-b border-slate-100 flex">
-                            <input type="text" id="parent-task-search" oninput="searchParentTasks(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search tasks by title..." onclick="event.stopPropagation()">
-                        </div>
-                        <ul id="parent-task-list" class="overflow-y-auto flex-1 p-1 text-sm text-slate-600">
-                            <!-- Items here -->
-                        </ul>
-                    </div>
-                </div>
+                <!-- Parent Task Selection Removed -->
             </div>
             
             <!-- Projects -->
@@ -727,45 +710,7 @@ async function openTaskModal(taskId) {
             completedContainer.classList.add('hidden');
         }
 
-        // Build parent tasks dropdown cache from current project data to restrict linking to within the same project
-        window.allTasksParentCache = [];
-        const flattenTasks = (tasksList) => {
-            if (!tasksList) return;
-            tasksList.forEach(t => {
-                window.allTasksParentCache.push({
-                    id: t.id,
-                    title: t.title,
-                    parent_task_id: t.parent_task_id,
-                    subtask_count: t.subtask_count || (t.subtasks ? t.subtasks.length : 0),
-                    project_names: window.currentProjectData ? window.currentProjectData.name : ''
-                });
-                if (t.subtasks && t.subtasks.length > 0) {
-                    flattenTasks(t.subtasks);
-                }
-            });
-        };
-        
-        if (window.currentProjectData && window.currentProjectData.sections) {
-            window.currentProjectData.sections.forEach(sec => flattenTasks(sec.tasks));
-        }
-
-        let pId = '';
-        let pName = 'None';
-        
-        if (task.parent_task_id) {
-            pId = task.parent_task_id;
-            const pTask = window.allTasksParentCache.find(t => t.id == task.parent_task_id);
-            if (pTask) {
-                const countStr = pTask.subtask_count > 0 ? ` (${pTask.subtask_count})` : '';
-                const projStr = pTask.project_names ? ` [${pTask.project_names}]` : '';
-                pName = `${pTask.title}${projStr}${countStr}`;
-            } else {
-                pName = `Task #${task.parent_task_id}`;
-            }
-        }
-        
-        document.getElementById('task-modal-parent-id').value = pId;
-        document.getElementById('parent-task-name').innerText = pName;
+        // Parent Task UI removed
         
         // Track current assignee IDs globally for the dropdown
         window.currentTaskAssigneeIds = task.assignee_ids ? task.assignee_ids.split(',').map(id => parseInt(id)) : [];
@@ -851,6 +796,8 @@ async function openTaskModal(taskId) {
             window.currentTaskSubtaskIds = task.subtasks.map(s => s.id);
             task.subtasks.forEach(sub => {
                 const isLinked = sub.parent_task_id !== task.id;
+                const isShared = parseInt(sub.project_count || 1, 10) > 1;
+                const sharedClass = isShared ? 'shared-task' : '';
                 const unlinkBtn = isLinked 
                     ? `<button onclick="unlinkSubtask(${task.id}, ${sub.id})" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-1 rounded transition-colors" title="Unlink Subtask">
                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -858,10 +805,13 @@ async function openTaskModal(taskId) {
                     : `<div class="w-6 h-6"></div>`;
 
                 subtasksContainer.innerHTML += `
-                    <div class="flex flex-col mb-1 group items-start justify-between bg-white border border-transparent hover:bg-slate-50 hover:border-slate-200 rounded px-2 py-1.5 transition-colors cursor-grab task-row task-row-${sub.id}" data-task-id="${sub.id}" data-parent-id="${task.id}" data-depth="1">
-                        <div class="flex items-center space-x-3 w-full">
+                    <div class="flex flex-col mb-1 group items-start justify-between bg-white border border-transparent hover:bg-slate-50 hover:border-slate-200 rounded px-2 py-1.5 transition-colors task-row task-row-${sub.id} ${sharedClass}" data-task-id="${sub.id}" data-parent-id="${task.id}" data-depth="1">
+                        <div class="flex items-center space-x-2 w-full">
+                            <div class="cursor-grab text-slate-300 hover:text-slate-500 flex items-center justify-center" title="Drag to reorder">
+                                <svg class="w-4 h-4 pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z"></path></svg>
+                            </div>
                             <input type="checkbox" ${sub.status==='completed'?'checked':''} onchange="updateSubtaskStatus(${sub.id}, this)" class="rounded text-teal-500 focus:ring-teal-500 focus:ring-offset-0 w-4 h-4 cursor-pointer">
-                            <span class="flex-1 text-sm cursor-pointer truncate ${sub.status==='completed'?'line-through text-slate-400':'text-slate-700'}" onclick="openTaskModal(${sub.id})" title="${sub.title}">${sub.title}</span>
+                            <span class="flex-1 text-sm cursor-pointer truncate pl-1 ${sub.status==='completed'?'line-through text-slate-400':'text-slate-700'}" onclick="openTaskModal(${sub.id})" title="${sub.title}">${sub.title}</span>
                             <span class="text-[10px] items-center px-1.5 py-0.5 rounded font-medium tracking-wide uppercase shadow-sm border ${window.getStatusBadgeClass(sub.status)}">${sub.status.replace('_', ' ')}</span>
                             ${unlinkBtn}
                         </div>
@@ -875,8 +825,16 @@ async function openTaskModal(taskId) {
             }
             if (typeof Sortable !== 'undefined') {
                 window.modalSubtasksSortable = new Sortable(subtasksContainer, {
-                    group: 'modal-subtasks', // Isolated from main board
+                    group: { name: 'modal-subtasks', put: ['main-board-list', 'shared-board'], pull: ['main-board-list', 'shared-board'] }, // Shared with main board
                     animation: 150,
+                    handle: '.cursor-grab',
+                    onMove: function(evt) {
+                        // Prevent dropping a shared task into a subtask zone
+                        if (evt.dragged.classList.contains('shared-task')) {
+                            return false;
+                        }
+                        return true;
+                    },
                     onEnd: function(evt) {
                         if (typeof window.handleTaskReorder === 'function') {
                             window.handleTaskReorder(evt);
@@ -893,8 +851,16 @@ async function openTaskModal(taskId) {
             }
             if (typeof Sortable !== 'undefined') {
                 window.modalSubtasksSortable = new Sortable(subtasksContainer, {
-                    group: 'modal-subtasks', // Isolated from main board
+                    group: { name: 'modal-subtasks', put: ['main-board-list', 'shared-board'], pull: ['main-board-list', 'shared-board'] }, // Shared with main board
                     animation: 150,
+                    handle: '.cursor-grab',
+                    onMove: function(evt) {
+                        // Prevent dropping a shared task into a subtask zone
+                        if (evt.dragged.classList.contains('shared-task')) {
+                            return false;
+                        }
+                        return true;
+                    },
                     onEnd: function(evt) {
                         if (typeof window.handleTaskReorder === 'function') {
                             window.handleTaskReorder(evt);
@@ -1002,9 +968,6 @@ async function updateTaskDetails() {
     let desc = getEditorContent('task-modal-desc');
     if (desc === '<p><br></p>') desc = '';
     
-    let parentId = document.getElementById('task-modal-parent-id').value;
-    parentId = parentId === '' ? null : parentId;
-    
     if(!id) return;
     
     // Update completed date text instantly if user selected 'completed'
@@ -1024,7 +987,7 @@ async function updateTaskDetails() {
         body: JSON.stringify({
             action: 'update_details',
             task_id: id,
-            details: { title, status, start_date: startDate, due_date: dueDate, description: desc, parent_task_id: parentId, estimated_minutes: estimatedMinutes },
+            details: { title, status, start_date: startDate, due_date: dueDate, description: desc, estimated_minutes: estimatedMinutes },
             project_id: typeof currentProjectId !== 'undefined' ? currentProjectId : null
         })
     });
@@ -1761,97 +1724,6 @@ function promptAddSubtask(parentId) {
             alert('Failed to create subtask');
         }
     });
-}
-
-function toggleParentTaskDropdown(e) {
-    if (e) e.stopPropagation();
-    const dropdown = document.getElementById('parent-task-dropdown');
-    if (dropdown.classList.contains('hidden')) {
-        dropdown.classList.remove('hidden');
-        dropdown.classList.add('flex');
-        document.getElementById('parent-task-search').value = '';
-        renderParentTaskList('');
-        document.getElementById('parent-task-search').focus();
-        
-        const outsideClickListener = (evt) => {
-            if (!dropdown.contains(evt.target) && !evt.target.closest('#parent-task-display')) {
-                dropdown.classList.add('hidden');
-                dropdown.classList.remove('flex');
-                document.removeEventListener('click', outsideClickListener);
-            }
-        };
-        setTimeout(() => document.addEventListener('click', outsideClickListener), 10);
-    } else {
-        dropdown.classList.add('hidden');
-        dropdown.classList.remove('flex');
-    }
-}
-
-function searchParentTasks(query) {
-    renderParentTaskList(query);
-}
-
-function renderParentTaskList(query) {
-    const list = document.getElementById('parent-task-list');
-    list.innerHTML = '';
-    const currentTaskIdIdStr = document.getElementById('task-modal-id').value;
-    const currentTaskId = currentTaskIdIdStr ? parseInt(currentTaskIdIdStr, 10) : null;
-    
-    // Default None option
-    if (!query) {
-        const li = document.createElement('li');
-        li.className = `p-2 hover:bg-slate-50 cursor-pointer rounded mb-0.5 text-slate-500 italic flex justify-between items-center`;
-        li.innerText = 'None';
-        li.onclick = (e) => {
-            e.stopPropagation();
-            setParentTask('', 'None');
-        };
-        list.appendChild(li);
-    }
-
-    if (!window.allTasksParentCache) return;
-
-    const filtered = window.allTasksParentCache.filter(t => {
-        if (currentTaskId && t.id === currentTaskId) return false; // Prevent self
-        if (currentTaskId && t.parent_task_id === currentTaskId) return false; // Prevent choosing a subtask as parent
-        
-        return t.title.toLowerCase().includes(query.toLowerCase());
-    });
-    
-    if (filtered.length === 0) {
-        list.innerHTML += `<li class="p-2 text-slate-400 italic text-xs">No tasks found</li>`;
-        return;
-    }
-    
-    filtered.forEach(t => {
-        const li = document.createElement('li');
-        li.className = `p-2 hover:bg-slate-50 cursor-pointer rounded mb-0.5 flex justify-between items-center group`;
-        const countStr = t.subtask_count > 0 ? ` <span class="text-slate-400 text-xs ml-1">(${t.subtask_count})</span>` : '';
-        const projStr = t.project_names ? ` <span class="text-teal-600 bg-teal-50 px-1 rounded text-[10px] ml-1">#${t.project_names}</span>` : '';
-        
-        li.innerHTML = `
-            <div class="flex items-center truncate">
-                <span class="truncate font-medium">${t.title}</span>
-                ${projStr}
-                ${countStr}
-            </div>
-        `;
-        li.onclick = (e) => {
-            e.stopPropagation();
-            const displayName = `${t.title}${t.project_names ? ` [${t.project_names}]` : ''}${t.subtask_count > 0 ? ` (${t.subtask_count})` : ''}`;
-            setParentTask(t.id, displayName);
-        };
-        list.appendChild(li);
-    });
-}
-
-function setParentTask(id, name) {
-    document.getElementById('task-modal-parent-id').value = id;
-    document.getElementById('parent-task-name').innerText = name || 'None';
-    const dropdown = document.getElementById('parent-task-dropdown');
-    dropdown.classList.add('hidden');
-    dropdown.classList.remove('flex');
-    updateTaskDetails(); // trigger save
 }
 
 function toggleProjectLinkDropdown() {

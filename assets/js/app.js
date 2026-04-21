@@ -1,44 +1,49 @@
 // /assets/js/app.js
 
 window.handleTaskReorder = function(evt) {
-    const newSectionId = evt.to.dataset.sectionId || null;
+    let newSectionId = null;
+    let newParentTaskId = null;
+    let taskIds = [];
+    
+    // Try to determine newSectionId
+    if (evt.to.dataset.sectionId) {
+        newSectionId = evt.to.dataset.sectionId;
+    } else {
+        const column = evt.to.closest('.kanban-col');
+        if (column) newSectionId = column.dataset.sectionId;
+    }
     
     // Get dragged task ID
-    const draggedTaskMatch = evt.item.className.match(/task-row-(\d+)/);
-    const draggedTaskId = draggedTaskMatch ? draggedTaskMatch[1] : null;
-
-    let newParentTaskId = null;
-    let newDepth = 0;
-    let taskIds = [];
+    let draggedTaskId = evt.item.dataset.taskId;
+    if (!draggedTaskId) {
+        const draggedTaskMatch = evt.item.className.match(/task-row-(\d+)/);
+        draggedTaskId = draggedTaskMatch ? draggedTaskMatch[1] : null;
+    }
 
     // Is it dropped in the modal subtasks list?
     if (evt.to.id === 'task-modal-subtasks') {
         newParentTaskId = document.getElementById('task-modal-id').value;
-        newDepth = 1;
-        // In modal, we don't have tr>td, we have div.task-row
-        taskIds = Array.from(evt.to.querySelectorAll('.task-row'))
-            .map(c => {
-                const match = c.className.match(/task-row-(\d+)/);
-                return match ? match[1] : null;
-            })
+        newSectionId = null; // Explicitly null since it belongs to the modal task
+        taskIds = Array.from(evt.to.children)
+            .map(c => c.dataset.taskId || (c.className.match && c.className.match(/task-row-(\d+)/) ? c.className.match(/task-row-(\d+)/)[1] : null))
             .filter(id => id != null);
     } else {
-        // Dropped in the main board.
-        // ENFORCE RULE: Dragging in the list view CANNOT change the task's parent or depth level.
-        // It can only reorder tasks at the exact same depth/parent level.
-        const originalParentId = evt.item.dataset.parentId || null;
-        newParentTaskId = originalParentId;
-        newDepth = parseInt(evt.item.dataset.depth || '0', 10);
+        // Was it dragged from the modal?
+        const isFromModal = evt.from.id === 'task-modal-subtasks';
+        const isKanbanSubtask = evt.to.classList.contains('kanban-subtasks');
         
-        // We do not allow dropping an item such that it splits another parent's contiguous child block.
-        // However, the backend will safely process the reordering among siblings.
-        // So we just grab the new order from the DOM.
+        if (isKanbanSubtask) {
+            newParentTaskId = evt.to.dataset.parentTaskId;
+        } else if (isFromModal) {
+            newParentTaskId = null; // Become a root task
+        } else {
+            newParentTaskId = evt.item.dataset.parentId || null;
+        }
         
-        taskIds = Array.from(evt.to.querySelectorAll('.task-row:not(.section-header)'))
-            .map(c => {
-                const match = c.className.match(/task-row-(\d+)/);
-                return match ? match[1] : null;
-            })
+        // Exclude section header from task IDs in list view
+        taskIds = Array.from(evt.to.children)
+            .filter(c => !c.classList.contains('section-header'))
+            .map(c => c.dataset.taskId || (c.className.match && c.className.match(/task-row-(\d+)/) ? c.className.match(/task-row-(\d+)/)[1] : null))
             .filter(id => id != null);
     }
     
@@ -386,41 +391,19 @@ async function loadProjectBoard(projectId) {
 
                 // Board Tasks and Nested Subtasks Dropzones
                 const sortableOptions = {
-                    group: 'shared-board',
+                    group: { name: 'shared-board', put: ['shared-board', 'modal-subtasks', 'main-board-list'], pull: ['shared-board', 'modal-subtasks', 'main-board-list'] },
                     animation: 150,
                     handle: '.cursor-grab',
                     fallbackOnBody: true,
                     swapThreshold: 0.65,
-                    onEnd: function (evt) {
-                        const isSubtaskZone = evt.to.classList.contains('kanban-subtasks');
-                        let newSectionId = null;
-                        let parentTaskId = null;
-
-                        if (isSubtaskZone) {
-                            parentTaskId = evt.to.dataset.parentTaskId;
-                            const column = evt.to.closest('.kanban-col');
-                            newSectionId = column ? column.dataset.sectionId : null;
-                        } else {
-                            newSectionId = evt.to.dataset.sectionId;
-                        }
-
-                        const taskIds = Array.from(evt.to.children)
-                            .map(c => c.closest('.task-card')?.dataset.taskId)
-                            .filter(id => id != null);
-                        
-                        // For dropping directly into tasks, ensure evt.to.children are properly mapped to their task ID 
-                        fetch('api/tasks.php', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({ action: 'reorder', section_id: newSectionId, task_ids: taskIds, parent_task_id: parentTaskId })
-                        })
-                        .then(res => res.json())
-                        .then(data => {
-                            if (window.handleApiError) window.handleApiError(data);
-                            loadProjectBoard(currentProjectId);
-                        })
-                        .catch(console.error);
-                    }
+onMove: function(evt) {
+                            // Prevent dropping a shared task into a subtask zone
+                            if (evt.dragged.classList.contains('shared-task') && evt.to.classList.contains('kanban-subtasks')) {
+                                return false;
+                            }
+                            return true;
+                        },
+                        onEnd: window.handleTaskReorder
                 };
 
                 board.querySelectorAll('.kanban-col, .kanban-subtasks').forEach(area => {
@@ -449,13 +432,18 @@ async function loadProjectBoard(projectId) {
                 // List Tasks
                 listTable.querySelectorAll('tbody.sortable-section').forEach(tbody => {
                     new Sortable(tbody, {
-                        group: 'main-board-list', // Isolated from modal subtasks
+                        group: { name: 'main-board-list', put: ['main-board-list', 'modal-subtasks', 'shared-board'], pull: ['main-board-list', 'modal-subtasks', 'shared-board'] },
                         animation: 150,
                         handle: '.cursor-grab-list',
                         filter: '.section-header',
                         onMove: function(evt) {
                             // Don't allow dropping items before the section header
                             if (evt.related && evt.related.className.indexOf('section-header') !== -1) {
+                                return false;
+                            }
+                            
+                            // Prevent dropping a shared task into a subtask list (modal context)
+                            if (evt.dragged.classList.contains('shared-task') && evt.to.id === 'task-modal-subtasks') {
                                 return false;
                             }
                             
@@ -473,14 +461,6 @@ async function loadProjectBoard(projectId) {
                                 if (draggedParent !== relatedParent) {
                                     return false;
                                 }
-                            }
-                            
-                            // Prevent dragging entirely between main board list and sliding modal
-                            if (evt.from.id === 'task-modal-subtasks' && evt.to.id !== 'task-modal-subtasks') {
-                                return false;
-                            }
-                            if (evt.from.id !== 'task-modal-subtasks' && evt.to.id === 'task-modal-subtasks') {
-                                return false;
                             }
                             
                             return true;
@@ -523,7 +503,9 @@ function renderTaskCard(task) {
         assigneesHtml += `</div>`;
     }
 
-const totalSubtasks = parseInt(task.subtask_count || 0, 10);
+    const totalSubtasks = parseInt(task.subtask_count || 0, 10);
+    const isShared = parseInt(task.project_count || 1, 10) > 1;
+    const sharedClass = isShared ? 'shared-task' : '';
     const subtaskBadge = totalSubtasks > 0
         ? `<div class="text-[10px] text-slate-500 flex items-center"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>${totalSubtasks} subtasks</div>`
         : '';
@@ -532,7 +514,7 @@ const totalSubtasks = parseInt(task.subtask_count || 0, 10);
     const titleWithCount = totalSubtasks > 0 ? `${task.title} <span class="text-xs text-slate-400 ml-1">(${totalSubtasks})</span>` : task.title;
     
     return `
-        <div class="bg-white p-3.5 rounded-lg shadow-sm border border-slate-200 task-card hover:border-teal-400 hover:shadow transition-all cursor-grab active:cursor-grabbing" data-task-id="${task.id}" onclick="openTaskModal(${task.id})">
+        <div class="bg-white p-3.5 rounded-lg shadow-sm border border-slate-200 task-card hover:border-teal-400 hover:shadow transition-all cursor-grab active:cursor-grabbing ${sharedClass}" data-task-id="${task.id}" onclick="openTaskModal(${task.id})">
             <div class="flex justify-between items-start mb-2">
                 <h4 class="text-sm text-slate-800 font-medium leading-snug">${titleWithCount}</h4>
                 ${assigneesHtml}
@@ -553,7 +535,9 @@ const totalSubtasks = parseInt(task.subtask_count || 0, 10);
 
 function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
     const tr = document.createElement('tr');
-    tr.className = `hover:bg-slate-50 cursor-pointer border-b border-slate-100 task-row ${parentId ? 'child-of-' + parentId : ''} task-row-${task.id}`;
+    const isShared = parseInt(task.project_count || 1, 10) > 1;
+    const sharedClass = isShared ? 'shared-task' : '';
+    tr.className = `hover:bg-slate-50 cursor-pointer border-b border-slate-100 task-row ${parentId ? 'child-of-' + parentId : ''} task-row-${task.id} ${sharedClass}`;
     tr.dataset.taskId = task.id;
     tr.dataset.status = task.status || '';
     tr.dataset.assigneeIds = task.assignee_ids || '';
@@ -602,7 +586,7 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
     const titleWithCount = totalSubtasks > 0 ? `${task.title} <span class="text-xs text-slate-400 ml-1">(${totalSubtasks})</span>` : task.title;
 
     tr.innerHTML = `
-        <td class="py-3 font-medium text-slate-800 flex items-center" style="padding-left: ${paddingVal}px">
+        <td class="py-3 font-medium text-slate-800 flex items-center ${sharedClass}" style="padding-left: ${paddingVal}px">
             <div class="cursor-grab-list text-slate-300 hover:text-slate-500 mr-2 flex items-center justify-center cursor-move" title="Drag to reorder">
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z"></path></svg>
             </div>
