@@ -45,6 +45,14 @@ CREATE TABLE project_members (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE project_teams (
+    project_id INT NOT NULL,
+    team_id INT NOT NULL,
+    PRIMARY KEY (project_id, team_id),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+);
+
 CREATE TABLE project_default_notify (
     project_id INT NOT NULL,
     user_id INT NOT NULL,
@@ -230,7 +238,7 @@ INSERT INTO `team_members` (`team_id`, `user_id`, `role`, `joined_at`) VALUES
 
 -- Insert Users (Passwords are set to 'user123')
 INSERT INTO users (name, email, password_hash, role) VALUES 
-('Admin User', 'si@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'admin'),
+('Si', 'si@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'admin'),
 ('John Doe', 'john1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
 ('Jane Data', 'jane1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'data_analyst'),
 ('Mark Smith', 'mark1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),

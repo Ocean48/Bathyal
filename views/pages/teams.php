@@ -291,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     tr.className = 'hover:bg-slate-50 transition-colors group';
                     
                     // Simple Date Format
-                    const jDate = new Date(member.joined_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                    const jDate = new Date(member.joined_at.replace(/-/g, '/')).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                     
                     let actionHtml = '';
                     if (['owner', 'admin'].includes(userRole) || ['admin'].includes(userSystemRole) || parseInt(member.id) === currentUserId) {

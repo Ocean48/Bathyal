@@ -204,7 +204,7 @@
                                     <p class="text-sm <?= !$rn['is_read'] ? 'text-slate-800 font-medium' : 'text-slate-600' ?> leading-snug break-words">
                                         <?= htmlspecialchars($rn['message']) ?>
                                     </p>
-                                    <p class="text-[10px] text-slate-400 mt-1"><?= date('M j, g:i A', strtotime($rn['created_at'])) ?></p>
+                                    <p class="text-[10px] text-slate-400 mt-1"><?= convertUtcToToronto($rn['created_at'], 'M j, g:i A') ?></p>
                                 </div>
                             </a>
                             <?php endforeach; endif; ?>

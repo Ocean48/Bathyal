@@ -931,7 +931,7 @@ async function openTaskModal(taskId) {
         commentsContainer.innerHTML = '';
         if(task.comments) {
             task.comments.forEach(comment => {
-                const dt = new Date(comment.created_at).toLocaleString();
+                const dt = new Date(comment.created_at.replace(/-/g, '/')).toLocaleString();
                 const initials = comment.user_name ? comment.user_name.substring(0, 2) : 'U';
                 
                 // Assumes mock user ID 1 OR user can edit their own comment

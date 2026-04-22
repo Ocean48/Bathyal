@@ -89,6 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $newRole = 'member'; // Fallback
                 }
                 
+                $db->addProjectTeam($projectId, $teamIdToAdd);
+
                 $teamMembers = $db->getTeamMembersWithRoles($teamIdToAdd);
                 foreach ($teamMembers as $tm) {
                     $db->addProjectMember($projectId, $tm['id'], $newRole);
@@ -116,7 +118,7 @@ $memberIds = array_column($members, 'id');
 
 // Fetch potential members (users not yet in this project)
 // Show any user the current user has access to see (from their teams)
-$availableUsers = $db->getAvailableUsersForProject($currentUser['team_id'], $memberIds);
+$availableUsers = $db->getAvailableUsersForProject($currentUser['team_id'] ?? null, $memberIds);
 
 // Fetch teams the user has access to, for the "Add Team" dropdown
 $availableTeams = $db->getTeamsForUser($currentUser['id'], $currentUser['role'] ?? null);

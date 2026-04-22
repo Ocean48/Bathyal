@@ -1008,13 +1008,17 @@ function renderTimeline() {
     p.sections.forEach(s => {
         s.tasks.forEach(t => {
             if (t.expected_due_date) {
-                let endDate = new Date(t.expected_due_date.split(' ')[0]);
+                // Parse "YYYY-MM-DD" as local time instead of UTC to prevent date shifting
+                let endDateParts = t.expected_due_date.split(' ')[0].split('-');
+                let endDate = new Date(endDateParts[0], endDateParts[1] - 1, endDateParts[2]);
                 let startDate = new Date(endDate);
                 
                 if(t.expected_start_date) {
-                    startDate = new Date(t.expected_start_date.split(' ')[0]);
+                    let sdParts = t.expected_start_date.split(' ')[0].split('-');
+                    startDate = new Date(sdParts[0], sdParts[1] - 1, sdParts[2]);
                 } else if(t.start_date) {
-                    startDate = new Date(t.start_date.split(' ')[0]);
+                    let sdParts = t.start_date.split(' ')[0].split('-');
+                    startDate = new Date(sdParts[0], sdParts[1] - 1, sdParts[2]);
                 } else {
                     startDate.setDate(endDate.getDate() - 3); // mock duration if missing start date
                 }

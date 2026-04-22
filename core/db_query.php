@@ -66,7 +66,11 @@ class DBQueries {
         $stmt = $this->pdo->prepare("SELECT * FROM users WHERE id = :user_id");
         $stmt->bindValue(':user_id', (int)$userId, PDO::PARAM_INT);
         $stmt->execute();
-        return $stmt->fetch();
+        $user = $stmt->fetch();
+        if ($user && isset($user['created_at'])) {
+            $user['created_at'] = convertUtcToToronto($user['created_at']);
+        }
+        return $user;
     }
 
     public function getUserByEmail($email) {
@@ -95,7 +99,13 @@ class DBQueries {
         $stmt = $this->pdo->prepare("SELECT u.id, u.name, u.email, u.role, u.created_at FROM users u JOIN team_members tm ON u.id = tm.user_id WHERE tm.team_id = :team_id ORDER BY tm.role ASC, u.name ASC");
         $stmt->bindValue(':team_id', (int)$teamId, PDO::PARAM_INT);
         $stmt->execute();
-        return $stmt->fetchAll();
+        $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($members as &$m) {
+            if (isset($m['created_at'])) {
+                $m['created_at'] = convertUtcToToronto($m['created_at']);
+            }
+        }
+        return $members;
     }
 
     public function updateUserRole($userId, $teamId, $role) {
@@ -109,7 +119,13 @@ class DBQueries {
     public function getAllSystemUsers() {
         $stmt = $this->pdo->prepare("SELECT id, name, email, role, created_at FROM users ORDER BY role ASC, name ASC");
         $stmt->execute();
-        return $stmt->fetchAll();
+        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($users as &$u) {
+            if (isset($u['created_at'])) {
+                $u['created_at'] = convertUtcToToronto($u['created_at']);
+            }
+        }
+        return $users;
     }
 
     public function updateSystemUserRole($userId, $role) {
@@ -141,6 +157,9 @@ class DBQueries {
         $stmt->bindValue(':project_id', (int)$projectId, PDO::PARAM_INT);
         $stmt->execute();
         $project = $stmt->fetch();
+        if ($project && isset($project['created_at'])) {
+            $project['created_at'] = convertUtcToToronto($project['created_at']);
+        }
         return $project;
     }
 
@@ -282,7 +301,27 @@ class DBQueries {
         };
 
         $buildTree($tasks);
+        foreach ($tasks as &$t) {
+            $t = $this->formatTaskDates($t);
+        }
         return $tasks;
+    }
+
+    // Helper to format task dates for rendering
+    private function formatTaskDates($task) {
+        if (!$task) return $task;
+        $dateFields = ['start_date', 'expected_start_date', 'expected_due_date', 'completed_date', 'created_at', 'updated_at'];
+        foreach ($dateFields as $field) {
+            if (isset($task[$field]) && !empty($task[$field])) {
+                $task[$field] = convertUtcToToronto($task[$field]);
+            }
+        }
+        if (isset($task['subtasks']) && is_array($task['subtasks'])) {
+            foreach ($task['subtasks'] as &$sub) {
+                $sub = $this->formatTaskDates($sub);
+            }
+        }
+        return $task;
     }
 
     public function getAllTasks($userId = null) {
@@ -302,11 +341,16 @@ class DBQueries {
             $stmt = $this->pdo->prepare($sql);
             $stmt->bindValue(':userId', (int)$userId, PDO::PARAM_INT);
             $stmt->execute();
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $stmt = $this->pdo->query($sql);
+            $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        $stmt = $this->pdo->query($sql);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($tasks as &$t) {
+            $t = $this->formatTaskDates($t);
+        }
+        return $tasks;
     }
     
     public function getTasksByAssigneeId($userId) {
@@ -333,7 +377,11 @@ class DBQueries {
         ");
         $stmt->bindValue(':user_id', (int)$userId, PDO::PARAM_INT);
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($tasks as &$t) {
+            $t = $this->formatTaskDates($t);
+        }
+        return $tasks;
     }
 
     public function createTask($data) {
@@ -350,7 +398,7 @@ class DBQueries {
         $status = isset($data['status']) ? $data['status'] : 'todo';
         $stmt->bindValue(':status', $status, PDO::PARAM_STR);
         
-        $start = isset($data['start_date']) ? $data['start_date'] : null;
+        $start = isset($data['start_date']) ? convertTorontoToUtc($data['start_date']) : null;
         $stmt->bindValue(':start_date', $start, $start !== null ? PDO::PARAM_STR : PDO::PARAM_NULL);
         
         $completed_date = ($status === 'completed' || $status === 'done') ? date('Y-m-d H:i:s') : null;
@@ -533,7 +581,13 @@ class DBQueries {
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($notifications as &$n) {
+            if (isset($n['created_at'])) {
+                $n['created_at'] = convertUtcToToronto($n['created_at']);
+            }
+        }
+        return $notifications;
     }
     
     public function markNotificationRead($notificationId, $userId) {
@@ -602,6 +656,16 @@ class DBQueries {
         if (!$stmtCheck->fetchColumn()) {
             $stmt = $this->pdo->prepare("INSERT INTO project_members (project_id, user_id, role) VALUES (:pid, :uid, :role)");
             return $stmt->execute(['pid' => (int)$projectId, 'uid' => (int)$userId, 'role' => $role]);
+        }
+        return false;
+    }
+
+    public function addProjectTeam($projectId, $teamId) {
+        $stmtCheck = $this->pdo->prepare("SELECT 1 FROM project_teams WHERE project_id = :pid AND team_id = :tid");
+        $stmtCheck->execute(['pid' => (int)$projectId, 'tid' => (int)$teamId]);
+        if (!$stmtCheck->fetchColumn()) {
+            $stmt = $this->pdo->prepare("INSERT INTO project_teams (project_id, team_id) VALUES (:pid, :tid)");
+            return $stmt->execute(['pid' => (int)$projectId, 'tid' => (int)$teamId]);
         }
         return false;
     }
@@ -746,7 +810,13 @@ class DBQueries {
             ORDER BY tm.role = 'owner' DESC, tm.role = 'admin' DESC, u.name ASC
         ");
         $stmt->execute(['tid' => (int)$teamId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($members as &$m) {
+            if (isset($m['joined_at'])) {
+                $m['joined_at'] = convertUtcToToronto($m['joined_at']);
+            }
+        }
+        return $members;
     }
 
     public function addTeamMember($teamId, $userId, $role = 'member') {
@@ -754,7 +824,19 @@ class DBQueries {
         $stmtCheck->execute(['tid' => (int)$teamId, 'uid' => (int)$userId]);
         if (!$stmtCheck->fetchColumn()) {
             $stmt = $this->pdo->prepare("INSERT INTO team_members (team_id, user_id, role) VALUES (:tid, :uid, :role)");
-            return $stmt->execute(['tid' => (int)$teamId, 'uid' => (int)$userId, 'role' => $role]);
+            $success = $stmt->execute(['tid' => (int)$teamId, 'uid' => (int)$userId, 'role' => $role]);
+            
+            if ($success) {
+                // Add the user to all projects this team is linked to (as member)
+                $stmtProjects = $this->pdo->prepare("SELECT project_id FROM project_teams WHERE team_id = :tid");
+                $stmtProjects->execute(['tid' => (int)$teamId]);
+                $projectIds = $stmtProjects->fetchAll(PDO::FETCH_COLUMN);
+                
+                foreach ($projectIds as $pid) {
+                    $this->addProjectMember($pid, $userId, 'member');
+                }
+            }
+            return $success;
         }
         return false;
     }
@@ -1174,7 +1256,7 @@ class DBQueries {
             $task['parents'] = $stmtParents->fetchAll(PDO::FETCH_ASSOC);
         }
         
-        return $task;
+        return $this->formatTaskDates($task);
     }
 
     public function getTaskSubtasks($taskId) {
@@ -1198,7 +1280,11 @@ class DBQueries {
         $stmt->bindValue(':task_id_link', (int)$taskId, PDO::PARAM_INT);
         $stmt->bindValue(':task_id_link2', (int)$taskId, PDO::PARAM_INT);
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($tasks as &$t) {
+            $t = $this->formatTaskDates($t);
+        }
+        return $tasks;
     }
 
     public function updateTaskDetails($taskId, $data, $projectId = null) {
@@ -1221,15 +1307,15 @@ class DBQueries {
         }
         if (array_key_exists('start_date', $data)) {
             $setClauses[] = "start_date = :start_date";
-            $params[':start_date'] = $data['start_date'] ?: null;
+            $params[':start_date'] = $data['start_date'] ? convertTorontoToUtc($data['start_date']) : null;
         }
         if (array_key_exists('expected_start_date', $data)) {
             $setClauses[] = "expected_start_date = :expected_start_date";
-            $params[':expected_start_date'] = $data['expected_start_date'] ?: null;
+            $params[':expected_start_date'] = $data['expected_start_date'] ? convertTorontoToUtc($data['expected_start_date']) : null;
         }
         if (array_key_exists('expected_due_date', $data)) {
             $setClauses[] = "expected_due_date = :expected_due_date";
-            $params[':expected_due_date'] = $data['expected_due_date'] ?: null;
+            $params[':expected_due_date'] = $data['expected_due_date'] ? convertTorontoToUtc($data['expected_due_date']) : null;
         }
 
         if (array_key_exists('parent_task_id', $data)) {
@@ -1349,7 +1435,7 @@ class DBQueries {
 
         return [
             'is_running' => !!$runningLog,
-            'running_since' => $runningLog ? $runningLog['start_time'] : null,
+            'running_since' => $runningLog ? convertUtcToToronto($runningLog['start_time']) : null,
             'total_tracked_seconds' => $totalSeconds
         ];
     }
@@ -1473,7 +1559,13 @@ class DBQueries {
         ");
         $stmt->bindValue(':task_id', (int)$taskId, PDO::PARAM_INT);
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($attachments as &$att) {
+            if (isset($att['created_at'])) {
+                $att['created_at'] = convertUtcToToronto($att['created_at']);
+            }
+        }
+        return $attachments;
     }
 
     public function createTaskAttachment($taskId, $userId, $fileName, $filePath, $fileType) {
@@ -1516,7 +1608,13 @@ class DBQueries {
         ");
         $stmt->bindValue(':task_id', (int)$taskId, PDO::PARAM_INT);
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($comments as &$c) {
+            if (isset($c['created_at'])) {
+                $c['created_at'] = convertUtcToToronto($c['created_at']);
+            }
+        }
+        return $comments;
     }
 
     public function createComment($taskId, $userId, $content) {

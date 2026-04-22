@@ -63,7 +63,7 @@ require_once 'views/layouts/header.php';
                                 <?= htmlspecialchars($n['message']) ?>
                             </h4>
                             <span class="text-xs text-slate-400 whitespace-nowrap ml-4">
-                                <?= date('M j, Y g:i A', strtotime($n['created_at'])) ?>
+                                <?= convertUtcToToronto($n['created_at'], 'M j, Y g:i A') ?>
                             </span>
                         </div>
                         <?php if ($n['task_id']): ?>

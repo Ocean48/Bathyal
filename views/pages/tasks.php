@@ -97,7 +97,7 @@ $tasks = $db->getTasksByAssigneeId($userId);
                                     $isLate = false;
                                     $dueDateText = '--';
                                     if ($task['expected_due_date']) {
-                                        $dueDateText = date('M j', strtotime($task['expected_due_date']));
+                                        $dueDateText = convertUtcToToronto($task['expected_due_date'], 'M j');
                                         if (strtotime($task['expected_due_date']) < time() && $task['status'] !== 'done' && $task['status'] !== 'completed') {
                                             $isLate = true;
                                         }

@@ -87,7 +87,7 @@ require_once 'views/layouts/header.php';
                     <div>
                         <p class="text-xs text-slate-500 mb-1">Account Created</p>
                         <p class="text-sm font-medium text-slate-800">
-                            <?= isset($currentUser['created_at']) ? date('M j, Y', strtotime($currentUser['created_at'])) : 'Unknown' ?>
+                            <?= isset($currentUser['created_at']) ? convertUtcToToronto($currentUser['created_at'], 'M j, Y') : 'Unknown' ?>
                         </p>
                     </div>
                     <?php if (isset($currentUser['team_id']) && $currentUser['team_id']): ?>
@@ -136,7 +136,7 @@ require_once 'views/layouts/header.php';
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-slate-500">
-                                <?= isset($member['created_at']) ? date('M j, Y', strtotime($member['created_at'])) : '-' ?>
+                                <?= isset($member['created_at']) ? convertUtcToToronto($member['created_at'], 'M j, Y') : '-' ?>
                             </td>
                             <td class="px-6 py-4">
                                 <?php
