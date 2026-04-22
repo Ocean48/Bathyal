@@ -330,6 +330,9 @@ require_once 'views/layouts/header.php';
                         <button type="button" onmousedown="event.preventDefault(); formatText('underline', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Underline">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3m-9 18h6"></path></svg>
                         </button>
+                        <button type="button" onmousedown="event.preventDefault(); insertLink('task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Link">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                        </button>
                         <div class="w-px h-5 bg-slate-300 mx-1"></div>
                         <button type="button" onmousedown="event.preventDefault(); formatText('insertUnorderedList', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bullet List">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
@@ -355,7 +358,7 @@ require_once 'views/layouts/header.php';
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l-4 3 4 3m8-6l4 3-4 3"></path></svg>
                         </button>
                     </div>
-                    <div id="task-modal-desc" class="prose prose-sm text-slate-600 p-4 outline-none flex-1 max-w-none break-words min-h-[100px] border border-transparent focus:border-slate-200" contenteditable="true" onkeydown="handleRteTab(event)" onblur="updateTaskDetails()">
+                    <div id="task-modal-desc" class="prose prose-sm text-slate-600 p-4 outline-none flex-1 max-w-none break-words min-h-[100px] border border-transparent focus:border-slate-200" contenteditable="true" onkeydown="handleRteKeyDown(event)" oninput="handleRteInput(event)" onblur="updateTaskDetails()">
                     </div>
                     <textarea id="task-modal-desc-code" class="hidden font-mono text-sm p-4 w-full flex-1 outline-none text-slate-700 bg-slate-50 break-words min-h-[100px]" onblur="updateTaskDetails()"></textarea>
                 </div>
@@ -407,6 +410,9 @@ require_once 'views/layouts/header.php';
                                 <button type="button" onmousedown="event.preventDefault(); formatText('underline', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Underline">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3m-9 18h6"></path></svg>
                                 </button>
+                                <button type="button" onmousedown="event.preventDefault(); insertLink('task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Link">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                </button>
                                 <div class="w-px h-5 bg-slate-300 mx-1"></div>
                                 <button type="button" onmousedown="event.preventDefault(); formatText('insertUnorderedList', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bullet List">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
@@ -433,7 +439,7 @@ require_once 'views/layouts/header.php';
                                 </button>
                             </div>
                             
-                            <div id="task-modal-new-comment" class="prose prose-sm text-slate-600 p-3 outline-none flex-1 max-w-none break-words" contenteditable="true" data-placeholder="Ask a question or post an update..." onkeydown="handleRteTab(event)" onfocus="if(this.innerHTML==='<p><br></p>') this.innerHTML='';" onblur="if(this.innerHTML==='') this.innerHTML='<p><br></p>';"></div>
+                            <div id="task-modal-new-comment" class="prose prose-sm text-slate-600 p-3 outline-none flex-1 max-w-none break-words" contenteditable="true" data-placeholder="Ask a question or post an update..." onkeydown="handleRteKeyDown(event)" oninput="handleRteInput(event)" onfocus="if(this.innerHTML==='<p><br></p>') this.innerHTML='';" onblur="if(this.innerHTML==='') this.innerHTML='<p><br></p>';"></div>
                             <textarea id="task-modal-new-comment-code" class="hidden font-mono text-sm p-3 w-full flex-1 outline-none text-slate-700 bg-slate-50 break-words min-h-[100px]"></textarea>
                         </div>
                         <div class="mt-2 flex justify-end flex-wrap gap-2">
@@ -448,6 +454,11 @@ require_once 'views/layouts/header.php';
             </div>
         </div>
     </div>
+</div>
+
+<!-- Mention Popover -->
+<div id="mention-popover" class="hidden fixed z-[100] bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto w-64 flex-col text-sm text-slate-700">
+    <ul id="mention-popover-list" class="p-1"></ul>
 </div>
 
 <!-- Create Entry Modals (Ocean Theme) -->
@@ -505,6 +516,16 @@ document.addEventListener('click', function(event) {
             projDropdown.classList.add('hidden');
         }
     }
+
+    const link = event.target.closest('a');
+    if (link && link.href) {
+        const editable = link.closest('[contenteditable="true"]');
+        if (editable) {
+            // Check if user is clicking on a link inside an editor
+            event.preventDefault();
+            window.open(link.href, link.target || '_blank');
+        }
+    }
 });
 
 window.getStatusBadgeClass = function(status) {
@@ -537,20 +558,323 @@ window.getStatusTextClass = function(status) {
 let timerInterval;
 
 // Custom Rich Text Editor Functions
-function handleRteTab(event) {
+let mentionQuery = null;
+let mentionRange = null;
+let mentionType = null; 
+let mentionActiveEditor = null;
+let mentionResults = [];
+let mentionSelectedIndex = 0;
+
+function handleRteKeyDown(event) {
     if (event.key === 'Tab') {
+        if (!document.getElementById('mention-popover').classList.contains('hidden')) {
+            event.preventDefault();
+            insertMention();
+            return;
+        }
         event.preventDefault();
         if (event.shiftKey) {
             document.execCommand('outdent', false, null);
         } else {
             document.execCommand('indent', false, null);
         }
+        return;
+    }
+
+    const popover = document.getElementById('mention-popover');
+    if (!popover.classList.contains('hidden')) {
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            mentionSelectedIndex = (mentionSelectedIndex + 1) % mentionResults.length;
+            renderMentionPopover();
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            mentionSelectedIndex = (mentionSelectedIndex - 1 + mentionResults.length) % mentionResults.length;
+            renderMentionPopover();
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            insertMention();
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            closeMentionPopover();
+        }
+    }
+}
+
+function handleRteInput(event) {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+    const node = selection.anchorNode;
+    if (!node || node.nodeType !== Node.TEXT_NODE) {
+        closeMentionPopover();
+        return;
+    }
+
+    const textBeforeCursor = node.textContent.substring(0, range.startOffset);
+    const match = textBeforeCursor.match(/(?:^|\s)([@#])([a-zA-Z0-9\-_ ]*)$/);
+
+    if (match && match[2].length < 30) {
+        mentionType = match[1];
+        mentionQuery = match[2].trim();
+        
+        mentionRange = document.createRange();
+        // match[0] contains the matched string including the leading space if present
+        // we only want to replace the @word part.
+        const matchedText = match[0].trimStart(); // remove leading space
+        mentionRange.setStart(node, range.startOffset - matchedText.length);
+        mentionRange.setEnd(node, range.startOffset);
+        
+        mentionActiveEditor = event.currentTarget;
+        
+        const rect = range.getBoundingClientRect();
+        showMentionPopover(rect);
+        fetchMentions(mentionQuery);
+    } else {
+        closeMentionPopover();
+    }
+}
+
+function showMentionPopover(rect) {
+    const popover = document.getElementById('mention-popover');
+    popover.classList.remove('hidden');
+    popover.classList.add('flex');
+    popover.style.left = rect.left + 'px';
+    popover.style.top = (rect.bottom + 5) + 'px';
+}
+
+function closeMentionPopover() {
+    const popover = document.getElementById('mention-popover');
+    if(popover) {
+        popover.classList.add('hidden');
+        popover.classList.remove('flex');
+    }
+    mentionQuery = null;
+    mentionRange = null;
+    mentionActiveEditor = null;
+    mentionResults = [];
+    mentionSelectedIndex = 0;
+}
+
+document.addEventListener('mousedown', function(event) {
+    const popover = document.getElementById('mention-popover');
+    if (popover && !popover.classList.contains('hidden')) {
+        if (!popover.contains(event.target)) {
+            closeMentionPopover();
+        }
+    }
+});
+
+async function fetchMentions(query) {
+    mentionResults = [];
+    mentionSelectedIndex = 0;
+    
+    try {
+        const resTasks = await fetch('api/tasks.php');
+        const allTasks = await resTasks.json();
+        
+        const filteredTasks = allTasks.filter(t => t.title.toLowerCase().includes(query.toLowerCase()) || String(t.id).includes(query));
+        mentionResults.push(...filteredTasks.map(t => ({...t, itemType: 'task'})));
+        
+        const resProj = await fetch('api/projects.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'search', query: query })
+        });
+        const projData = await resProj.json();
+        if (projData.status === 'success') {
+            mentionResults.push(...projData.projects.map(p => ({...p, itemType: 'project'})));
+        }
+        
+        mentionResults = mentionResults.slice(0, 10);
+        renderMentionPopover();
+        
+    } catch(e) {
+        console.error('Mention fetch error', e);
+    }
+}
+
+function renderMentionPopover() {
+    const list = document.getElementById('mention-popover-list');
+    list.innerHTML = '';
+    
+    if (mentionResults.length === 0) {
+        list.innerHTML = '<li class="p-2 text-slate-400 italic text-xs">No matching tasks or projects</li>';
+        return;
+    }
+    
+    mentionResults.forEach((item, index) => {
+        const li = document.createElement('li');
+        const isSelected = index === mentionSelectedIndex;
+        li.className = `p-2 cursor-pointer flex items-center justify-between text-slate-700 hover:bg-slate-100 rounded mt-0.5 ${isSelected ? 'bg-teal-50' : ''}`;
+        
+        if (item.itemType === 'task') {
+            li.innerHTML = `
+                <div class="flex items-center truncate">
+                    <svg class="w-3.5 h-3.5 mr-2 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                    <span class="truncate"><span class="text-xs text-slate-400 font-medium">#${item.id}</span> ${item.title}</span>
+                </div>
+            `;
+        } else {
+            li.innerHTML = `
+                <div class="flex items-center truncate">
+                    <svg class="w-3.5 h-3.5 mr-2 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                    <span class="truncate"><span class="text-xs text-slate-400 font-medium">PRJ-${item.id}</span> ${item.name}</span>
+                </div>
+            `;
+        }
+        
+        li.onmousedown = (e) => {
+            e.preventDefault();
+            mentionSelectedIndex = index;
+            insertMention();
+        };
+        li.onmouseenter = () => {
+            mentionSelectedIndex = index;
+            Array.from(list.children).forEach((child, i) => {
+                if (i === index) child.classList.add('bg-teal-50');
+                else child.classList.remove('bg-teal-50');
+            });
+        };
+        
+        list.appendChild(li);
+    });
+}
+
+function insertMention() {
+    if (mentionResults.length === 0) {
+        closeMentionPopover();
+        return;
+    }
+    
+    const item = mentionResults[mentionSelectedIndex];
+    
+    if (mentionActiveEditor) {
+        mentionActiveEditor.focus();
+    }
+    
+    const selection = window.getSelection();
+    
+    selection.removeAllRanges();
+    if (mentionRange) {
+        selection.addRange(mentionRange);
+    }
+    
+    let html = '';
+    if (item.itemType === 'task') {
+        const url = window.location.origin + window.location.pathname + '?id=' + (typeof currentProjectId !== 'undefined' ? currentProjectId : 1) + '&task_id=' + item.id;
+        html = `<a href="${url}" class="text-indigo-600 font-medium hover:underline px-1 py-0.5 rounded bg-indigo-50" contenteditable="false" target="_blank">#${item.id} ${item.title}</a>&nbsp;`;
+    } else {
+        const url = window.location.origin + window.location.pathname + '?id=' + item.id;
+        html = `<a href="${url}" class="text-emerald-600 font-medium hover:underline px-1 py-0.5 rounded bg-emerald-50" contenteditable="false" target="_blank">PRJ-${item.id} ${item.name}</a>&nbsp;`;
+    }
+    
+    document.execCommand('insertHTML', false, html);
+    closeMentionPopover();
+    
+    if (mentionActiveEditor && mentionActiveEditor.id === 'task-modal-desc') {
+        updateTaskDetails();
     }
 }
 
 function formatText(command, editorId) {
     document.getElementById(editorId).focus();
     document.execCommand(command, false, null);
+}
+
+function showPromptModal(title, label, defaultValue) {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('global-modal-overlay');
+        const box = document.getElementById('global-modal-box');
+        const titleEl = document.getElementById('global-modal-title');
+        const msgEl = document.getElementById('global-modal-message');
+        const iconContainer = document.getElementById('global-modal-icon');
+        const btnCancel = document.getElementById('global-modal-cancel');
+        const btnConfirm = document.getElementById('global-modal-confirm');
+
+        if (!overlay) return resolve(null);
+
+        // Setup UI for prompt
+        titleEl.textContent = title;
+        msgEl.innerHTML = `
+            <label class="block text-sm font-medium text-slate-700 mb-1">${label}</label>
+            <input type="text" id="global-prompt-input" value="${defaultValue}" class="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-slate-800" autofocus>
+        `;
+        
+        iconContainer.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>`;
+        iconContainer.className = 'w-10 h-10 rounded-full flex flex-shrink-0 items-center justify-center shrink-0 bg-blue-100 text-blue-600';
+
+        btnCancel.classList.remove('hidden');
+        btnCancel.onclick = () => { closeModal(); resolve(null); };
+        
+        btnConfirm.textContent = 'Insert';
+        btnConfirm.className = 'px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 active:scale-[0.98]';
+        
+        const inputEl = document.getElementById('global-prompt-input');
+        
+        btnConfirm.onclick = () => { 
+            const val = inputEl.value;
+            closeModal(); 
+            resolve(val); 
+        };
+        
+        inputEl.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                btnConfirm.click();
+            } else if (e.key === 'Escape') {
+                btnCancel.click();
+            }
+        };
+
+        function closeModal() {
+            overlay.classList.remove('opacity-100', 'pointer-events-auto');
+            overlay.classList.add('opacity-0', 'pointer-events-none');
+            box.classList.remove('scale-100');
+            box.classList.add('scale-95');
+        }
+
+        // Open Modal
+        overlay.classList.remove('opacity-0', 'pointer-events-none');
+        overlay.classList.add('opacity-100', 'pointer-events-auto');
+        box.classList.remove('scale-95');
+        box.classList.add('scale-100');
+        
+        setTimeout(() => {
+            inputEl.focus();
+            inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+        }, 100);
+    });
+}
+
+async function insertLink(editorId) {
+    document.getElementById(editorId).focus();
+    const selection = window.getSelection();
+    
+    if (!selection.rangeCount) return;
+    
+    // Save the selection range so we can restore it after the async modal closes
+    const range = selection.getRangeAt(0).cloneRange();
+    const selectedText = selection.toString();
+    
+    const url = await showPromptModal('Insert Link', 'URL:', '');
+    
+    if (!url || url === 'https://') return;
+    
+    // Restore the selection to the editor
+    document.getElementById(editorId).focus();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    const textToDisplay = selectedText.length > 0 ? selectedText : url;
+    const html = `<a href="${url}" target="_blank" class="text-blue-600 hover:underline">${textToDisplay}</a>`;
+    
+    document.execCommand('insertHTML', false, html);
+    
+    if (editorId === 'task-modal-desc') {
+        updateTaskDetails();
+    }
 }
 
 function toggleCodeView(editorId) {
@@ -1137,6 +1461,9 @@ function enableCommentEdit(commentId) {
                     <button type="button" onmousedown="event.preventDefault(); formatText('underline', 'edit-comment-area-${commentId}')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Underline">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3m-9 18h6"></path></svg>
                     </button>
+                    <button type="button" onmousedown="event.preventDefault(); insertLink('edit-comment-area-${commentId}')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Link">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                    </button>
                     <div class="w-px h-5 bg-slate-300 mx-1"></div>
                     <button type="button" onmousedown="event.preventDefault(); formatText('insertUnorderedList', 'edit-comment-area-${commentId}')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bullet List">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
@@ -1165,7 +1492,8 @@ function enableCommentEdit(commentId) {
                 <div 
                     id="edit-comment-area-${commentId}" 
                     contenteditable="true" 
-                    onkeydown="handleRteTab(event)"
+                    onkeydown="handleRteKeyDown(event)"
+                    oninput="handleRteInput(event)"
                     class="p-3 min-h-[60px] max-h-48 overflow-y-auto focus:outline-none text-sm text-slate-700 bg-white list-disc list-inside prose prose-sm max-w-none"
                     style="outline: none;"
                 >${existingHtml}</div>
