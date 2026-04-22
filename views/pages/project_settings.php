@@ -13,8 +13,13 @@ if (!$projectId) {
 
 $db = new DBQueries($pdo);
 
+if (!isset($currentUser['id']) || !$db->isProjectMember($projectId, $currentUser['id'])) {
+    header("Location: /bathyal/projects");
+    exit;
+}
+
 // Get current user's role in this project
-$userProjectRole = $db->getProjectMemberRole($projectId, $currentUser['id']) ?: 'viewer'; // Default to viewer if not in project (e.g. system admin observing)
+$userProjectRole = $db->getProjectMemberRole($projectId, $currentUser['id']);
 
 // Handle POST requests for settings updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -75,6 +80,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Add member if not already exists
                 $db->addProjectMember($projectId, $newUserId, $newRole);
             }
+        } elseif ($_POST['action'] === 'add_team_members') {
+            $teamIdToAdd = (int)$_POST['team_id'];
+            $newRole = $_POST['role'];
+            
+            if ($userProjectRole === 'manager' || $userProjectRole === 'member') {
+                if ($newRole === 'manager' && $userProjectRole !== 'manager') {
+                    $newRole = 'member'; // Fallback
+                }
+                
+                $teamMembers = $db->getTeamMembersWithRoles($teamIdToAdd);
+                foreach ($teamMembers as $tm) {
+                    $db->addProjectMember($projectId, $tm['id'], $newRole);
+                }
+            }
         }
         
         // Redirect back to same tab to avoid resubmission on refresh
@@ -99,10 +118,13 @@ $memberIds = array_column($members, 'id');
 // Show any user the current user has access to see (from their teams)
 $availableUsers = $db->getAvailableUsersForProject($currentUser['team_id'], $memberIds);
 
+// Fetch teams the user has access to, for the "Add Team" dropdown
+$availableTeams = $db->getTeamsForUser($currentUser['id'], $currentUser['role'] ?? null);
+
 require_once 'views/layouts/header.php';
 ?>
 
-<div class="max-w-6xl mx-auto px-6 py-8">
+<div class="max-w-7xl mx-auto px-6 py-8">
     <div class="flex items-center justify-between mb-8">
         <div>
             <h1 class="text-2xl font-semibold text-slate-800">Project Settings</h1>
@@ -113,23 +135,23 @@ require_once 'views/layouts/header.php';
         </a>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="flex flex-col md:flex-row gap-6">
         <!-- Settings Nav -->
-        <div class="col-span-1">
-            <nav class="space-y-1">
+        <div class="w-full md:w-1/4 lg:w-1/5 shrink-0">
+            <nav class="space-y-1 md:sticky md:top-8">
                 <a href="#" onclick="switchTab('general', event)" id="nav-general" class="flex items-center px-4 py-2.5 bg-white text-teal-700 text-sm font-medium rounded-lg shadow-sm border border-slate-200/60">
-                    <svg class="w-5 h-5 mr-3 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                    <svg class="w-5 h-5 mr-3 text-teal-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
                     General
                 </a>
                 <a href="#" onclick="switchTab('members', event)" id="nav-members" class="flex items-center px-4 py-2.5 text-slate-600 hover:bg-slate-50 hover:text-slate-900 text-sm font-medium rounded-lg transition-colors">
-                    <svg class="w-5 h-5 mr-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                    <svg class="w-5 h-5 mr-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                     Members & Permissions
                 </a>
             </nav>
         </div>
 
         <!-- Settings Form -->
-        <div class="col-span-2 space-y-6">
+        <div class="flex-1 space-y-6">
             
             <div id="panel-general" class="space-y-6">
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -175,27 +197,55 @@ require_once 'views/layouts/header.php';
             <!-- Panel Members -->
             <div id="panel-members" class="hidden space-y-6">
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="px-6 py-5 border-b border-slate-200 flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
+                    <div class="px-6 py-5 border-b border-slate-200 flex flex-col xl:flex-row xl:justify-between xl:items-start space-y-4 xl:space-y-0">
                         <div>
                             <h2 class="text-lg font-medium text-slate-800">Members & Permissions</h2>
                             <p class="text-xs text-slate-500 mt-1">Adjust who has access to this project, and tweak their role.</p>
                         </div>
                         <?php if ($userProjectRole === 'manager' || $userProjectRole === 'member'): ?>
-                        <div class="flex items-center space-x-3 shrink-0">
-                            <form method="POST" action="/bathyal/project_settings?id=<?= $projectId ?>&tab=members" id="add-member-form" class="flex items-center space-x-2 m-0 bg-slate-50/50 p-2 rounded-xl border border-slate-200/80 shadow-sm relative overflow-visible">
+                        <div class="flex flex-col space-y-3 shrink-0 xl:w-2/3 xl:items-end">
+                            <!-- Add Team Form -->
+                            <form method="POST" action="/bathyal/project_settings?id=<?= $projectId ?>&tab=members" class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 m-0 bg-slate-50/50 p-2 rounded-xl border border-slate-200/80 shadow-sm relative overflow-visible w-full md:w-auto">
+                                <input type="hidden" name="action" value="add_team_members">
+                                
+                                <div class="relative group flex-1">
+                                    <select name="team_id" required class="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 block px-3 py-2 outline-none w-full sm:w-56 shadow-sm hover:border-slate-400 transition-colors">
+                                        <option value="" disabled selected>Select Team...</option>
+                                        <?php foreach($availableTeams as $t): ?>
+                                            <option value="<?= $t['id'] ?>"><?= htmlspecialchars($t['name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="relative group">
+                                    <select name="role" required class="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 block px-3 py-2 outline-none w-full sm:w-32 shadow-sm hover:border-slate-400 transition-colors">
+                                        <?php if ($userProjectRole === 'manager'): ?>
+                                            <option value="manager">Manager</option>
+                                        <?php endif; ?>
+                                        <option value="member" selected>Member</option>
+                                        <option value="viewer">Viewer</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="bg-teal-500 hover:bg-teal-600 text-white p-2 rounded-lg transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 active:scale-95 flex items-center justify-center font-medium px-4 w-[130px]" title="Add Team">
+                                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                    Add Team
+                                </button>
+                            </form>
+
+                            <!-- Add Individual Member Form -->
+                            <form method="POST" action="/bathyal/project_settings?id=<?= $projectId ?>&tab=members" id="add-member-form" class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 m-0 bg-slate-50/50 p-2 rounded-xl border border-slate-200/80 shadow-sm relative overflow-visible w-full md:w-auto">
                                 <input type="hidden" name="action" value="add_member">
                                 
                                 <!-- Custom Searchable Dropdown -->
-                                <div class="relative group" id="userDropdownContainer">
+                                <div class="relative group flex-1" id="userDropdownContainer">
                                     <input type="hidden" name="user_id" id="selectedUserValue" required>
-                                    <input type="text" id="userSearchInput" autocomplete="off" placeholder="Search user to add..." class="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 block pl-3 pr-8 py-2 outline-none w-64 shadow-sm hover:border-slate-400 transition-colors placeholder:text-slate-400">
+                                    <input type="text" id="userSearchInput" autocomplete="off" placeholder="Search user to add..." class="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 block pl-3 pr-8 py-2 outline-none w-full sm:w-56 shadow-sm hover:border-slate-400 transition-colors placeholder:text-slate-400">
                                     <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400 cursor-pointer">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                     </div>
                                     
                                     <!-- Dropdown List -->
                                     <div id="userDropdownList" class="hidden absolute top-full left-0 mt-1 max-h-60 w-full overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg z-50">
-                                        <ul class="text-sm text-slate-700">
+                                        <ul class="text-sm text-slate-700" id="userDropdownUl">
                                             <?php foreach($availableUsers as $index => $u): ?>
                                                 <li class="px-4 py-2 hover:bg-teal-50 cursor-pointer transition-colors user-item" 
                                                     data-id="<?= $u['id'] ?>" 
@@ -214,7 +264,7 @@ require_once 'views/layouts/header.php';
 
                                 <div class="relative" id="roleDropdownContainer">
                                     <input type="hidden" name="role" id="selectedRoleValue" value="member">
-                                    <button type="button" id="roleDropdownBtn" class="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 flex justify-between items-center pl-3 pr-2 py-2 outline-none w-32 shadow-sm hover:border-slate-400 transition-colors cursor-pointer text-left">
+                                    <button type="button" id="roleDropdownBtn" class="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 flex justify-between items-center pl-3 pr-2 py-2 outline-none w-full sm:w-32 shadow-sm hover:border-slate-400 transition-colors cursor-pointer text-left">
                                         <span id="roleDropdownLabel">Member</span>
                                         <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                     </button>
@@ -230,9 +280,9 @@ require_once 'views/layouts/header.php';
                                         </ul>
                                     </div>
                                 </div>
-                                <button type="submit" class="bg-teal-500 hover:bg-teal-600 text-white p-2 rounded-lg transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 active:scale-95 flex items-center justify-center font-medium px-4" title="Add User">
-                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                                    Add
+                                <button type="submit" class="bg-teal-500 hover:bg-teal-600 text-white p-2 rounded-lg transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 active:scale-95 flex items-center justify-center font-medium px-4 w-full sm:w-[130px]" title="Add User">
+                                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                    Add User
                                 </button>
                             </form>
                         </div>
@@ -363,15 +413,10 @@ require_once 'views/layouts/header.php';
     // Custom Searchable Dropdown Logic
     const searchInput = document.getElementById('userSearchInput');
     const dropdownList = document.getElementById('userDropdownList');
-    const userItems = document.querySelectorAll('.user-item');
+    const userDropdownUl = document.getElementById('userDropdownUl');
     const hiddenUserId = document.getElementById('selectedUserValue');
 
     if (searchInput) {
-        // Toggle dropdown open
-        searchInput.addEventListener('focus', () => {
-            dropdownList.classList.remove('hidden');
-        });
-
         // Click outside to close
         document.addEventListener('click', (e) => {
             if (!searchInput.contains(e.target) && !dropdownList.contains(e.target)) {
@@ -383,32 +428,59 @@ require_once 'views/layouts/header.php';
             }
         });
 
-        // Filter Logic
+        let searchTimeout;
+
+        // Filter Logic via API
         searchInput.addEventListener('input', (e) => {
             dropdownList.classList.remove('hidden');
-            const term = e.target.value.toLowerCase();
-            let matches = 0;
+            const term = e.target.value.trim();
             
-            userItems.forEach(item => {
-                const name = item.dataset.name.toLowerCase();
-                const email = item.dataset.email.toLowerCase();
-                
-                if (name.includes(term) || email.includes(term)) {
-                    item.style.display = '';
-                    matches++;
-                } else {
-                    item.style.display = 'none';
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(async () => {
+                userDropdownUl.innerHTML = '<li class="px-4 py-3 text-slate-500 italic">Searching...</li>';
+                try {
+                    // Fetch all users that match query, minus existing project members
+                    const res = await fetch(`/bathyal/api/users.php?search=${encodeURIComponent(term)}&exclude_project_id=<?= $projectId ?>`);
+                    const json = await res.json();
+                    
+                    userDropdownUl.innerHTML = '';
+                    
+                    if (json.length > 0) {
+                        json.forEach(u => {
+                            const li = document.createElement('li');
+                            li.className = 'px-4 py-2 hover:bg-teal-50 cursor-pointer transition-colors user-item';
+                            li.dataset.id = u.id;
+                            li.dataset.name = u.name;
+                            li.dataset.email = u.email;
+                            li.innerHTML = `
+                                <div class="font-medium text-slate-800">${u.name}</div>
+                                <div class="text-[11px] text-slate-500">${u.email}</div>
+                            `;
+                            
+                            // Rebind selection event
+                            li.addEventListener('click', () => {
+                                hiddenUserId.value = u.id;
+                                searchInput.value = u.name + ' (' + u.email + ')';
+                                dropdownList.classList.add('hidden');
+                            });
+                            
+                            userDropdownUl.appendChild(li);
+                        });
+                    } else {
+                        userDropdownUl.innerHTML = '<li class="px-4 py-3 text-slate-500 italic">No available users.</li>';
+                    }
+                } catch (error) {
+                    userDropdownUl.innerHTML = '<li class="px-4 py-3 text-rose-500 italic">Search error.</li>';
                 }
-            });
+            }, 300);
         });
 
-        // Selection Logic
-        userItems.forEach(item => {
-            item.addEventListener('click', () => {
-                hiddenUserId.value = item.dataset.id;
-                searchInput.value = item.dataset.name + ' (' + item.dataset.email + ')';
-                dropdownList.classList.add('hidden');
-            });
+        // Initialize options on focus if empty
+        searchInput.addEventListener('focus', () => {
+            dropdownList.classList.remove('hidden');
+            if (userDropdownUl.children.length === 0 || searchInput.value === '') {
+                searchInput.dispatchEvent(new Event('input'));
+            }
         });
     }
 

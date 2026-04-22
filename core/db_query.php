@@ -24,18 +24,28 @@ class DBQueries {
             SELECT p.id, p.name 
             FROM projects p
             JOIN user_recent_projects urp ON p.id = urp.project_id
-            WHERE urp.user_id = :userId
+            JOIN project_members pm ON p.id = pm.project_id
+            WHERE urp.user_id = :userId1 AND pm.user_id = :userId2
             ORDER BY urp.last_accessed DESC 
             LIMIT :limit
         ");
-        $stmt->bindValue(':userId', (int)$userId, PDO::PARAM_INT);
+        $stmt->bindValue(':userId1', (int)$userId, PDO::PARAM_INT);
+        $stmt->bindValue(':userId2', (int)$userId, PDO::PARAM_INT);
         $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
         $recentProjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Fallback to latest created globally if user has no recent history
+        // Fallback to latest created projects the user is a member of if user has no recent history
         if (empty($recentProjects)) {
-            $recentProjectsStmt = $this->pdo->prepare("SELECT id, name FROM projects ORDER BY created_at DESC LIMIT :limit");
+            $recentProjectsStmt = $this->pdo->prepare("
+                SELECT p.id, p.name 
+                FROM projects p
+                JOIN project_members pm ON p.id = pm.project_id
+                WHERE pm.user_id = :userId
+                ORDER BY p.created_at DESC 
+                LIMIT :limit
+            ");
+            $recentProjectsStmt->bindValue(':userId', (int)$userId, PDO::PARAM_INT);
             $recentProjectsStmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
             $recentProjectsStmt->execute();
             $recentProjects = $recentProjectsStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -68,13 +78,12 @@ class DBQueries {
 
     public function createUser($data) {
         $stmt = $this->pdo->prepare("
-            INSERT INTO users (name, email, password_hash, team_id, role) 
-            VALUES (:name, :email, :password_hash, :team_id, :role)
+            INSERT INTO users (name, email, password_hash, role) 
+            VALUES (:name, :email, :password_hash, :role)
         ");
         $stmt->bindValue(':name', $data['name'], PDO::PARAM_STR);
         $stmt->bindValue(':email', $data['email'], PDO::PARAM_STR);
         $stmt->bindValue(':password_hash', $data['password_hash'], PDO::PARAM_STR);
-        $stmt->bindValue(':team_id', $data['team_id'] ?? null, $data['team_id'] ? PDO::PARAM_INT : PDO::PARAM_NULL);
         $stmt->bindValue(':role', $data['role'] ?? 'member', PDO::PARAM_STR);
         
         $stmt->execute();
@@ -82,14 +91,15 @@ class DBQueries {
     }
 
     public function getTeamMembers($teamId) {
-        $stmt = $this->pdo->prepare("SELECT id, name, email, role, created_at FROM users WHERE team_id = :team_id ORDER BY role ASC, name ASC");
+        // Fallback to the join query, though might be unused
+        $stmt = $this->pdo->prepare("SELECT u.id, u.name, u.email, u.role, u.created_at FROM users u JOIN team_members tm ON u.id = tm.user_id WHERE tm.team_id = :team_id ORDER BY tm.role ASC, u.name ASC");
         $stmt->bindValue(':team_id', (int)$teamId, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
     }
 
     public function updateUserRole($userId, $teamId, $role) {
-        $stmt = $this->pdo->prepare("UPDATE users SET role = :role WHERE id = :user_id AND team_id = :team_id");
+        $stmt = $this->pdo->prepare("UPDATE team_members SET role = :role WHERE user_id = :user_id AND team_id = :team_id");
         $stmt->bindValue(':role', $role, PDO::PARAM_STR);
         $stmt->bindValue(':user_id', (int)$userId, PDO::PARAM_INT);
         $stmt->bindValue(':team_id', (int)$teamId, PDO::PARAM_INT);
@@ -97,7 +107,7 @@ class DBQueries {
     }
 
     public function getAllSystemUsers() {
-        $stmt = $this->pdo->prepare("SELECT id, name, email, role, created_at, team_id FROM users ORDER BY role ASC, name ASC");
+        $stmt = $this->pdo->prepare("SELECT id, name, email, role, created_at FROM users ORDER BY role ASC, name ASC");
         $stmt->execute();
         return $stmt->fetchAll();
     }
@@ -107,6 +117,12 @@ class DBQueries {
         $stmt->bindValue(':role', $role, PDO::PARAM_STR);
         $stmt->bindValue(':user_id', (int)$userId, PDO::PARAM_INT);
         return $stmt->execute();
+    }
+
+    public function isProjectMember($projectId, $userId) {
+        $stmt = $this->pdo->prepare("SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?");
+        $stmt->execute([(int)$projectId, (int)$userId]);
+        return (bool)$stmt->fetchColumn();
     }
 
     // --- PROJECTS AND SECTIONS ---
@@ -263,8 +279,8 @@ class DBQueries {
         return $tasks;
     }
 
-    public function getAllTasks() {
-        $stmt = $this->pdo->query("
+    public function getAllTasks($userId = null) {
+        $sql = "
             SELECT t.*,
                    (SELECT GROUP_CONCAT(p.name SEPARATOR ', ') FROM task_projects tp JOIN projects p ON tp.project_id = p.id WHERE tp.task_id = t.id) AS project_names,
                    (SELECT GROUP_CONCAT(tp.project_id SEPARATOR ',') FROM task_projects tp WHERE tp.task_id = t.id) AS project_ids,
@@ -273,7 +289,17 @@ class DBQueries {
                        (SELECT COUNT(*) FROM task_links tl WHERE tl.parent_id = t.id)
                    ) AS subtask_count
             FROM tasks t
-        ");
+        ";
+        
+        if ($userId) {
+            $sql .= " WHERE EXISTS (SELECT 1 FROM task_projects tp JOIN project_members pm ON tp.project_id = pm.project_id WHERE tp.task_id = t.id AND pm.user_id = :userId)";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->bindValue(':userId', (int)$userId, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        $stmt = $this->pdo->query($sql);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     
@@ -586,8 +612,8 @@ class DBQueries {
 
     public function getAvailableUsersForProject($teamId, $memberIds) {
         $placeholders = count($memberIds) > 0 ? implode(',', array_fill(0, count($memberIds), '?')) : '0';
-        $query = "SELECT id, name, email FROM users WHERE team_id = ? AND id NOT IN ($placeholders) ORDER BY name ASC";
-        $params = array_merge([(int)$teamId], count($memberIds) > 0 ? $memberIds : []);
+        $query = "SELECT id, name, email FROM users WHERE id NOT IN ($placeholders) ORDER BY name ASC";
+        $params = count($memberIds) > 0 ? $memberIds : [];
 
         $stmt = $this->pdo->prepare($query);
         $stmt->execute($params);
@@ -621,7 +647,7 @@ class DBQueries {
         return (int)$stmtPos->fetchColumn();
     }
 
-    public function searchUsers($search, $projectId = null) {
+    public function searchUsers($search, $projectId = null, $excludeTeamId = null, $excludeProjectId = null) {
         if ($projectId) {
             $sql = "SELECT u.id, u.name, u.email FROM users u 
                     INNER JOIN project_members pm ON pm.user_id = u.id 
@@ -640,12 +666,28 @@ class DBQueries {
         } else {
             $sql = "SELECT id, name, email FROM users";
             $params = [];
+            $whereConditions = [];
 
             if ($search !== '') {
-                $sql .= " WHERE name LIKE ? OR email LIKE ?";
+                $whereConditions[] = "(name LIKE ? OR email LIKE ?)";
                 $params[] = "%$search%";
                 $params[] = "%$search%";
             }
+            
+            if ($excludeTeamId) {
+                $whereConditions[] = "id NOT IN (SELECT user_id FROM team_members WHERE team_id = ?)";
+                $params[] = (int)$excludeTeamId;
+            }
+
+            if ($excludeProjectId) {
+                $whereConditions[] = "id NOT IN (SELECT user_id FROM project_members WHERE project_id = ?)";
+                $params[] = (int)$excludeProjectId;
+            }
+            
+            if (!empty($whereConditions)) {
+                $sql .= " WHERE " . implode(" AND ", $whereConditions);
+            }
+            
             $sql .= " ORDER BY name ASC LIMIT 20";
 
             $stmt = $this->pdo->prepare($sql);
@@ -670,29 +712,16 @@ class DBQueries {
     }
 
     public function getTeamsForUser($userId, $systemRole = null) {
-        if ($systemRole === 'admin' || $systemRole === 'member') {
-            // Can see all teams
-            $stmt = $this->pdo->prepare("
-                SELECT t.id, t.name, t.created_by, t.created_at, 
-                       COALESCE(tm.role, 'viewer') as role 
-                FROM teams t
-                LEFT JOIN team_members tm ON t.id = tm.team_id AND tm.user_id = :uid
-                ORDER BY t.name ASC
-            ");
-            $stmt->execute(['uid' => (int)$userId]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } else {
-            // Only see teams they are a member of
-            $stmt = $this->pdo->prepare("
-                SELECT t.id, t.name, t.created_by, t.created_at, tm.role 
-                FROM teams t
-                JOIN team_members tm ON t.id = tm.team_id
-                WHERE tm.user_id = :uid
-                ORDER BY t.name ASC
-            ");
-            $stmt->execute(['uid' => (int)$userId]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        }
+        // Everyone can see all teams
+        $stmt = $this->pdo->prepare("
+            SELECT t.id, t.name, t.created_by, t.created_at, 
+                   COALESCE(tm.role, '') as role 
+            FROM teams t
+            LEFT JOIN team_members tm ON t.id = tm.team_id AND tm.user_id = :uid
+            ORDER BY t.name ASC
+        ");
+        $stmt->execute(['uid' => (int)$userId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function getTeamById($teamId) {
@@ -1547,9 +1576,17 @@ class DBQueries {
         return $projects;
     }
 
-    public function searchProjects($query, $limit = 10) {
-        $stmt = $this->pdo->prepare("SELECT id, name FROM projects WHERE name LIKE :query LIMIT " . (int)$limit);
-        $stmt->execute(['query' => "%$query%"]);
+    public function searchProjects($query, $userId, $limit = 10) {
+        $stmt = $this->pdo->prepare("
+            SELECT p.id, p.name 
+            FROM projects p 
+            JOIN project_members pm ON p.id = pm.project_id
+            WHERE pm.user_id = :userId AND p.name LIKE :query 
+            LIMIT " . (int)$limit
+        );
+        $stmt->bindValue(':userId', (int)$userId, PDO::PARAM_INT);
+        $stmt->bindValue(':query', "%$query%", PDO::PARAM_STR);
+        $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 

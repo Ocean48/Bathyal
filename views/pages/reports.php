@@ -10,9 +10,16 @@ require_once 'views/layouts/header.php';
 $userId = $currentUser['id'] ?? 1;
 
 try {
-    // 1. Task Status Breakdown (Overall)
-    $stmtStatus = $pdo->prepare("SELECT status, COUNT(*) as count FROM tasks GROUP BY status");
-    $stmtStatus->execute();
+    // 1. Task Status Breakdown (Overall for user's projects)
+    $stmtStatus = $pdo->prepare("
+        SELECT t.status, COUNT(DISTINCT t.id) as count 
+        FROM tasks t
+        JOIN task_projects tp ON t.id = tp.task_id
+        JOIN project_members pm ON tp.project_id = pm.project_id
+        WHERE pm.user_id = :userId
+        GROUP BY t.status
+    ");
+    $stmtStatus->execute(['userId' => $userId]);
     $statusDataRaw = $stmtStatus->fetchAll(PDO::FETCH_ASSOC);
     $statusData = ['todo' => 0, 'in_progress' => 0, 'paused' => 0, 'completed' => 0];
     foreach ($statusDataRaw as $row) {
@@ -24,16 +31,19 @@ try {
         }
     }
 
-        // 2. Tasks by Project
+    // 2. Tasks by Project
+    $userId = $currentUser['id'] ?? 1;
     $stmtProject = $pdo->prepare("
         SELECT p.name, COUNT(tp.task_id) as task_count 
         FROM projects p 
+        JOIN project_members pm ON p.id = pm.project_id
         LEFT JOIN task_projects tp ON p.id = tp.project_id 
+        WHERE pm.user_id = :userId
         GROUP BY p.id 
         ORDER BY task_count DESC 
         LIMIT 5
     ");
-    $stmtProject->execute();
+    $stmtProject->execute(['userId' => $userId]);
     $projectsData = $stmtProject->fetchAll(PDO::FETCH_ASSOC);
     $projectNames = [];
     $projectTaskCounts = [];
@@ -42,18 +52,20 @@ try {
         $projectTaskCounts[] = $p['task_count'];
     }
 
-    // 3. User Workload (Tasks Assignee Breakdown)
+    // 3. User Workload (Tasks Assignee Breakdown within user's projects)
     $stmtWorkload = $pdo->prepare("
-        SELECT u.name as assignee_name, COUNT(ta.task_id) as count 
+        SELECT u.name as assignee_name, COUNT(DISTINCT ta.task_id) as count 
         FROM users u 
         JOIN task_assignees ta ON u.id = ta.user_id 
         JOIN tasks t ON ta.task_id = t.id
-        WHERE t.status != 'completed'
+        JOIN task_projects tp ON t.id = tp.task_id
+        JOIN project_members pm ON tp.project_id = pm.project_id
+        WHERE t.status != 'completed' AND pm.user_id = :userId
         GROUP BY u.id 
         ORDER BY count DESC 
         LIMIT 5
     ");
-    $stmtWorkload->execute();
+    $stmtWorkload->execute(['userId' => $userId]);
     $workloadData = $stmtWorkload->fetchAll(PDO::FETCH_ASSOC);
     $workloadLabels = [];
     $workloadCounts = [];
@@ -62,14 +74,17 @@ try {
         $workloadCounts[] = $w['count'];
     }
 
-    // 4. Overdue Tasks
+    // 4. Overdue Tasks within user's projects
     $stmtOverdue = $pdo->prepare("
-        SELECT COUNT(*) as count 
-        FROM tasks 
-        WHERE expected_due_date < NOW() 
-        AND status != 'completed'
+        SELECT COUNT(DISTINCT t.id) as count 
+        FROM tasks t
+        JOIN task_projects tp ON t.id = tp.task_id
+        JOIN project_members pm ON tp.project_id = pm.project_id
+        WHERE t.expected_due_date < NOW() 
+        AND t.status != 'completed'
+        AND pm.user_id = :userId
     ");
-    $stmtOverdue->execute();
+    $stmtOverdue->execute(['userId' => $userId]);
     $overdueCount = $stmtOverdue->fetchColumn();
 
 } catch (\PDOException $e) {

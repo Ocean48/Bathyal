@@ -31,8 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $systemRole = $currentUser['role'] ?? 'data_analyst';
         
-        // System admin/member have global access, otherwise check team permissions
-        if (!in_array($systemRole, ['admin', 'member'])) {
+        // System admin has global access, otherwise check team permissions
+        if ($systemRole !== 'admin') {
             $currentUserRole = $db->getTeamMemberRole($teamId, $currentUser['id']);
             if (!in_array($currentUserRole, ['owner', 'admin'])) {
                 echo json_encode(['success' => false, 'error' => 'You do not have permission to add members to this team.']);
@@ -54,18 +54,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $userId = (int)($_POST['user_id'] ?? 0);
         
         $systemRole = $currentUser['role'] ?? 'data_analyst';
+        $currentUserRole = $db->getTeamMemberRole($teamId, $currentUser['id']);
+        $targetUserRole = $db->getTeamMemberRole($teamId, $userId);
 
-        // Check permissions (Global admin/member, or team owner/admin, or self)
-        if (!in_array($systemRole, ['admin', 'member'])) {
-            $currentUserRole = $db->getTeamMemberRole($teamId, $currentUser['id']);
-            if (!in_array($currentUserRole, ['owner', 'admin']) && $currentUser['id'] !== $userId) {
-                echo json_encode(['success' => false, 'error' => 'You do not have permission to remove members from this team.']);
-                exit;
+        // Check permissions (Global admin, or team owner/admin, or self)
+        if ($systemRole !== 'admin') {
+            if ($currentUser['id'] !== $userId) {
+                if (!in_array($currentUserRole, ['owner', 'admin'])) {
+                    echo json_encode(['success' => false, 'error' => 'You do not have permission to remove members from this team.']);
+                    exit;
+                }
+                if ($targetUserRole === 'owner') {
+                    echo json_encode(['success' => false, 'error' => 'You cannot remove an owner of the team.']);
+                    exit;
+                }
             }
         }
 
-        // Prevent removing the last owner (if the target isn't the current user? wait, even admin shouldn't remove the last owner)
-        if ($db->getTeamMemberRole($teamId, $userId) === 'owner') {
+        // Prevent removing the last owner
+        if ($targetUserRole === 'owner') {
             $members = $db->getTeamMembersWithRoles($teamId);
             $ownerCount = count(array_filter($members, fn($m) => $m['team_role'] === 'owner'));
             if ($ownerCount <= 1) {
@@ -95,10 +102,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $systemRole = $currentUser['role'] ?? 'data_analyst';
 
         // Add permission check
-        if (!in_array($systemRole, ['admin', 'member'])) {
+        if ($systemRole !== 'admin') {
             $currentUserRole = $db->getTeamMemberRole($teamId, $currentUser['id']);
             if (!in_array($currentUserRole, ['owner', 'admin'])) {
                 echo json_encode(['success' => false, 'error' => 'You do not have permission to change member roles.']);
+                exit;
+            }
+            $targetUserRole = $db->getTeamMemberRole($teamId, $userId);
+            if ($targetUserRole === 'owner' && $currentUserRole !== 'owner') {
+                echo json_encode(['success' => false, 'error' => 'You do not have permission to change an owner\'s role.']);
                 exit;
             }
         }
@@ -157,16 +169,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     
     if ($action === 'members') {
         $teamId = (int)($_GET['team_id'] ?? 0);
-        $systemRole = $currentUser['role'] ?? 'data_analyst';
-
-        // Check access
-        if (!in_array($systemRole, ['admin', 'member'])) {
-            $role = $db->getTeamMemberRole($teamId, $currentUser['id']);
-            if (!$role) {
-                echo json_encode(['success' => false, 'error' => 'Access denied.']);
-                exit;
-            }
-        }
         
         $members = $db->getTeamMembersWithRoles($teamId);
         echo json_encode(['success' => true, 'members' => $members]);
@@ -175,7 +177,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     
     if ($action === 'search_users') {
         $query = $_GET['q'] ?? '';
-        $users = $db->searchUsers($query, null);
+        $teamId = isset($_GET['team_id']) ? (int)$_GET['team_id'] : null;
+        $users = $db->searchUsers($query, null, $teamId);
         echo json_encode(['success' => true, 'users' => $users]);
         exit;
     }

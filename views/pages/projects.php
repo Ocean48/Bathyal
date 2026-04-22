@@ -57,8 +57,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 require_once 'views/layouts/header.php';
 
-// Fetch all projects
-$stmt = $pdo->query("SELECT * FROM projects ORDER BY created_at DESC");
+// Fetch projects for the current user
+$userId = $currentUser['id'] ?? 1; // Assume $currentUser is populated by auth_check.php
+$stmt = $pdo->prepare("
+    SELECT p.* 
+    FROM projects p
+    JOIN project_members pm ON p.id = pm.project_id
+    WHERE pm.user_id = ?
+    ORDER BY p.created_at DESC
+");
+$stmt->execute([$userId]);
 $allProjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 function getInitials($string) {

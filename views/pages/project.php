@@ -9,6 +9,11 @@ require_once 'core/db_query.php';
 $projectId = isset($_GET['id']) ? (int)$_GET['id'] : 1;
 if (isset($currentUser['id'])) {
     $dbQueries = new DBQueries($pdo);
+    // Check if user is member of project
+    if (!$dbQueries->isProjectMember($projectId, $currentUser['id'])) {
+        header("Location: /bathyal/projects");
+        exit;
+    }
     $dbQueries->trackProjectAccess($currentUser['id'], $projectId);
 }
 

@@ -9,9 +9,17 @@ $request_uri = $_SERVER['REQUEST_URI'];
 
 // Fetch recent projects
 $recent_projects = [];
-if (isset($pdo)) {
+if (isset($pdo) && isset($currentUser['id'])) {
     try {
-        $stmt = $pdo->query("SELECT * FROM projects ORDER BY created_at DESC LIMIT 5");
+        $stmt = $pdo->prepare("
+            SELECT p.* 
+            FROM projects p
+            JOIN project_members pm ON p.id = pm.project_id
+            WHERE pm.user_id = ?
+            ORDER BY p.created_at DESC 
+            LIMIT 5
+        ");
+        $stmt->execute([$currentUser['id']]);
         $recent_projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (\PDOException $e) {
         // Table might not exist yet

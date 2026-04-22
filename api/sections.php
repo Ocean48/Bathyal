@@ -19,9 +19,17 @@ if (!$input) {
 $action = $input['action'] ?? '';
 
 try {
+    $userId = $currentUser['id'] ?? 1;
+
     if ($action === 'create') {
         $projectId = (int)$input['project_id'];
         $name = trim($input['name']);
+
+        if (!$db->isProjectMember($projectId, $userId)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden']);
+            exit;
+        }
 
         if (!$name || !$projectId) {
             throw new Exception("Project ID and Section Name are required.");

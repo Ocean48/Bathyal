@@ -9,13 +9,11 @@ CREATE TABLE teams (
 
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    team_id INT NULL,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role ENUM('admin', 'member', 'data_analyst') DEFAULT 'member',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE team_members (
@@ -229,11 +227,21 @@ INSERT INTO `team_members` (`team_id`, `user_id`, `role`, `joined_at`) VALUES
 (1, 2, 'member', '2026-04-19 21:55:10'),
 (1, 3, 'member', '2026-04-19 21:55:10');
 
+
 -- Insert Users (Passwords are set to 'user123')
-INSERT INTO users (team_id, name, email, password_hash, role) VALUES 
-(1, 'Admin User', 'si@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'admin'),
-(1, 'John Doe', 'john1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
-(1, 'Jane Data', 'jane1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'data_analyst');
+INSERT INTO users (name, email, password_hash, role) VALUES 
+('Admin User', 'si@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'admin'),
+('John Doe', 'john1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('Jane Data', 'jane1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'data_analyst'),
+('Mark Smith', 'mark1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('Emily Davis', 'emily1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('Michael Brown', 'michael1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('Sarah Wilson', 'sarah1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('David Lee', 'david1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('Laura Martinez', 'laura1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('James Anderson', 'james1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('Olivia Thomas', 'olivia1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member');
+
 
 -- Insert Projects
 INSERT INTO projects (name, description, status, cycle) VALUES 

@@ -40,8 +40,13 @@ require 'views/layouts/header.php';
                                 <div>
                                     <h3 class="font-semibold text-slate-800 text-sm group-hover:text-teal-700 transition-colors"><?= htmlspecialchars($team['name']) ?></h3>
                                     <p class="text-xs text-slate-500 mt-1 flex items-center">
-                                        <span class="inline-block w-2h-2 rounded-full mr-1 <?= $team['role'] === 'owner' ? 'text-amber-500' : 'text-slate-400' ?>">★</span>
-                                        <?= ucfirst($team['role']) ?>
+                                        <?php if (!empty($team['role'])): ?>
+                                            <span class="inline-block w-2h-2 rounded-full mr-1 <?= $team['role'] === 'owner' ? 'text-amber-500' : 'text-slate-400' ?>">★</span>
+                                            <?= ucfirst($team['role']) ?>
+                                        <?php else: ?>
+                                            <span class="inline-block w-2h-2 rounded-full mr-1 text-slate-400">○</span>
+                                            Not a member
+                                        <?php endif; ?>
                                     </p>
                                 </div>
                                 <svg class="w-5 h-5 text-slate-300 group-hover:text-teal-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
@@ -134,7 +139,7 @@ require 'views/layouts/header.php';
 
 <!-- Add Member Modal -->
 <div id="modal-add-member" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity">
-    <div class="bg-white w-96 rounded-xl shadow-2xl border border-slate-200 transform scale-95 transition-transform overflow-hidden">
+    <div class="bg-white w-96 rounded-xl shadow-2xl border border-slate-200 transform scale-95 transition-transform overflow-visible">
         <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
             <h3 class="font-semibold text-slate-800">Add Team Member</h3>
             <button class="modal-close text-slate-400 hover:text-slate-600 transition-colors">
@@ -148,7 +153,7 @@ require 'views/layouts/header.php';
                 <label class="block text-xs font-medium text-slate-700 mb-1">Search User</label>
                 <input type="text" id="user-search-input" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-200 outline-none transition-all placeholder-slate-400" placeholder="Search by name or email..." autocomplete="off">
                 <input type="hidden" name="user_id" id="selected-user-id" required>
-                <ul id="user-search-results" class="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-[200px] overflow-y-auto hidden divide-y divide-slate-50"></ul>
+                <ul id="user-search-results" class="absolute z-[60] w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-[250px] overflow-y-auto hidden divide-y divide-slate-50"></ul>
                 <div id="selected-user-display" class="hidden mt-2 p-2 bg-teal-50 border border-teal-200 rounded text-sm text-teal-800 flex items-center justify-between">
                     <span id="selected-user-name" class="font-medium"></span>
                     <button type="button" id="clear-selected-user" class="text-teal-600 hover:text-teal-800"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
@@ -254,9 +259,9 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('active-state').classList.remove('hidden');
             
             document.getElementById('active-team-name').textContent = item.dataset.name;
-            document.getElementById('active-team-role').textContent = currentTeamRole.charAt(0).toUpperCase() + currentTeamRole.slice(1);
+            document.getElementById('active-team-role').textContent = currentTeamRole ? (currentTeamRole.charAt(0).toUpperCase() + currentTeamRole.slice(1)) : 'Observer';
             
-            if(['owner', 'admin'].includes(currentTeamRole) || ['admin', 'member'].includes(userSystemRole)) {
+            if(['owner', 'admin'].includes(currentTeamRole) || ['admin'].includes(userSystemRole)) {
                 document.getElementById('btn-add-member').classList.remove('hidden');
             } else {
                 document.getElementById('btn-add-member').classList.add('hidden');
@@ -289,8 +294,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const jDate = new Date(member.joined_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                     
                     let actionHtml = '';
-                    if (['owner', 'admin'].includes(userRole) || ['admin', 'member'].includes(userSystemRole)) {
-                        actionHtml = `<button class="text-rose-500 hover:text-rose-700 text-xs font-medium px-2 py-1 rounded hover:bg-rose-50 transition-colors" onclick="removeMember(${member.id}, ${teamId})">Remove</button>`;
+                    if (['owner', 'admin'].includes(userRole) || ['admin'].includes(userSystemRole) || parseInt(member.id) === currentUserId) {
+                        if (!(userRole === 'admin' && member.team_role === 'owner') && !(parseInt(member.id) !== currentUserId && member.team_role === 'owner')) {
+                            actionHtml = `<button class="text-rose-500 hover:text-rose-700 text-xs font-medium px-2 py-1 rounded hover:bg-rose-50 transition-colors" onclick="removeMember(${member.id}, ${teamId})">${parseInt(member.id) === currentUserId ? 'Leave' : 'Remove'}</button>`;
+                        }
                     }
                     
                     let roleDisplayHtml = '';
@@ -450,7 +457,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         searchTimeout = setTimeout(async () => {
             try {
-                const res = await fetch(`/bathyal/api/teams.php?action=search_users&q=${encodeURIComponent(q)}`);
+                // Pass currentTeamId to exclude existing team members
+                const res = await fetch(`/bathyal/api/teams.php?action=search_users&q=${encodeURIComponent(q)}&team_id=${currentTeamId}`);
                 const json = await res.json();
                 
                 searchResults.innerHTML = '';

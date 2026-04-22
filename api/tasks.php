@@ -12,10 +12,18 @@ $db = new DBQueries($pdo);
 
 switch ($method) {
     case 'GET':
+        $userId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1; // Current user ID fallback
         if (isset($_GET['id'])) {
             $taskId = (int)$_GET['id'];
             $task = $db->getTaskById($taskId);
             if ($task) {
+                // Check if user is member of the project
+                if (!$db->isProjectMember($task['project_id'], $userId)) {
+                    http_response_code(403);
+                    echo json_encode(['error' => 'Forbidden']);
+                    exit;
+                }
+
                 // Fetch comments for this task
                 $task['comments'] = $db->getCommentsByTaskId($taskId);
                 
@@ -26,7 +34,6 @@ switch ($method) {
                 $task['subtasks'] = $db->getTaskSubtasks($taskId);
 
                 // Fetch time log status
-                $userId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1; // Current user ID fallback
                 $task['time_log_status'] = $db->getTaskTimeLogStatus($taskId, $userId);
 
                 // Fetch projects this task belongs to
@@ -38,10 +45,26 @@ switch ($method) {
                 echo json_encode(['error' => 'Task not found']);
             }
         } else {
-            echo json_encode($db->getAllTasks());
+            echo json_encode($db->getAllTasks($userId));
         }
         break;
     case 'POST':
+        $userId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1; // Current user ID fallback
+        $taskIdForCheck = isset($_POST['task_id']) ? $_POST['task_id'] : null;
+        if (!$taskIdForCheck) {
+            $dataCheck = json_decode(file_get_contents('php://input'), true);
+            $taskIdForCheck = isset($dataCheck['task_id']) ? $dataCheck['task_id'] : null;
+        }
+        
+        if ($taskIdForCheck) {
+            $taskCheck = $db->getTaskById($taskIdForCheck);
+            if ($taskCheck && !$db->isProjectMember($taskCheck['project_id'], $userId)) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden']);
+                exit;
+            }
+        }
+
         if (isset($_POST['action']) && $_POST['action'] === 'add_attachment') {
             $taskId = $_POST['task_id'];
             $file = $_FILES['file'];
@@ -82,7 +105,8 @@ switch ($method) {
             exit;
         }
 
-        $data = json_decode(file_get_contents('php://input'), true);
+        $data = isset($dataCheck) ? $dataCheck : json_decode(file_get_contents('php://input'), true);
+        
         if (isset($data['action'])) {
             if ($data['action'] === 'update_status') {
                 if ($db->updateTaskStatus($data['task_id'], $data['status'])) {
