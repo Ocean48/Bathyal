@@ -17,8 +17,22 @@ switch ($method) {
             $taskId = (int)$_GET['id'];
             $task = $db->getTaskById($taskId);
             if ($task) {
-                // Check if user is member of the project
-                if (!$db->isProjectMember($task['project_id'], $userId)) {
+                // Fetch projects this task belongs to
+                $taskProjects = $db->getTaskProjects($taskId);
+                $isMember = false;
+                
+                if (empty($taskProjects)) {
+                    $isMember = true; // Allow access if task is not attached to any project
+                } else {
+                    foreach ($taskProjects as $tp) {
+                        if ($db->isProjectMember($tp['project_id'], $userId)) {
+                            $isMember = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!$isMember) {
                     http_response_code(403);
                     echo json_encode(['error' => 'Forbidden']);
                     exit;
@@ -58,10 +72,24 @@ switch ($method) {
         
         if ($taskIdForCheck) {
             $taskCheck = $db->getTaskById($taskIdForCheck);
-            if ($taskCheck && !$db->isProjectMember($taskCheck['project_id'], $userId)) {
-                http_response_code(403);
-                echo json_encode(['error' => 'Forbidden']);
-                exit;
+            if ($taskCheck) {
+                $taskProjects = $db->getTaskProjects($taskIdForCheck);
+                $isMember = false;
+                if (empty($taskProjects)) {
+                    $isMember = true;
+                } else {
+                    foreach ($taskProjects as $tp) {
+                        if ($db->isProjectMember($tp['project_id'], $userId)) {
+                            $isMember = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$isMember) {
+                    http_response_code(403);
+                    echo json_encode(['error' => 'Forbidden']);
+                    exit;
+                }
             }
         }
 

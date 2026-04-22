@@ -324,7 +324,7 @@ async function loadProjectBoard(projectId) {
                 secTr.className = 'bg-slate-50/80 border-b border-slate-200/60 cursor-pointer hover:bg-slate-100 transition-colors section-header';
                 secTr.onclick = (e) => toggleListSection(tbody, secTr);
                 secTr.innerHTML = `
-                    <td colspan="4" class="p-0">
+                    <td colspan="5" class="p-0">
                         <div class="sticky top-0 z-10 bg-slate-50/80 px-4 py-2 font-semibold text-slate-700 text-sm flex items-center justify-between group">
                             <div class="flex items-center">
                                 <svg class="w-4 h-4 mr-2 text-slate-400 transform transition-transform section-toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -541,6 +541,7 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
     tr.dataset.taskId = task.id;
     tr.dataset.status = task.status || '';
     tr.dataset.assigneeIds = task.assignee_ids || '';
+    tr.dataset.collaboratorIds = task.collaborator_ids || '';
     tr.dataset.title = task.title || '';
     tr.dataset.parentId = parentId || '';
     tr.dataset.depth = depth;
@@ -582,6 +583,21 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
         assigneesHtml += `</div>`;
     }
 
+    // Multiple Collaborators Visual Stack
+    let collaboratorsHtml = '<span class="text-slate-400 italic">None</span>';
+    if (task.collaborator_name) {
+        const names = task.collaborator_name.split(',');
+        collaboratorsHtml = `<div class="flex -space-x-2 overflow-hidden" title="${task.collaborator_name}">`;
+        names.slice(0, 3).forEach(n => {
+            const initial = n.trim().charAt(0).toUpperCase();
+            collaboratorsHtml += `<div class="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white text-indigo-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+        });
+        if (names.length > 3) {
+            collaboratorsHtml += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${names.length - 3}</div>`;
+        }
+        collaboratorsHtml += `</div>`;
+    }
+
     // Add subtask count to the end of the title if it exists
     const titleWithCount = totalSubtasks > 0 ? `${task.title} <span class="text-xs text-slate-400 ml-1">(${totalSubtasks})</span>` : task.title;
 
@@ -596,6 +612,11 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
         <td class="px-4 py-3">
             <div class="cursor-pointer inline-flex items-center p-1 hover:bg-slate-100 rounded transition-colors -ml-1" onclick="if(window.openListViewAssigneeDropdown) window.openListViewAssigneeDropdown(event, ${task.id}, '${task.assignee_ids || ''}')">
                 ${assigneesHtml}
+            </div>
+        </td>
+        <td class="px-4 py-3">
+            <div class="cursor-pointer inline-flex items-center p-1 hover:bg-slate-100 rounded transition-colors -ml-1" onclick="if(window.openListViewCollaboratorDropdown) window.openListViewCollaboratorDropdown(event, ${task.id}, '${task.collaborator_ids || ''}')">
+                ${collaboratorsHtml}
             </div>
         </td>
         <td class="px-4 py-3 text-slate-500 text-sm whitespace-nowrap">${task.completed_date ? task.completed_date.split(' ')[0] : '-'}</td>

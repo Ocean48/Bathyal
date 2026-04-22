@@ -167,6 +167,8 @@ class DBQueries {
             SELECT t.*, tp.section_id, tp.position as tp_position, 
                    GROUP_CONCAT(u.name SEPARATOR ', ') as assignee_name,
                    GROUP_CONCAT(u.id SEPARATOR ',') as assignee_ids,
+                   (SELECT GROUP_CONCAT(u2.name SEPARATOR ', ') FROM task_collaborators tc JOIN users u2 ON tc.user_id = u2.id WHERE tc.task_id = t.id) as collaborator_name,
+                   (SELECT GROUP_CONCAT(tc.user_id SEPARATOR ',') FROM task_collaborators tc WHERE tc.task_id = t.id) as collaborator_ids,
                    (
                        (SELECT COUNT(*) FROM tasks sub WHERE sub.parent_task_id = t.id) + 
                        (SELECT COUNT(*) FROM task_links tl WHERE tl.parent_id = t.id)
@@ -195,6 +197,8 @@ class DBQueries {
             SELECT t.*, 
                    GROUP_CONCAT(u.name SEPARATOR ', ') as assignee_name,
                    GROUP_CONCAT(u.id SEPARATOR ',') as assignee_ids,
+                   (SELECT GROUP_CONCAT(u2.name SEPARATOR ', ') FROM task_collaborators tc JOIN users u2 ON tc.user_id = u2.id WHERE tc.task_id = t.id) as collaborator_name,
+                   (SELECT GROUP_CONCAT(tc.user_id SEPARATOR ',') FROM task_collaborators tc WHERE tc.task_id = t.id) as collaborator_ids,
                    (
                        (SELECT COUNT(*) FROM tasks sub WHERE sub.parent_task_id = t.id) + 
                        (SELECT COUNT(*) FROM task_links tl WHERE tl.parent_id = t.id)
@@ -223,6 +227,8 @@ class DBQueries {
             SELECT tl.parent_id as _tl_parent, t.*, tl.position as link_position,
                    GROUP_CONCAT(u.name SEPARATOR ', ') as assignee_name,
                    GROUP_CONCAT(u.id SEPARATOR ',') as assignee_ids,
+                   (SELECT GROUP_CONCAT(u2.name SEPARATOR ', ') FROM task_collaborators tc JOIN users u2 ON tc.user_id = u2.id WHERE tc.task_id = t.id) as collaborator_name,
+                   (SELECT GROUP_CONCAT(tc.user_id SEPARATOR ',') FROM task_collaborators tc WHERE tc.task_id = t.id) as collaborator_ids,
                    (
                        (SELECT COUNT(*) FROM tasks sub WHERE sub.parent_task_id = t.id) +
                        (SELECT COUNT(*) FROM task_links tl2 WHERE tl2.parent_id = t.id)
@@ -360,6 +366,7 @@ class DBQueries {
                 $stmtA->bindValue(':tid', $newTaskId, PDO::PARAM_INT);
                 $stmtA->bindValue(':uid', (int)$uid, PDO::PARAM_INT);
                 $stmtA->execute();
+                $this->sendAssigneeNotification($newTaskId, $uid);
             }
         }
 
@@ -446,13 +453,13 @@ class DBQueries {
             }
 
             if ($projectId) {
-                $stmtDef = $this->pdo->prepare("SELECT u.id, u.email, u.name FROM project_default_notify pdn JOIN users u ON pdn.user_id = u.id WHERE pdn.project_id = :pid");
-                $stmtDef->execute(['pid' => $projectId]);
-                $defNotifiers = $stmtDef->fetchAll(PDO::FETCH_ASSOC);
-                foreach ($defNotifiers as $dn) {
-                    // Deduplicate by using user ID as key
-                    if ($excludeUserId && (int)$dn['id'] === (int)$excludeUserId) continue;
-                    $notifyUsers[$dn['id']] = $dn;
+                // Find project admins
+                $stmtAdmins = $this->pdo->prepare("SELECT u.id, u.email, u.name FROM project_members pm JOIN users u ON pm.user_id = u.id WHERE pm.project_id = :pid AND pm.role = 'admin'");
+                $stmtAdmins->execute(['pid' => $projectId]);
+                $projectAdmins = $stmtAdmins->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($projectAdmins as $admin) {
+                    if ($excludeUserId && (int)$admin['id'] === (int)$excludeUserId) continue;
+                    $notifyUsers[$admin['id']] = $admin;
                 }
             }
 
@@ -1176,6 +1183,8 @@ class DBQueries {
                    (SELECT position FROM task_links WHERE parent_id = :task_id_link AND subtask_id = t.id LIMIT 1) as link_pos,
                    GROUP_CONCAT(u.name SEPARATOR ', ') as assignee_name,
                    GROUP_CONCAT(u.id SEPARATOR ',') as assignee_ids,
+                   (SELECT GROUP_CONCAT(u2.name SEPARATOR ', ') FROM task_collaborators tc JOIN users u2 ON tc.user_id = u2.id WHERE tc.task_id = t.id) as collaborator_name,
+                   (SELECT GROUP_CONCAT(tc.user_id SEPARATOR ',') FROM task_collaborators tc WHERE tc.task_id = t.id) as collaborator_ids,
                    (SELECT COUNT(*) FROM task_projects tp2 WHERE tp2.task_id = t.id) AS project_count
             FROM tasks t 
             LEFT JOIN task_assignees ta ON t.id = ta.task_id

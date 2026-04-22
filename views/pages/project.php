@@ -160,6 +160,7 @@ require_once 'views/layouts/header.php';
                         <tr>
                             <th class="px-4 py-3 font-medium">Tasks</th>
                             <th class="px-4 py-3 font-medium">Assignees</th>
+                            <th class="px-4 py-3 font-medium">Collaborators</th>
                             <th class="px-4 py-3 font-medium">Completed On</th>
                             <th class="px-4 py-3 font-medium">Status / Actions</th>
                         </tr>
@@ -1592,32 +1593,31 @@ async function toggleUserAssignment(userId) {
     const taskId = window.activeAssigneeTaskId || document.getElementById('task-modal-id').value;
     if (!taskId) return;
 
-    // Immediately update modal UI locally if in modal context
-    if (window.assigneeDropdownContext !== 'list') {
-        const nameEl = document.getElementById('task-modal-assignee-name');
-        const stack = document.getElementById('task-modal-assignees-stack');
-        if (window.currentTaskAssigneeIds.length === 0) {
+    // Calculate selected users for soft DOM updates
+    const allPossibleUsers = [...window.allUsersCache, ...window.lastSearchedUsers];
+    const selectedUsers = [];
+    window.currentTaskAssigneeIds.forEach(id => {
+        const u = allPossibleUsers.find(user => Number(user.id) === id);
+        if (u && !selectedUsers.find(su => su.id === u.id)) selectedUsers.push(u);
+    });
+
+    const assigneesString = window.currentTaskAssigneeIds.join(',');
+
+    // 1. Immediately update modal UI locally
+    const nameEl = document.getElementById('task-modal-assignee-name');
+    const stack = document.getElementById('task-modal-assignees-stack');
+    if (nameEl) {
+        if (selectedUsers.length === 0) {
             nameEl.innerText = 'Unassigned';
             if (stack) {
                 stack.innerHTML = '';
                 stack.classList.add('hidden');
             }
         } else {
+            nameEl.innerText = selectedUsers.map(u => u.name).join(', ') || 'Unassigned';
             if (stack) {
                 stack.classList.remove('hidden');
                 stack.innerHTML = '';
-            }
-            
-            const allPossibleUsers = [...window.allUsersCache, ...window.lastSearchedUsers];
-            const selectedUsers = [];
-            window.currentTaskAssigneeIds.forEach(id => {
-                const u = allPossibleUsers.find(user => Number(user.id) === id);
-                if (u && !selectedUsers.find(su => su.id === u.id)) selectedUsers.push(u);
-            });
-            
-            nameEl.innerText = selectedUsers.map(u => u.name).join(', ') || 'Unassigned';
-            
-            if (stack) {
                 selectedUsers.slice(0, 3).forEach(u => {
                     const initial = u.name.charAt(0).toUpperCase();
                     stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-teal-100 border-2 border-white text-teal-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
@@ -1628,6 +1628,57 @@ async function toggleUserAssignment(userId) {
             }
         }
     }
+
+    // 2. Soft update List View Row
+    const rows = document.querySelectorAll('.task-row-' + taskId);
+    rows.forEach(row => {
+        row.dataset.assigneeIds = assigneesString;
+        const cells = row.querySelectorAll('td');
+        if (cells.length > 1) {
+            const container = cells[1].querySelector('.inline-flex');
+            if (container) {
+                container.setAttribute('onclick', `if(window.openListViewAssigneeDropdown) window.openListViewAssigneeDropdown(event, ${taskId}, '${assigneesString}')`);
+                let html = '<span class="text-slate-400 italic">Unassigned</span>';
+                if (selectedUsers.length > 0) {
+                    const nameStr = selectedUsers.map(u => u.name).join(', ');
+                    html = `<div class="flex -space-x-2 overflow-hidden" title="${nameStr}">`;
+                    selectedUsers.slice(0, 3).forEach(u => {
+                        const initial = u.name.charAt(0).toUpperCase();
+                        html += `<div class="w-6 h-6 rounded-full bg-teal-100 border-2 border-white text-teal-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+                    });
+                    if (selectedUsers.length > 3) {
+                        html += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${selectedUsers.length - 3}</div>`;
+                    }
+                    html += `</div>`;
+                }
+                container.innerHTML = html;
+            }
+        }
+    });
+
+    // 3. Soft update Kanban Board Card
+    const cards = document.querySelectorAll(`.task-card[data-task-id="${taskId}"]`);
+    cards.forEach(card => {
+        const header = card.querySelector('.flex.justify-between.items-start.mb-2');
+        if (header) {
+            const oldStack = header.querySelector('.flex.-space-x-2.overflow-hidden');
+            if (oldStack) oldStack.remove();
+
+            if (selectedUsers.length > 0) {
+                const nameStr = selectedUsers.map(u => u.name).join(', ');
+                let html = `<div class="flex -space-x-2 overflow-hidden ml-2 flex-shrink-0" title="${nameStr}">`;
+                selectedUsers.slice(0, 3).forEach(u => {
+                    const initial = u.name.charAt(0).toUpperCase();
+                    html += `<div class="w-6 h-6 rounded-full bg-teal-100 border-2 border-white text-teal-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+                });
+                if (selectedUsers.length > 3) {
+                    html += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${selectedUsers.length - 3}</div>`;
+                }
+                html += `</div>`;
+                header.insertAdjacentHTML('beforeend', html);
+            }
+        }
+    });
     
     try {
         // Run network requests and await completion without blocking UI
@@ -1638,8 +1689,6 @@ async function toggleUserAssignment(userId) {
         });
         const assignData = await resAssign.json();
         if (window.handleApiError) window.handleApiError(assignData);
-        
-        if (typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
     } catch (e) {
         console.error('Error updating assignees:', e);
     }
@@ -1650,6 +1699,42 @@ async function toggleUserAssignment(userId) {
 // ==========================================
 
 window.activeCollaboratorTaskId = null;
+
+window.openListViewCollaboratorDropdown = async function(event, taskId, collaboratorIdsStr) {
+    event.stopPropagation();
+    window.activeCollaboratorTaskId = taskId;
+    window.currentTaskCollaboratorIds = collaboratorIdsStr ? String(collaboratorIdsStr).split(',').map(id => parseInt(id)) : [];
+
+    const dropdown = document.getElementById('collaborator-dropdown');
+    
+    // Move dropdown to body for absolute positioning avoiding table clipping
+    if (dropdown.parentElement !== document.body) {
+        document.body.appendChild(dropdown);
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    dropdown.style.position = 'fixed';
+    dropdown.style.top = (rect.bottom + 4) + 'px';
+    dropdown.style.left = rect.left + 'px';
+    dropdown.style.zIndex = '61';
+    
+    dropdown.classList.remove('hidden');
+    dropdown.classList.add('flex');
+
+    if (!window.allCollaboratorsCache || window.allCollaboratorsCache.length === 0) {
+        await searchCollaborators('');
+    } else {
+        renderCollaboratorList(window.allCollaboratorsCache);
+    }
+
+    setTimeout(() => document.getElementById('collaborator-search').focus(), 50);
+
+    // Open an invisible backdrop to catch clicks and prevent interaction with elements underneath
+    openAssigneeBackdrop(() => {
+        dropdown.classList.add('hidden');
+        dropdown.classList.remove('flex');
+    });
+};
 
 async function toggleCollaboratorDropdown(event) {
     window.activeCollaboratorTaskId = document.getElementById('task-modal-id').value || null;
@@ -1791,6 +1876,41 @@ async function toggleCollaboratorAssignment(userId) {
             }
         }
     }
+
+    const collaboratorsString = window.currentTaskCollaboratorIds.join(',');
+    const allPossibleUsersList = [...window.allCollaboratorsCache, ...window.lastSearchedCollaborators];
+    const selectedUsersList = [];
+    window.currentTaskCollaboratorIds.forEach(id => {
+        const u = allPossibleUsersList.find(user => Number(user.id) === id);
+        if (u && !selectedUsersList.find(su => su.id === u.id)) selectedUsersList.push(u);
+    });
+
+    // 2. Soft update List View Row
+    const rows = document.querySelectorAll('.task-row-' + taskId);
+    rows.forEach(row => {
+        row.dataset.collaboratorIds = collaboratorsString;
+        const cells = row.querySelectorAll('td');
+        if (cells.length > 2) {
+            const container = cells[2].querySelector('.inline-flex');
+            if (container) {
+                container.setAttribute('onclick', `if(window.openListViewCollaboratorDropdown) window.openListViewCollaboratorDropdown(event, ${taskId}, '${collaboratorsString}')`);
+                let html = '<span class="text-slate-400 italic">None</span>';
+                if (selectedUsersList.length > 0) {
+                    const nameStr = selectedUsersList.map(u => u.name).join(', ');
+                    html = `<div class="flex -space-x-2 overflow-hidden" title="${nameStr}">`;
+                    selectedUsersList.slice(0, 3).forEach(u => {
+                        const initial = u.name.charAt(0).toUpperCase();
+                        html += `<div class="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white text-indigo-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+                    });
+                    if (selectedUsersList.length > 3) {
+                        html += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${selectedUsersList.length - 3}</div>`;
+                    }
+                    html += `</div>`;
+                }
+                container.innerHTML = html;
+            }
+        }
+    });
     
     try {
         const resAssign = await fetch('api/tasks.php', {
@@ -1800,8 +1920,6 @@ async function toggleCollaboratorAssignment(userId) {
         });
         const assignData = await resAssign.json();
         if (window.handleApiError) window.handleApiError(assignData);
-        
-        if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
     } catch (e) {
         console.error('Error updating collaborators:', e);
     }
