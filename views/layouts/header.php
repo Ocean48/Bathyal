@@ -4,11 +4,14 @@
     <?php
     $appConfig = file_exists(__DIR__ . '/../../config.php') ? require __DIR__ . '/../../config.php' : ['app_name' => 'Bathyal'];
     $appName = $appConfig['app_name'] ?? 'Bathyal';
+    $favicon = $appConfig['favicon'] ?? 'assets/images/favicon.png';
+    $basePath = rtrim($appConfig['base_path'] ?? '/bathyal', '/');
     ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($appName) ?> Project Management</title>
-    <link rel="stylesheet" href="/bathyal/assets/css/style.css">
+    <link rel="icon" href="<?= htmlspecialchars($basePath) ?>/<?= htmlspecialchars($favicon) ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars($basePath) ?>/assets/css/style.css">
     <!-- Optional: Add Tailwind CSS via CDN for rapid UI development -->
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <?php require_once __DIR__ . '/tailwind_config.php'; ?>

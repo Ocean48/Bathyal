@@ -35,12 +35,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $appConfig = file_exists(__DIR__ . '/../../config.php') ? require __DIR__ . '/../../config.php' : ['app_name' => 'Bathyal'];
 $appName = $appConfig['app_name'] ?? 'Bathyal';
+$favicon = $appConfig['favicon'] ?? 'assets/images/favicon.png';
+$basePath = rtrim($appConfig['base_path'] ?? '/bathyal', '/');
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Login - <?= htmlspecialchars($appName) ?></title>
+    <link rel="icon" href="<?= htmlspecialchars($basePath) ?>/<?= htmlspecialchars($favicon) ?>">
     <script src="https://cdn.tailwindcss.com"></script>
     <?php require_once __DIR__ . '/../layouts/tailwind_config.php'; ?>
 </head>
@@ -58,7 +61,7 @@ $appName = $appConfig['app_name'] ?? 'Bathyal';
             </div>
         <?php endif; ?>
 
-        <form method="POST" action="/bathyal/login" class="space-y-4">
+        <form method="POST" action="<?= htmlspecialchars($basePath) ?>/login" class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-slate-600 mb-1" for="email">Email</label>
                 <input type="email" id="email" name="email" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-colors">
@@ -71,7 +74,7 @@ $appName = $appConfig['app_name'] ?? 'Bathyal';
         </form>
         
         <p class="text-center text-sm text-slate-500 mt-6">
-            Don't have an account? <a href="/bathyal/register" class="text-teal-600 font-medium hover:underline">Sign up</a>
+            Don't have an account? <a href="<?= htmlspecialchars($basePath) ?>/register" class="text-teal-600 font-medium hover:underline">Sign up</a>
         </p>
     </div>
 </body>
