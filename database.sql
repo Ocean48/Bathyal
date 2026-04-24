@@ -238,7 +238,8 @@ INSERT INTO `team_members` (`team_id`, `user_id`, `role`, `joined_at`) VALUES
 
 
 -- Insert Users (Passwords are set to 'user123')
-INSERT INTO users (name, email, password_hash, role) VALUES 
+INSERT INTO users (name, email, password_hash, role) VALUES
+('Default User', 'default@pharmachieve.org', '$2y$10$e..rHysD5ZF5OXazTP1p9OnmpDQ1o98U.XpGxuLdjwR1uZy/WpkJ.', 'admin'),
 ('Si', 'si@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'admin'),
 ('John Doe', 'john1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
 ('Jane Data', 'jane1@pharmachieve.org', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'data_analyst'),
