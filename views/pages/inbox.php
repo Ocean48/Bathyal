@@ -11,11 +11,18 @@ $category = $_GET['category'] ?? 'all';
 $notifications = $db->getUserNotifications($userId, 50, $category);
 
 // Handle mark as read
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_read_id'])) {
-    $db->markNotificationRead($_POST['mark_read_id'], $userId);
-    $catParam = isset($_GET['category']) ? "?category=" . urlencode($_GET['category']) : "";
-    header("Location: /bathyal/inbox{$catParam}");
-    exit;
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['mark_read_id'])) {
+        $db->markNotificationRead($_POST['mark_read_id'], $userId);
+        $catParam = isset($_GET['category']) ? "?category=" . urlencode($_GET['category']) : "";
+        header("Location: /bathyal/inbox{$catParam}");
+        exit;
+    } elseif (isset($_POST['mark_all_read'])) {
+        $db->markAllNotificationsRead($userId);
+        $catParam = isset($_GET['category']) ? "?category=" . urlencode($_GET['category']) : "";
+        header("Location: /bathyal/inbox{$catParam}");
+        exit;
+    }
 }
 
 require_once 'views/layouts/header.php';
@@ -26,6 +33,14 @@ require_once 'views/layouts/header.php';
         <div>
             <h1 class="text-2xl font-semibold text-slate-800">Inbox</h1>
             <p class="text-sm text-slate-500 mt-1">Updates and notifications across your projects.</p>
+        </div>
+        <div class="mt-4 md:mt-0">
+            <form method="POST">
+                <input type="hidden" name="mark_all_read" value="1">
+                <button type="submit" class="px-4 py-2 bg-white border border-slate-200 text-sm font-medium rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-sm">
+                    <i class="fas fa-check-double mr-2"></i>Mark all as read
+                </button>
+            </form>
         </div>
     </div>
 

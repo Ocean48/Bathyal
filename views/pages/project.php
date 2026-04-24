@@ -317,7 +317,10 @@ require_once 'views/layouts/header.php';
 
             <!-- Description -->
             <div class="mb-8">
-                <label class="font-semibold text-slate-800 mb-2 block">Description</label>
+                <div class="flex justify-between items-center mb-2">
+                    <label class="font-semibold text-slate-800 block">Description</label>
+                    <button onclick="updateTaskDetails(true)" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded text-xs font-medium shadow-sm transition-colors">Save Description</button>
+                </div>
                 <div class="border border-slate-300 rounded bg-white overflow-hidden flex flex-col min-h-[200px]">
                     <!-- RTE Toolbar -->
                     <div class="bg-slate-50 border-b border-slate-200 px-2 py-1.5 flex flex-wrap gap-1 items-center">
@@ -348,6 +351,9 @@ require_once 'views/layouts/header.php';
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         </button>
                         <input type="file" id="rte-image-upload-desc" accept="image/*" class="hidden" onchange="uploadRteImage(this, 'task-modal-desc')">
+                        <button type="button" onclick="insertMention();" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Mention">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                        </button>
                         <div class="w-px h-5 bg-slate-300 mx-1"></div>
                         <button type="button" onmousedown="event.preventDefault(); editTable('addRow', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Row">+Row</button>
                         <button type="button" onmousedown="event.preventDefault(); editTable('addCol', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Column">+Col</button>
@@ -358,9 +364,9 @@ require_once 'views/layouts/header.php';
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l-4 3 4 3m8-6l4 3-4 3"></path></svg>
                         </button>
                     </div>
-                    <div id="task-modal-desc" class="prose prose-sm text-slate-600 p-4 outline-none flex-1 max-w-none break-words min-h-[100px] border border-transparent focus:border-slate-200" contenteditable="true" onkeydown="handleRteKeyDown(event)" oninput="handleRteInput(event)" onblur="updateTaskDetails()">
+                    <div id="task-modal-desc" class="prose prose-sm text-slate-600 p-4 outline-none flex-1 max-w-none break-words min-h-[100px] border border-transparent focus:border-slate-200" contenteditable="true" onkeydown="handleRteKeyDown(event)" oninput="handleRteInput(event)">
                     </div>
-                    <textarea id="task-modal-desc-code" class="hidden font-mono text-sm p-4 w-full flex-1 outline-none text-slate-700 bg-slate-50 break-words min-h-[100px]" onblur="updateTaskDetails()"></textarea>
+                    <textarea id="task-modal-desc-code" class="hidden font-mono text-sm p-4 w-full flex-1 outline-none text-slate-700 bg-slate-50 break-words min-h-[100px]"></textarea>
                 </div>
             </div>
 
@@ -507,6 +513,8 @@ require_once 'views/layouts/header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script>
+// showSavingOverlay and hideSavingOverlay are now globally defined in header.php
+
 document.addEventListener('click', function(event) {
     const projDropdown = document.getElementById('project-link-dropdown');
     const projButton = document.querySelector('button[onclick="toggleProjectLinkDropdown()"]');
@@ -916,7 +924,8 @@ function editTable(action, editorId) {
     
     const td = node.closest('td, th');
     if (!td || !document.getElementById(editorId).contains(td)) {
-        return alert('Please place your cursor inside a table cell to modify the table.');
+        showAlert('Invalid Selection', 'Please place your cursor inside a table cell to modify the table.', 'warning');
+        return;
     }
     
     const tr = td.closest('tr');
@@ -985,11 +994,11 @@ async function uploadRteImage(input, editorId) {
             document.execCommand('insertImage', false, data.location);
         } else {
             console.error("Upload response data:", data);
-            alert('Image upload failed. Error details: ' + JSON.stringify(data));
+            showAlert('Upload Failed', 'Image upload failed. Error details: ' + JSON.stringify(data), 'danger');
         }
     } catch(e) {
         console.error(e);
-        alert('Image upload error');
+        showAlert('Upload Error', 'Image upload error', 'danger');
     } finally {
         input.value = '';
     }
@@ -1035,7 +1044,10 @@ async function openTaskModal(taskId) {
     try {
         const res = await fetch(`api/tasks.php?id=${taskId}`);
         const task = await res.json();
-        if(task.error) return alert(task.error);
+        if(task.error) {
+            showAlert('Error', task.error, 'danger');
+            return;
+        }
         
         document.getElementById('task-modal-id').value = task.id;
         document.getElementById('task-modal-title').value = task.title;
@@ -1327,11 +1339,12 @@ async function openTaskModal(taskId) {
         modal.classList.remove('hidden');
     } catch(e) {
         console.error(e);
-        alert('Failed to load task details');
+        showAlert('Load Failed', 'Failed to load task details', 'danger');
     }
 }
 
-async function updateTaskDetails() {
+async function updateTaskDetails(forceSaveDescription = false) {
+    showSavingOverlay();
     const id = document.getElementById('task-modal-id').value;
     const title = document.getElementById('task-modal-title').value;
     const statusSelect = document.getElementById('task-modal-status');
@@ -1348,9 +1361,12 @@ async function updateTaskDetails() {
     const estimatedMinutesInput = document.getElementById('task-modal-estimated').value;
     const estimatedMinutes = estimatedMinutesInput ? parseInt(estimatedMinutesInput, 10) : 0;
     
-    // Get content from custom editor or code block
-    let desc = getEditorContent('task-modal-desc');
-    if (desc === '<p><br></p>') desc = '';
+    // Only save the description when the Save Description button is pressed
+    let desc;
+    if (forceSaveDescription) {
+        desc = getEditorContent('task-modal-desc');
+        if (desc === '<p><br></p>') desc = '';
+    }
     
     if(!id) return;
     
@@ -1365,22 +1381,33 @@ async function updateTaskDetails() {
         completedContainer.classList.add('hidden');
     }
 
+    const payloadDetails = { title, status, start_date: startDate, expected_start_date: expectedStartDate, expected_due_date: expectedDueDate, estimated_minutes: estimatedMinutes };
+    if (forceSaveDescription) {
+        payloadDetails.description = desc;
+    }
+
     await fetch('api/tasks.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             action: 'update_details',
             task_id: id,
-            details: { title, status, start_date: startDate, expected_start_date: expectedStartDate, expected_due_date: expectedDueDate, description: desc, estimated_minutes: estimatedMinutes },
+            details: payloadDetails,
             project_id: typeof currentProjectId !== 'undefined' ? currentProjectId : null
         })
     });
     
+    if (forceSaveDescription) {
+        showAlert('Success', 'Description saved successfully.', 'success');
+    }
+    
     // Refresh board in background
     if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
+    hideSavingOverlay();
 }
 
 async function updateSubtaskStatus(id, checkbox) {
+    showSavingOverlay();
     const status = checkbox.checked ? 'completed' : 'todo';
     await fetch('api/tasks.php', {
         method: 'POST',
@@ -1408,14 +1435,19 @@ async function updateSubtaskStatus(id, checkbox) {
             statusSpan.className = `text-[10px] items-center px-1.5 py-0.5 rounded font-medium tracking-wide uppercase shadow-sm border ${window.getStatusBadgeClass(status)}`;
         }
     }
+    hideSavingOverlay();
 }
 
 async function submitTaskComment() {
+    showSavingOverlay();
     const id = document.getElementById('task-modal-id').value;
     let content = getEditorContent('task-modal-new-comment').trim();
     if (content === '<p><br></p>') content = '';
     
-    if(!id || !content) return;
+    if(!id || !content) {
+        hideSavingOverlay();
+        return;
+    }
 
     const res = await fetch('api/tasks.php', {
         method: 'POST',
@@ -1436,6 +1468,7 @@ async function submitTaskComment() {
         
         openTaskModal(id); // Reload modal to show new comment and attachments
     }
+    hideSavingOverlay();
 }
 
 function enableCommentEdit(commentId) {
@@ -1519,11 +1552,13 @@ function cancelCommentEdit(commentId) {
 }
 
 async function submitEditedComment(commentId) {
+    showSavingOverlay();
     let content = getEditorContent('edit-comment-area-' + commentId).trim();
     if (content === '<p><br></p>') content = '';
     
     if (!content) {
-        alert('Comment cannot be empty.');
+        showAlert('Invalid Input', 'Comment cannot be empty.', 'warning');
+        hideSavingOverlay();
         return;
     }
 
@@ -1537,13 +1572,15 @@ async function submitEditedComment(commentId) {
         const taskId = document.getElementById('task-modal-id').value;
         openTaskModal(taskId); // refresh task modal
     } else {
-        alert('Failed to edit comment. Ensure you have permission.');
+        showAlert('Edit Failed', 'Failed to edit comment. Ensure you have permission.', 'danger');
     }
+    hideSavingOverlay();
 }
 
 async function deleteAttachment(attachmentId) {
     if(!confirm('Are you sure you want to delete this attachment?')) return;
     
+    showSavingOverlay();
     const res = await fetch('api/tasks.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -1553,6 +1590,7 @@ async function deleteAttachment(attachmentId) {
         const id = document.getElementById('task-modal-id').value;
         openTaskModal(id);
     }
+    hideSavingOverlay();
 }
 
 async function uploadTaskAttachment(input) {
@@ -1568,6 +1606,7 @@ async function uploadTaskAttachment(input) {
     const oldText = btn.innerText;
     btn.innerText = 'Uploading...';
     btn.disabled = true;
+    showSavingOverlay();
     
     try {
         const res = await fetch('api/tasks.php', {
@@ -1580,15 +1619,16 @@ async function uploadTaskAttachment(input) {
             if (window.handleApiError) window.handleApiError(data);
             openTaskModal(id);
         } else {
-            alert('Upload failed');
+            showAlert('Upload Failed', 'Upload failed', 'danger');
         }
     } catch(e) {
         console.error(e);
-        alert('Upload completely failed.');
+        showAlert('Upload Failed', 'Upload completely failed.', 'danger');
     } finally {
         input.value = '';
         btn.innerText = oldText;
         btn.disabled = false;
+        hideSavingOverlay();
     }
 }
 
@@ -1604,7 +1644,7 @@ window.lastSearchedCollaborators = [];
 // ==========================================
 async function toggleProjectMemberDropdown(event) {
     if (window.currentUserProjectRole === 'viewer') {
-        alert('You must be a manager or member of this project to edit default notifications.');
+        showAlert('Permission Denied', 'You must be a manager or member of this project to edit default notifications.', 'warning');
         return;
     }
 
@@ -1689,6 +1729,7 @@ function renderProjectMemberList(users) {
 }
 
 async function toggleProjectMemberAssignment(userId) {
+    showSavingOverlay();
     const index = window.currentProjectMemberIds.indexOf(userId);
     if (index === -1) {
         window.currentProjectMemberIds.push(userId);
@@ -1908,6 +1949,7 @@ function renderAssigneeList(users) {
 }
 
 async function toggleUserAssignment(userId) {
+    showSavingOverlay();
     const index = window.currentTaskAssigneeIds.indexOf(userId);
     if (index === -1) {
         window.currentTaskAssigneeIds.push(userId);
@@ -2019,6 +2061,8 @@ async function toggleUserAssignment(userId) {
         if (window.handleApiError) window.handleApiError(assignData);
     } catch (e) {
         console.error('Error updating assignees:', e);
+    } finally {
+        hideSavingOverlay();
     }
 }
 
@@ -2157,6 +2201,7 @@ function renderCollaboratorList(users) {
 }
 
 async function toggleCollaboratorAssignment(userId) {
+    showSavingOverlay();
     const index = window.currentTaskCollaboratorIds.indexOf(userId);
     if (index === -1) {
         window.currentTaskCollaboratorIds.push(userId);
@@ -2250,6 +2295,8 @@ async function toggleCollaboratorAssignment(userId) {
         if (window.handleApiError) window.handleApiError(assignData);
     } catch (e) {
         console.error('Error updating collaborators:', e);
+    } finally {
+        hideSavingOverlay();
     }
 }
 
@@ -2270,8 +2317,12 @@ function copyTaskLink() {
 }
 
 function toggleProgress() {
+    showSavingOverlay();
     const taskId = document.getElementById('task-modal-id').value;
-    if (!taskId) return;
+    if (!taskId) {
+        hideSavingOverlay();
+        return;
+    }
 
     fetch('api/tasks.php', {
         method: 'POST',
@@ -2283,8 +2334,9 @@ function toggleProgress() {
               // Refresh the modal to sync state from database
               openTaskModal(taskId);
           } else {
-              alert('Failed to toggle time track');
+              showAlert('Error', 'Failed to toggle time track', 'danger');
           }
+          hideSavingOverlay();
       });
 }
 
@@ -2351,13 +2403,14 @@ function uncheckSectionSubtasks(btnElement) {
     const modalCheckboxes = document.querySelectorAll('#subtask-list input[type="checkbox"]');
     modalCheckboxes.forEach(cb => cb.checked = false);
 
-    alert('All subtasks in section unchecked');
+    showAlert('Success', 'All subtasks in section unchecked', 'success');
 }
 
 function promptAddSubtask(parentId) {
     const title = prompt("Enter subtask title:");
     if(!title) return;
     
+    showSavingOverlay();
     fetch('api/tasks.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -2371,8 +2424,9 @@ function promptAddSubtask(parentId) {
             openTaskModal(parentId); // Reload modal
             if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId); // Refresh board view to show new subtask expander
         } else {
-            alert('Failed to create subtask');
+            showAlert('Error', 'Failed to create subtask', 'danger');
         }
+        hideSavingOverlay();
     });
 }
 
@@ -2428,6 +2482,7 @@ async function searchProjectsToLink(query) {
 
 async function addProjectToTask(projectId) {
     const taskId = document.getElementById('task-modal-id').value;
+    showSavingOverlay();
     try {
         const res = await fetch('api/tasks.php', {
             method: 'POST',
@@ -2443,12 +2498,15 @@ async function addProjectToTask(projectId) {
         }
     } catch (e) {
         console.error(e);
+    } finally {
+        hideSavingOverlay();
     }
 }
 
 async function changeTaskProjectSection(projectId, selectElem) {
     const taskId = document.getElementById('task-modal-id').value;
     const sectionId = selectElem.value;
+    showSavingOverlay();
     try {
         const res = await fetch('api/tasks.php', {
             method: 'POST',
@@ -2462,6 +2520,8 @@ async function changeTaskProjectSection(projectId, selectElem) {
         }
     } catch (e) {
         console.error(e);
+    } finally {
+        hideSavingOverlay();
     }
 }
 
@@ -2536,6 +2596,7 @@ async function searchTasksToLink(query) {
 }
 
 function submitLinkSubtask(parentId, subtaskId) {
+    showSavingOverlay();
     fetch('api/tasks.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -2549,14 +2610,16 @@ function submitLinkSubtask(parentId, subtaskId) {
             toggleLinkSubtaskDropdown();
             openTaskModal(parentId); // Reload parent to show new subtask
         } else {
-            alert('Failed to link subtask.');
+            showAlert('Error', 'Failed to link subtask.', 'danger');
         }
+        hideSavingOverlay();
     });
 }
 
 function unlinkSubtask(parentId, subtaskId) {
     if (!confirm('Are you sure you want to unlink this subtask?')) return;
     
+    showSavingOverlay();
     fetch('api/tasks.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -2570,11 +2633,13 @@ function unlinkSubtask(parentId, subtaskId) {
             openTaskModal(parentId); // Reload parent to reflect changes
             if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
         } else {
-            alert('Failed to unlink subtask: ' + data.message);
+            showAlert('Error', 'Failed to unlink subtask: ' + data.message, 'danger');
         }
+        hideSavingOverlay();
     }).catch(e => {
         console.error('Error unlinking subtask', e);
-        alert('An error occurred while unlinking.');
+        showAlert('Error', 'An error occurred while unlinking.', 'danger');
+        hideSavingOverlay();
     });
 }
 

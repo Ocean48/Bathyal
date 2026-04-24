@@ -846,7 +846,7 @@ async function handleCreateSubmit(e) {
         loadProjectBoard(currentProjectId);
     } catch (err) {
         console.error('Error saving:', err);
-        alert('An error occurred. Please try again.');
+        showAlert('Error', 'An error occurred. Please try again.', 'danger');
     } finally {
         submitBtnText.innerText = oldText;
     }

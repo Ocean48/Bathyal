@@ -219,6 +219,24 @@
                 </div>
 
                 <script>
+                    function showSavingOverlay() {
+                        const overlay = document.getElementById('saving-overlay');
+                        if(overlay) {
+                            overlay.classList.remove('hidden');
+                            overlay.classList.add('pointer-events-auto');
+                            setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+                        }
+                    }
+
+                    function hideSavingOverlay() {
+                        const overlay = document.getElementById('saving-overlay');
+                        if(overlay) {
+                            overlay.classList.add('opacity-0');
+                            overlay.classList.remove('pointer-events-auto');
+                            setTimeout(() => overlay.classList.add('hidden'), 200); 
+                        }
+                    }
+                    
                     document.getElementById('header-bell-btn').addEventListener('click', function(e) {
                         e.stopPropagation();
                         document.getElementById('global-notifications-dropdown').classList.toggle('hidden');
@@ -254,3 +272,14 @@
 
         <!-- Main scrolling area -->
         <main class="flex-1 overflow-x-hidden overflow-y-auto">
+        
+            <!-- Saving Overlay -->
+            <div id="saving-overlay" class="fixed inset-0 bg-slate-900/20 hidden z-[9999] flex items-center justify-center backdrop-blur-sm transition-opacity opacity-0 pointer-events-none">
+                <div class="bg-white px-5 py-3 rounded-lg shadow-xl flex items-center space-x-3 border border-slate-200">
+                    <svg class="animate-spin h-5 w-5 text-teal-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-slate-700 font-medium text-sm">Saving...</span>
+                </div>
+            </div>

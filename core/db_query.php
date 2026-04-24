@@ -3,6 +3,9 @@
 
 class DBQueries {
     private $pdo;
+    
+    // Track users who have already received a notification for a task in the current request
+    public $notifiedUsers = [];
 
     public function __construct($pdo) {
         $this->pdo = $pdo;
@@ -470,10 +473,13 @@ class DBQueries {
         try {
             $notifyUsers = [];
 
-            // If excludeUserId is not provided, try to get it from session
+            // By default we do NOT exclude the user making the change so testing works as expected
+            // unless an excludeUserId is explicitly provided.
+            /*
             if ($excludeUserId === null && session_status() === PHP_SESSION_ACTIVE && isset($_SESSION['user_id'])) {
                 $excludeUserId = $_SESSION['user_id'];
             }
+            */
 
             // Find collaborators (Assignees are only notified when assigned)
             $stmtCollab = $this->pdo->prepare("SELECT u.id, u.email, u.name FROM task_collaborators tc JOIN users u ON tc.user_id = u.id WHERE tc.task_id = :tid");
@@ -484,6 +490,7 @@ class DBQueries {
                 foreach ($collaborators as $c) {
                     // Deduplicate by using user ID as key
                     if ($excludeUserId && (int)$c['id'] === (int)$excludeUserId) continue;
+                    if (isset($this->notifiedUsers[$taskId]) && in_array($c['id'], $this->notifiedUsers[$taskId])) continue;
                     $notifyUsers[$c['id']] = $c;
                 }
             }
@@ -507,6 +514,7 @@ class DBQueries {
                 $projectAdmins = $stmtAdmins->fetchAll(PDO::FETCH_ASSOC);
                 foreach ($projectAdmins as $admin) {
                     if ($excludeUserId && (int)$admin['id'] === (int)$excludeUserId) continue;
+                    if (isset($this->notifiedUsers[$taskId]) && in_array($admin['id'], $this->notifiedUsers[$taskId])) continue;
                     $notifyUsers[$admin['id']] = $admin;
                 }
             }
@@ -520,8 +528,17 @@ class DBQueries {
 
             $allSent = true;
             $errors = [];
+            
+            $projectUrlId = $projectId ? $projectId : 1;
+            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $projectUrlId . "&task_id=" . $taskId;
+            
+            // Replace any generic /bathyal/tasks?id= URL in the provided body with the rich taskUrl
+            $bodyHtmlFixed = preg_replace('/http:\/\/[^\'"]+\/bathyal\/tasks\?id=\d+/', $taskUrl, $bodyHtml);
 
             foreach ($notifyUsers as $u) {
+                // Mark user as notified for this task
+                $this->notifiedUsers[$taskId][] = $u['id'];
+
                 // Insert DB notification
                 $stmtInsertNotif->execute([
                     'uid' => $u['id'],
@@ -533,7 +550,7 @@ class DBQueries {
                 // Send email
                 $to = $u['email'];
                 $mailSubject = $subject ? $subject : "App Notification: Task {$taskId}";
-                $mailBody = $bodyHtml ? $bodyHtml : "Hello {$u['name']},<br><br>{$message}<br><br>Task ID: {$taskId}<br>";
+                $mailBody = $bodyHtmlFixed ? $bodyHtmlFixed : "Hello {$u['name']},<br><br>{$message}<br><br>Task ID: {$taskId}<br><p><a href='{$taskUrl}'>Click here to view the task</a></p>";
                 
                 $emailResult = $emailService->sendEmail($to, $u['name'], $mailSubject, $mailBody);
                 if (!$emailResult['success']) {
@@ -595,6 +612,11 @@ class DBQueries {
         return $stmt->execute(['id' => (int)$notificationId, 'uid' => (int)$userId]);
     }
 
+    public function markAllNotificationsRead($userId) {
+        $stmt = $this->pdo->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = :uid AND is_read = 0");
+        return $stmt->execute(['uid' => (int)$userId]);
+    }
+
     public function getUnreadNotificationCount($userId) {
         $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = :uid AND is_read = 0");
         $stmt->execute(['uid' => (int)$userId]);
@@ -640,14 +662,87 @@ class DBQueries {
         return $stmt->fetchColumn();
     }
 
+    public function sendProjectMemberNotification($projectId, $userId, $role, $action) {
+        try {
+            // Get Project details
+            $stmtProj = $this->pdo->prepare("SELECT name FROM projects WHERE id = :pid");
+            $stmtProj->execute(['pid' => $projectId]);
+            $projectName = $stmtProj->fetchColumn() ?: "Project " . $projectId;
+            
+            // Get User details
+            $stmtUser = $this->pdo->prepare("SELECT email, name FROM users WHERE id = :uid");
+            $stmtUser->execute(['uid' => $userId]);
+            $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user) return false;
+
+            // Get Changer details
+            $changerId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1;
+            $stmtChanger = $this->pdo->prepare("SELECT name FROM users WHERE id = :uid");
+            $stmtChanger->execute(['uid' => $changerId]);
+            $changerName = $stmtChanger->fetchColumn() ?: 'Someone';
+            
+            require_once __DIR__ . '/email_service.php';
+            $emailService = new EmailService();
+            
+            $subject = "";
+            $bodyHtml = "";
+            $messageText = "";
+            
+            if ($action === 'add') {
+                $subject = "You have been added to the project: " . $projectName;
+                $messageText = $changerName . " added you to the project: " . $projectName;
+                $bodyHtml = "<h2>Welcome to the project!</h2>";
+                $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> added you to the project: <strong>" . htmlspecialchars($projectName) . "</strong></p>";
+                $bodyHtml .= "<p>Your role is: <strong>" . htmlspecialchars($role) . "</strong></p>";
+            } elseif ($action === 'remove') {
+                $subject = "You have been removed from the project: " . $projectName;
+                $messageText = $changerName . " removed you from the project: " . $projectName;
+                $bodyHtml = "<h2>You were removed from the project</h2>";
+                $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> removed you from the project: <strong>" . htmlspecialchars($projectName) . "</strong></p>";
+            } elseif ($action === 'update_role') {
+                $subject = "Your role was updated in the project: " . $projectName;
+                $messageText = $changerName . " updated your role in the project: " . $projectName;
+                $bodyHtml = "<h2>Project Role Updated</h2>";
+                $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> updated your role in the project: <strong>" . htmlspecialchars($projectName) . "</strong></p>";
+                $bodyHtml .= "<p>Your new role is: <strong>" . htmlspecialchars($role) . "</strong></p>";
+            }
+            
+            $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/projects'>Click here to view your projects</a></p>";
+            
+            // Insert DB notification
+            $stmtInsertNotif = $this->pdo->prepare("INSERT INTO notifications (user_id, category, message, is_read) VALUES (:uid, :cat, :msg, 0)");
+            $stmtInsertNotif->execute([
+                'uid' => $userId,
+                'cat' => 'general', // project member changes go to general
+                'msg' => $messageText
+            ]);
+            
+            $emailService->sendEmail($user['email'], $user['name'], $subject, $bodyHtml);
+            
+            return true;
+        } catch (Exception $e) {
+            error_log("Failed to send project member notification: " . $e->getMessage());
+            return false;
+        }
+    }
+
     public function updateProjectMemberRole($projectId, $userId, $role) {
         $stmt = $this->pdo->prepare("UPDATE project_members SET role = :role WHERE project_id = :pid AND user_id = :uid");
-        return $stmt->execute(['role' => $role, 'pid' => (int)$projectId, 'uid' => (int)$userId]);
+        $result = $stmt->execute(['role' => $role, 'pid' => (int)$projectId, 'uid' => (int)$userId]);
+        if ($result) {
+            $this->sendProjectMemberNotification($projectId, $userId, $role, 'update_role');
+        }
+        return $result;
     }
 
     public function removeProjectMember($projectId, $userId) {
         $stmt = $this->pdo->prepare("DELETE FROM project_members WHERE project_id = :pid AND user_id = :uid");
-        return $stmt->execute(['pid' => (int)$projectId, 'uid' => (int)$userId]);
+        $result = $stmt->execute(['pid' => (int)$projectId, 'uid' => (int)$userId]);
+        if ($result) {
+            $this->sendProjectMemberNotification($projectId, $userId, null, 'remove');
+        }
+        return $result;
     }
 
     public function addProjectMember($projectId, $userId, $role) {
@@ -655,7 +750,11 @@ class DBQueries {
         $stmtCheck->execute(['pid' => (int)$projectId, 'uid' => (int)$userId]);
         if (!$stmtCheck->fetchColumn()) {
             $stmt = $this->pdo->prepare("INSERT INTO project_members (project_id, user_id, role) VALUES (:pid, :uid, :role)");
-            return $stmt->execute(['pid' => (int)$projectId, 'uid' => (int)$userId, 'role' => $role]);
+            $result = $stmt->execute(['pid' => (int)$projectId, 'uid' => (int)$userId, 'role' => $role]);
+            if ($result) {
+                $this->sendProjectMemberNotification($projectId, $userId, $role, 'add');
+            }
+            return $result;
         }
         return false;
     }
@@ -1385,6 +1484,13 @@ class DBQueries {
                     }
                 }
             }
+            
+            // Notify removed users
+            foreach ($oldAssignees as $oldUid) {
+                if (empty($data['assignee_ids']) || !in_array($oldUid, $data['assignee_ids'])) {
+                    $this->sendAssigneeRemovedNotification($taskId, $oldUid);
+                }
+            }
         }
         
         if (array_key_exists('collaborator_ids', $data)) {
@@ -1409,6 +1515,13 @@ class DBQueries {
                     if (!in_array($uid, $oldCollaborators)) {
                         $this->sendCollaboratorNotification($taskId, $uid);
                     }
+                }
+            }
+            
+            // Notify removed users
+            foreach ($oldCollaborators as $oldUid) {
+                if (empty($data['collaborator_ids']) || !in_array($oldUid, $data['collaborator_ids'])) {
+                    $this->sendCollaboratorRemovedNotification($taskId, $oldUid);
                 }
             }
         }
@@ -1472,6 +1585,10 @@ class DBQueries {
 
     public function sendAssigneeNotification($taskId, $userId) {
         try {
+            if (isset($this->notifiedUsers[$taskId]) && in_array($userId, $this->notifiedUsers[$taskId])) {
+                return true; // Already notified in this request
+            }
+            
             // Get Task details
             $taskDetails = $this->getTaskById($taskId);
             $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $taskId;
@@ -1482,15 +1599,29 @@ class DBQueries {
             $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
             
             if (!$user) return false;
+
+            // Get Changer details
+            $changerId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1;
+            $stmtChanger = $this->pdo->prepare("SELECT name FROM users WHERE id = :uid");
+            $stmtChanger->execute(['uid' => $changerId]);
+            $changerName = $stmtChanger->fetchColumn() ?: 'Someone';
+            
+            $this->notifiedUsers[$taskId][] = $userId;
             
             // Insert DB notification
             $stmtInsertNotif = $this->pdo->prepare("INSERT INTO notifications (user_id, task_id, category, message, is_read) VALUES (:uid, :tid, :cat, :msg, 0)");
             $stmtInsertNotif->execute([
                 'uid' => $userId,
                 'tid' => $taskId,
-                'cat' => 'task_assigned',
-                'msg' => "You have been assigned to: " . $taskTitle
+                'cat' => 'task_update',
+                'msg' => $changerName . " assigned you to: " . $taskTitle
             ]);
+            
+            // Get Project ID for URL
+            $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
+            $stmtProj->execute(['tid' => $taskId]);
+            $projectId = $stmtProj->fetchColumn() ?: 1;
+            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $projectId . "&task_id=" . $taskId;
             
             // Send Email
             require_once __DIR__ . '/email_service.php';
@@ -1498,8 +1629,8 @@ class DBQueries {
             
             $subject = "You have been assigned to: " . $taskTitle;
             $bodyHtml = "<h2>You have been assigned to a task</h2>";
-            $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
-            $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
+            $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> assigned you to the task: " . $taskTitle . "</p>";
+            $bodyHtml .= "<p><a href='{$taskUrl}'>Click here to view the task</a></p>";
             
             $emailService->sendEmail($user['email'], $user['name'], $subject, $bodyHtml);
             
@@ -1510,7 +1641,7 @@ class DBQueries {
         }
     }
 
-    public function sendCollaboratorNotification($taskId, $userId) {
+    public function sendAssigneeRemovedNotification($taskId, $userId) {
         try {
             // Get Task details
             $taskDetails = $this->getTaskById($taskId);
@@ -1522,15 +1653,85 @@ class DBQueries {
             $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
             
             if (!$user) return false;
+
+            // Get Changer details
+            $changerId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1;
+            $stmtChanger = $this->pdo->prepare("SELECT name FROM users WHERE id = :uid");
+            $stmtChanger->execute(['uid' => $changerId]);
+            $changerName = $stmtChanger->fetchColumn() ?: 'Someone';
             
             // Insert DB notification
             $stmtInsertNotif = $this->pdo->prepare("INSERT INTO notifications (user_id, task_id, category, message, is_read) VALUES (:uid, :tid, :cat, :msg, 0)");
             $stmtInsertNotif->execute([
                 'uid' => $userId,
                 'tid' => $taskId,
-                'cat' => 'task_assigned',
-                'msg' => "You have been added as a collaborator to: " . $taskTitle
+                'cat' => 'task_update',
+                'msg' => $changerName . " removed you from the assignees of: " . $taskTitle
             ]);
+            
+            // Get Project ID for URL
+            $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
+            $stmtProj->execute(['tid' => $taskId]);
+            $projectId = $stmtProj->fetchColumn() ?: 1;
+            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $projectId . "&task_id=" . $taskId;
+            
+            // Send Email
+            require_once __DIR__ . '/email_service.php';
+            $emailService = new EmailService();
+            
+            $subject = "You have been removed from task: " . $taskTitle;
+            $bodyHtml = "<h2>You are no longer assigned to a task</h2>";
+            $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> removed you from the assignees of the task: " . $taskTitle . "</p>";
+            $bodyHtml .= "<p><a href='{$taskUrl}'>Click here to view the task</a></p>";
+            
+            $emailService->sendEmail($user['email'], $user['name'], $subject, $bodyHtml);
+            
+            return true;
+        } catch (Exception $e) {
+            error_log("Failed to send assignee removed notification: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function sendCollaboratorNotification($taskId, $userId) {
+        try {
+            if (isset($this->notifiedUsers[$taskId]) && in_array($userId, $this->notifiedUsers[$taskId])) {
+                return true; // Already notified in this request
+            }
+            
+            // Get Task details
+            $taskDetails = $this->getTaskById($taskId);
+            $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $taskId;
+            
+            // Get User details
+            $stmtUser = $this->pdo->prepare("SELECT email, name FROM users WHERE id = :uid");
+            $stmtUser->execute(['uid' => $userId]);
+            $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user) return false;
+
+            // Get Changer details
+            $changerId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1;
+            $stmtChanger = $this->pdo->prepare("SELECT name FROM users WHERE id = :uid");
+            $stmtChanger->execute(['uid' => $changerId]);
+            $changerName = $stmtChanger->fetchColumn() ?: 'Someone';
+            
+            $this->notifiedUsers[$taskId][] = $userId;
+            
+            // Insert DB notification
+            $stmtInsertNotif = $this->pdo->prepare("INSERT INTO notifications (user_id, task_id, category, message, is_read) VALUES (:uid, :tid, :cat, :msg, 0)");
+            $stmtInsertNotif->execute([
+                'uid' => $userId,
+                'tid' => $taskId,
+                'cat' => 'task_update',
+                'msg' => $changerName . " added you as a collaborator to: " . $taskTitle
+            ]);
+            
+            // Get Project ID for URL
+            $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
+            $stmtProj->execute(['tid' => $taskId]);
+            $projectId = $stmtProj->fetchColumn() ?: 1;
+            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $projectId . "&task_id=" . $taskId;
             
             // Send Email
             require_once __DIR__ . '/email_service.php';
@@ -1538,14 +1739,66 @@ class DBQueries {
             
             $subject = "You have been added as a collaborator to: " . $taskTitle;
             $bodyHtml = "<h2>You have been added as a collaborator</h2>";
-            $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
-            $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
+            $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> added you as a collaborator to the task: " . $taskTitle . "</p>";
+            $bodyHtml .= "<p><a href='{$taskUrl}'>Click here to view the task</a></p>";
             
             $emailService->sendEmail($user['email'], $user['name'], $subject, $bodyHtml);
             
             return true;
         } catch (Exception $e) {
             error_log("Failed to send collaborator notification: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function sendCollaboratorRemovedNotification($taskId, $userId) {
+        try {
+            // Get Task details
+            $taskDetails = $this->getTaskById($taskId);
+            $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $taskId;
+            
+            // Get User details
+            $stmtUser = $this->pdo->prepare("SELECT email, name FROM users WHERE id = :uid");
+            $stmtUser->execute(['uid' => $userId]);
+            $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user) return false;
+
+            // Get Changer details
+            $changerId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1;
+            $stmtChanger = $this->pdo->prepare("SELECT name FROM users WHERE id = :uid");
+            $stmtChanger->execute(['uid' => $changerId]);
+            $changerName = $stmtChanger->fetchColumn() ?: 'Someone';
+            
+            // Insert DB notification
+            $stmtInsertNotif = $this->pdo->prepare("INSERT INTO notifications (user_id, task_id, category, message, is_read) VALUES (:uid, :tid, :cat, :msg, 0)");
+            $stmtInsertNotif->execute([
+                'uid' => $userId,
+                'tid' => $taskId,
+                'cat' => 'task_update',
+                'msg' => $changerName . " removed you from the collaborators of: " . $taskTitle
+            ]);
+            
+            // Get Project ID for URL
+            $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
+            $stmtProj->execute(['tid' => $taskId]);
+            $projectId = $stmtProj->fetchColumn() ?: 1;
+            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $projectId . "&task_id=" . $taskId;
+            
+            // Send Email
+            require_once __DIR__ . '/email_service.php';
+            $emailService = new EmailService();
+            
+            $subject = "You have been removed from task collaborators: " . $taskTitle;
+            $bodyHtml = "<h2>You are no longer a collaborator</h2>";
+            $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> removed you from the collaborators of the task: " . $taskTitle . "</p>";
+            $bodyHtml .= "<p><a href='{$taskUrl}'>Click here to view the task</a></p>";
+            
+            $emailService->sendEmail($user['email'], $user['name'], $subject, $bodyHtml);
+            
+            return true;
+        } catch (Exception $e) {
+            error_log("Failed to send collaborator removed notification: " . $e->getMessage());
             return false;
         }
     }
@@ -1715,5 +1968,65 @@ class DBQueries {
     public function changeTaskProjectSection($taskId, $projectId, $sectionId) {
         $stmtUpd = $this->pdo->prepare("UPDATE task_projects SET section_id = :sid WHERE task_id = :tid AND project_id = :pid");
         return $stmtUpd->execute(['sid' => $sectionId, 'tid' => $taskId, 'pid' => $projectId]);
+    }
+
+    public function getActiveTimerForUser($userId) {
+        $stmt = $this->pdo->prepare("
+            SELECT t.title, tl.start_time, t.id as task_id, tp.project_id
+            FROM task_time_logs tl
+            JOIN tasks t ON tl.task_id = t.id
+            LEFT JOIN task_projects tp ON t.id = tp.task_id
+            WHERE tl.user_id = :user_id AND tl.status = 'running'
+            LIMIT 1
+        ");
+        $stmt->execute([':user_id' => $userId]);
+        return $stmt->fetch();
+    }
+
+    public function updateUserPreferences($userId, $jsonStr) {
+        $stmt = $this->pdo->prepare("UPDATE users SET dashboard_preferences = :prefs WHERE id = :user_id");
+        return $stmt->execute([':prefs' => $jsonStr, ':user_id' => $userId]);
+    }
+
+    public function getDashboardStats($userId) {
+        // Tasks completed
+        $stmt = $this->pdo->prepare("
+            SELECT COUNT(t.id) as count 
+            FROM tasks t
+            JOIN task_assignees ta ON t.id = ta.task_id
+            WHERE ta.user_id = :user_id AND t.status IN ('done', 'completed')
+        ");
+        $stmt->execute([':user_id' => $userId]);
+        $tasksCompleted = $stmt->fetchColumn();
+
+        // Collaborators
+        $stmt = $this->pdo->prepare("
+            SELECT COUNT(DISTINCT pm2.user_id) as count 
+            FROM project_members pm1
+            JOIN project_members pm2 ON pm1.project_id = pm2.project_id
+            WHERE pm1.user_id = :user_id1 AND pm2.user_id != :user_id2
+        ");
+        $stmt->execute([':user_id1' => $userId, ':user_id2' => $userId]);
+        $collaborators = $stmt->fetchColumn();
+
+        // Tasks due soon (next 3 days)
+        $stmt = $this->pdo->prepare("
+            SELECT COUNT(t.id) as count 
+            FROM tasks t
+            JOIN task_assignees ta ON t.id = ta.task_id
+            WHERE ta.user_id = :user_id 
+              AND t.status NOT IN ('done', 'completed')
+              AND t.expected_due_date IS NOT NULL
+              AND t.expected_due_date <= DATE_ADD(NOW(), INTERVAL 3 DAY)
+              AND t.expected_due_date >= NOW()
+        ");
+        $stmt->execute([':user_id' => $userId]);
+        $tasksDueSoon = $stmt->fetchColumn();
+
+        return [
+            'tasks_completed' => (int)$tasksCompleted,
+            'collaborators' => (int)$collaborators,
+            'tasks_due_soon' => (int)$tasksDueSoon
+        ];
     }
 }

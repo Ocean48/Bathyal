@@ -13,6 +13,7 @@ CREATE TABLE users (
     email VARCHAR(150) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role ENUM('admin', 'member', 'data_analyst') DEFAULT 'member',
+    dashboard_preferences TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

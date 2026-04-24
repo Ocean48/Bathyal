@@ -1,6 +1,11 @@
 <?php
 // /config/database.php
 
+// Enable error reporting to help with debugging
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // Set PHP default timezone to UTC
 date_default_timezone_set('UTC');
 

@@ -64,6 +64,11 @@ switch ($method) {
         break;
     case 'POST':
         $userId = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1; // Current user ID fallback
+        global $pdo;
+        $stmtChanger = $pdo->prepare("SELECT name FROM users WHERE id = :uid");
+        $stmtChanger->execute(['uid' => $userId]);
+        $changerName = $stmtChanger->fetchColumn() ?: 'Someone';
+        
         $taskIdForCheck = isset($_POST['task_id']) ? $_POST['task_id'] : null;
         if (!$taskIdForCheck) {
             $dataCheck = json_decode(file_get_contents('php://input'), true);
@@ -96,7 +101,7 @@ switch ($method) {
         if (isset($_POST['action']) && $_POST['action'] === 'add_attachment') {
             $taskId = $_POST['task_id'];
             $file = $_FILES['file'];
-            $userId = 1; // Mock user ID
+            // use the $userId from above instead of hardcoding 1
             
             $uploadDir = '../assets/uploads/';
             if (!is_dir($uploadDir)) {
@@ -115,7 +120,7 @@ switch ($method) {
                     $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $taskId;
                     $subject = "New Attachment on Task: " . $taskTitle;
                     $bodyHtml = "<h2>A new attachment was added to the task: " . $taskTitle . "</h2>";
-                    $bodyHtml .= "<p><strong>File:</strong> " . htmlspecialchars($file['name']) . "</p>";
+                    $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> attached the file: " . htmlspecialchars($file['name']) . "</p>";
                     $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
                     $notifResult = $db->sendTaskNotification($taskId, "New attachment added: " . $file['name'], 'task_update', $subject, $bodyHtml);
 
@@ -143,7 +148,7 @@ switch ($method) {
                     $subject = "Task Status Updated: " . $taskTitle;
                     $bodyHtml = "<h2>Task status was updated</h2>";
                     $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
-                    $bodyHtml .= "<p><strong>New Status:</strong> " . htmlspecialchars($data['status']) . "</p>";
+                    $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> updated the status to: <strong>" . htmlspecialchars($data['status']) . "</strong></p>";
                     $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
                     $notifResult = $db->sendTaskNotification($data['task_id'], "Task status updated to " . $data['status'], 'task_update', $subject, $bodyHtml);
 
@@ -159,19 +164,68 @@ switch ($method) {
                 }
             } elseif ($data['action'] === 'update_details') {
                 $projectId = isset($data['project_id']) ? $data['project_id'] : null;
+                $oldTaskDetails = $db->getTaskById($data['task_id']);
+                
                 if ($db->updateTaskDetails($data['task_id'], $data['details'], $projectId)) {
                     $response = ['status' => 'success'];
                     
-                    $detailsKeys = array_keys($data['details']);
-                    $onlyAssigneesOrCollabs = count(array_diff($detailsKeys, ['assignee_ids', 'collaborator_ids'])) === 0;
-
-                    if (!$onlyAssigneesOrCollabs) {
-                        $taskDetails = $db->getTaskById($data['task_id']);
-                        $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $data['task_id'];
-                        $subject = "Task Details Updated: " . $taskTitle;
+                    // Notify admins and collaborators on ANY detail update
+                    $taskDetails = $db->getTaskById($data['task_id']);
+                    $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $data['task_id'];
+                    $subject = "Task Details Updated: " . $taskTitle;
+                    
+                    $changes = [];
+                    foreach ($data['details'] as $k => $v) {
+                        if ($k === 'assignee_ids') {
+                            $oldDisplay = !empty($oldTaskDetails['assignee_name']) ? htmlspecialchars($oldTaskDetails['assignee_name']) : '<em>Unassigned</em>';
+                            $newDisplay = !empty($taskDetails['assignee_name']) ? htmlspecialchars($taskDetails['assignee_name']) : '<em>Unassigned</em>';
+                            if ($oldDisplay !== $newDisplay) {
+                                $changes[] = "<li><strong>Assignees:</strong> changed from {$oldDisplay} to {$newDisplay}</li>";
+                            }
+                            continue;
+                        }
+                        if ($k === 'collaborator_ids') {
+                            $oldDisplay = !empty($oldTaskDetails['collaborator_name']) ? htmlspecialchars($oldTaskDetails['collaborator_name']) : '<em>None</em>';
+                            $newDisplay = !empty($taskDetails['collaborator_name']) ? htmlspecialchars($taskDetails['collaborator_name']) : '<em>None</em>';
+                            if ($oldDisplay !== $newDisplay) {
+                                $changes[] = "<li><strong>Collaborators:</strong> changed from {$oldDisplay} to {$newDisplay}</li>";
+                            }
+                            continue;
+                        }
+                        
+                        $oldVal = isset($oldTaskDetails[$k]) ? (string)$oldTaskDetails[$k] : '';
+                        $newVal = isset($taskDetails[$k]) ? (string)$taskDetails[$k] : '';
+                        
+                        if ($oldVal === $newVal) continue; // No change
+                        
+                        $fieldName = ucwords(str_replace('_', ' ', $k));
+                        if ($k === 'description') {
+                            $changes[] = "<li><strong>{$fieldName}:</strong> [Content updated]</li>";
+                        } else {
+                            $oldDisplay = $oldVal === '' ? '<em>(empty)</em>' : htmlspecialchars($oldVal);
+                            $newDisplay = $newVal === '' ? '<em>(empty)</em>' : htmlspecialchars($newVal);
+                            
+                            // Format dates nicely
+                            if (in_array($k, ['start_date', 'expected_start_date', 'expected_due_date'])) {
+                                $oldDisplay = $oldVal === '' ? '<em>(empty)</em>' : htmlspecialchars(explode(' ', $oldVal)[0]);
+                                $newDisplay = $newVal === '' ? '<em>(empty)</em>' : htmlspecialchars(explode(' ', $newVal)[0]);
+                            }
+                            
+                            // It's possible that formatting makes them look the same (e.g. same date, different time)
+                            if ($oldDisplay !== $newDisplay || !in_array($k, ['start_date', 'expected_start_date', 'expected_due_date'])) {
+                                $changes[] = "<li><strong>{$fieldName}:</strong> changed from {$oldDisplay} to {$newDisplay}</li>";
+                            }
+                        }
+                    }
+                    $changesStr = implode('', $changes);
+                    
+                    if (!empty($changesStr)) {
                         $bodyHtml = "<h2>Task details were updated</h2>";
                         $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
+                        $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> updated the following fields:</p>";
+                        $bodyHtml .= "<ul>" . $changesStr . "</ul>";
                         $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
+                        
                         $notifResult = $db->sendTaskNotification($data['task_id'], "Task details updated", 'task_update', $subject, $bodyHtml);
 
                         if (isset($notifResult['success']) && !$notifResult['success']) {
@@ -193,9 +247,10 @@ switch ($method) {
                     $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $data['task_id'];
                     $subject = "New Comment on Task: " . $taskTitle;
                     $bodyHtml = "<h2>A new comment was added to the task: " . $taskTitle . "</h2>";
-                    $bodyHtml .= "<p><strong>Comment:</strong><br>" . nl2br(htmlspecialchars($data['content'])) . "</p>";
+                    $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> commented:</p>";
+                    $bodyHtml .= "<blockquote style='border-left: 4px solid #ddd; padding-left: 10px; margin-left: 0;'>" . nl2br(htmlspecialchars($data['content'])) . "</blockquote>";
                     $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
-                    $notifResult = $db->sendTaskNotification($data['task_id'], "New comment added", 'comment', $subject, $bodyHtml);
+                    $notifResult = $db->sendTaskNotification($data['task_id'], "New comment added", 'task_update', $subject, $bodyHtml);
 
                     $response = ['status' => 'success', 'comment_id' => $commentId];
                     if (isset($notifResult['success']) && !$notifResult['success']) {
@@ -211,7 +266,28 @@ switch ($method) {
                 $userId = 1; // Assuming mock user ID 1
                 $success = $db->updateComment($data['comment_id'], $userId, $data['content']);
                 if ($success) {
-                    echo json_encode(['status' => 'success']);
+                    $response = ['status' => 'success'];
+                    
+                    // Add notification for comment edit
+                    global $pdo;
+                    $stmtComm = $pdo->prepare("SELECT task_id FROM comments WHERE id = :cid");
+                    $stmtComm->execute(['cid' => $data['comment_id']]);
+                    $taskId = $stmtComm->fetchColumn();
+                    if ($taskId) {
+                        $taskDetails = $db->getTaskById($taskId);
+                        $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $taskId;
+                        $subject = "Comment Edited on Task: " . $taskTitle;
+                        $bodyHtml = "<h2>A comment was edited on the task: " . $taskTitle . "</h2>";
+                        $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> updated their comment:</p>";
+                        $bodyHtml .= "<blockquote style='border-left: 4px solid #ddd; padding-left: 10px; margin-left: 0;'>" . nl2br(htmlspecialchars($data['content'])) . "</blockquote>";
+                        $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
+                        $notifResult = $db->sendTaskNotification($taskId, "Comment edited", 'task_update', $subject, $bodyHtml);
+
+                        if (isset($notifResult['success']) && !$notifResult['success']) {
+                            $response['email_error'] = 'Comment edited, but failed to send email notification: ' . $notifResult['error'];
+                        }
+                    }
+                    echo json_encode($response);
                 } else {
                     http_response_code(500);
                     echo json_encode(['status' => 'error', 'message' => 'Failed to update comment or unauthorized']);
@@ -288,7 +364,7 @@ switch ($method) {
                 // Send Email Notification using the centralized notification method
                 $subject = "New Task Created: " . $data['title'];
                 $bodyHtml = "<h2>A new task was created!</h2>";
-                $bodyHtml .= "<p><strong>Task:</strong> " . htmlspecialchars($data['title']) . "</p>";
+                $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> created the task: " . htmlspecialchars($data['title']) . "</p>";
                 if (!empty($data['description'])) {
                     $bodyHtml .= "<p><strong>Description:</strong> " . nl2br(htmlspecialchars($data['description'])) . "</p>";
                 }
