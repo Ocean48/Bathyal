@@ -846,7 +846,13 @@ async function handleCreateSubmit(e) {
             res = await fetch(`api/sections.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ project_id: currentProjectId, title: title })
+                body: JSON.stringify({ action: 'create', project_id: currentProjectId, name: title })
+            });
+        } else if (actionType === 'edit_section') {
+            res = await fetch(`api/sections.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update', section_id: targetId, name: title })
             });
         } else if (actionType === 'task') {
             res = await fetch(`api/tasks.php`, {
