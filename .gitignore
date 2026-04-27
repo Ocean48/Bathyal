@@ -2,3 +2,4 @@
 vendor/*
 config.php
 assets/images/pa_favicon.png
+*.sql
