@@ -2000,6 +2000,7 @@ async function saveTaskLabels() {
     const taskId = window.activeLabelTaskId || document.getElementById('task-modal-id').value;
     if (!taskId) return;
     
+    showSavingOverlay();
     try {
         const res = await fetch('/bathyal/api/tasks.php', {
             method: 'POST',
@@ -2019,6 +2020,8 @@ async function saveTaskLabels() {
         }
     } catch (e) {
         console.error(e);
+    } finally {
+        hideSavingOverlay();
     }
 }
 
