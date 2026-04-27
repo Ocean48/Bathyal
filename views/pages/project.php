@@ -2012,7 +2012,12 @@ async function saveTaskLabels() {
             if (window.labelDropdownContext === 'modal') {
                 openTaskModal(taskId); // Reload modal
             } else {
-                fetchProjectTasks(); // Reload list view
+                if (typeof loadProjectBoard === 'function' && typeof currentProjectId !== 'undefined') {
+                    loadProjectBoard(currentProjectId); // Refresh list view
+                } else if (typeof window.location.reload === 'function') {
+                    window.location.reload(); // Fallback for other pages like My Tasks
+                }
+                
                 if (document.getElementById('task-modal').classList.contains('hidden') === false && document.getElementById('task-modal-id').value == taskId) {
                     openTaskModal(taskId); // Reload modal if open
                 }
