@@ -161,6 +161,7 @@ require_once 'views/layouts/header.php';
                             <th class="px-4 py-3 font-medium">Tasks</th>
                             <th class="px-4 py-3 font-medium">Assignees</th>
                             <th class="px-4 py-3 font-medium">Collaborators</th>
+                            <th class="px-4 py-3 font-medium">Labels</th>
                             <th class="px-4 py-3 font-medium">Completed On</th>
                             <th class="px-4 py-3 font-medium">Status / Actions</th>
                         </tr>
@@ -289,6 +290,26 @@ require_once 'views/layouts/header.php';
                     <input type="number" id="task-modal-estimated" onchange="updateTaskDetails()" min="0" placeholder="0" class="text-sm text-slate-700 border border-transparent hover:border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 p-1 -ml-1 rounded cursor-pointer w-24">
                 </div>
                 <!-- Parent Task Selection Removed -->
+                
+                <div class="col-span-2 relative">
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Labels</label>
+                    <div class="flex flex-wrap gap-2 items-center" id="task-modal-labels">
+                        <!-- Labels will be dynamically populated here -->
+                    </div>
+                    <button onclick="toggleLabelsDropdown(event)" class="text-xs text-teal-600 font-medium hover:text-teal-700 whitespace-nowrap px-2 py-1 bg-teal-50 hover:bg-teal-100 rounded transition-colors flex items-center mt-2">
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        Add Label
+                    </button>
+                    <!-- Dropdown for labels -->
+                    <div id="labels-dropdown" class="hidden absolute top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-64 flex-col">
+                        <div class="p-2 border-b border-slate-100">
+                            <input type="text" id="labels-search" oninput="searchLabels(this.value)" onkeydown="handleLabelSearchKeydown(event)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search or create label..." onclick="event.stopPropagation()">
+                        </div>
+                        <ul id="labels-dropdown-list" class="overflow-y-auto flex-1 p-1 text-sm text-slate-600">
+                            <!-- Items here -->
+                        </ul>
+                    </div>
+                </div>
             </div>
             
             <!-- Projects -->
@@ -1128,6 +1149,28 @@ async function openTaskModal(taskId) {
         
         document.getElementById('task-modal-estimated').value = task.estimated_minutes || 0;
         
+        // Render Labels
+        window.currentTaskLabelIds = task.label_ids ? task.label_ids.split(',').map(id => parseInt(id)) : [];
+        const labelsContainer = document.getElementById('task-modal-labels');
+        if (labelsContainer) {
+            labelsContainer.innerHTML = '';
+            if (task.label_names) {
+                const names = task.label_names.split(',');
+                const ids = task.label_ids.split(',');
+                const colors = task.label_colors.split(',');
+                for(let i=0; i<names.length; i++) {
+                    const lName = names[i].trim();
+                    const lColor = colors[i] ? colors[i].trim() : '#38b2ac';
+                    const lId = parseInt(ids[i]);
+                    // Auto-determine text color based on background (simple heuristic)
+                    labelsContainer.innerHTML += `<div class="px-2 py-0.5 rounded text-xs font-medium text-white flex items-center" style="background-color: ${lColor}">
+                        ${lName}
+                        <svg onclick="removeLabelFromTask(${lId})" class="w-3 h-3 ml-1 cursor-pointer opacity-70 hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </div>`;
+                }
+            }
+        }
+        
         // Render custom editor content
         document.getElementById('task-modal-desc').innerHTML = task.description || '<p><br></p>';
 
@@ -1776,6 +1819,206 @@ async function toggleProjectMemberAssignment(userId) {
         console.error('Error updating project members:', e);
     } finally {
         hideLoadingOverlay();
+    }
+}
+
+// ==========================================
+// Task Labels UI
+// ==========================================
+
+window.allLabelsCache = [];
+window.currentTaskLabelIds = [];
+window.activeLabelTaskId = null;
+window.labelDropdownContext = 'modal';
+
+async function toggleLabelsDropdown(event) {
+    window.labelDropdownContext = 'modal';
+    window.activeLabelTaskId = document.getElementById('task-modal-id').value || null;
+
+    const dropdown = document.getElementById('labels-dropdown');
+    
+    if (dropdown.classList.contains('hidden')) {
+        if (dropdown.parentElement !== document.body) {
+            document.body.appendChild(dropdown);
+        }
+
+        const rect = event.currentTarget.getBoundingClientRect();
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 4) + 'px';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.zIndex = '61';
+
+        dropdown.classList.remove('hidden');
+        dropdown.classList.add('flex');
+
+        await searchLabels('');
+
+        setTimeout(() => document.getElementById('labels-search').focus(), 50);
+
+        openAssigneeBackdrop(() => {
+            dropdown.classList.add('hidden');
+            dropdown.classList.remove('flex');
+        });
+    } else {
+        dropdown.classList.add('hidden');
+        dropdown.classList.remove('flex');
+        closeAssigneeBackdrop();
+    }
+}
+
+window.openListViewLabelsDropdown = async function(event, taskId, labelIdsStr) {
+    event.stopPropagation();
+    window.labelDropdownContext = 'list';
+    window.activeLabelTaskId = taskId;
+    window.currentTaskLabelIds = labelIdsStr ? String(labelIdsStr).split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
+
+    const dropdown = document.getElementById('labels-dropdown');
+    
+    if (dropdown.parentElement !== document.body) {
+        document.body.appendChild(dropdown);
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    dropdown.style.position = 'fixed';
+    dropdown.style.top = (rect.bottom + 4) + 'px';
+    dropdown.style.left = rect.left + 'px';
+    dropdown.style.zIndex = '61';
+    
+    dropdown.classList.remove('hidden');
+    dropdown.classList.add('flex');
+
+    await searchLabels('');
+
+    setTimeout(() => document.getElementById('labels-search').focus(), 50);
+
+    openAssigneeBackdrop(() => {
+        dropdown.classList.add('hidden');
+        dropdown.classList.remove('flex');
+    });
+};
+
+async function searchLabels(query) {
+    if (window.allLabelsCache.length === 0) {
+        try {
+            const res = await fetch('/bathyal/api/labels.php');
+            const data = await res.json();
+            if (data.status === 'success') {
+                window.allLabelsCache = data.data;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+    
+    const q = query.toLowerCase().trim();
+    const filtered = window.allLabelsCache.filter(l => l.name.toLowerCase().includes(q));
+    const list = document.getElementById('labels-dropdown-list');
+    list.innerHTML = '';
+    
+    filtered.forEach(label => {
+        const isSelected = window.currentTaskLabelIds.includes(parseInt(label.id));
+        list.innerHTML += `
+            <li class="px-3 py-2 hover:bg-slate-50 cursor-pointer flex items-center justify-between group" onclick="toggleTaskLabel(${label.id})">
+                <div class="flex items-center">
+                    <span class="w-3 h-3 rounded-full mr-2" style="background-color: ${label.color}"></span>
+                    <span class="${isSelected ? 'font-medium text-slate-800' : 'text-slate-600'}">${label.name}</span>
+                </div>
+                ${isSelected ? '<svg class="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' : ''}
+            </li>
+        `;
+    });
+
+    // Check role for creation
+    const userRole = <?= json_encode($currentUser['role'] ?? 'member') ?>;
+    if (q.length > 0 && filtered.length === 0 && (userRole === 'admin' || userRole === 'member')) {
+        list.innerHTML += `
+            <li class="px-3 py-2 hover:bg-slate-50 cursor-pointer flex items-center text-teal-600 font-medium" onclick="createLabelAndAssign('${q.replace(/'/g, "\\'")}')">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Create "${q}"
+            </li>
+        `;
+    } else if (filtered.length === 0) {
+        list.innerHTML += `<li class="px-3 py-2 text-slate-400 italic">No labels found</li>`;
+    }
+}
+
+function handleLabelSearchKeydown(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const query = e.target.value.trim();
+        const userRole = <?= json_encode($currentUser['role'] ?? 'member') ?>;
+        if (query.length > 0 && (userRole === 'admin' || userRole === 'member')) {
+            const exactMatch = window.allLabelsCache.find(l => l.name.toLowerCase() === query.toLowerCase());
+            if (exactMatch) {
+                toggleTaskLabel(exactMatch.id);
+            } else {
+                createLabelAndAssign(query);
+            }
+        }
+    }
+}
+
+async function createLabelAndAssign(name) {
+    try {
+        const res = await fetch('/bathyal/api/labels.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'create', name: name })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            window.allLabelsCache.push(data.data);
+            await toggleTaskLabel(data.data.id);
+            document.getElementById('labels-search').value = '';
+            searchLabels('');
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function toggleTaskLabel(labelId) {
+    const idx = window.currentTaskLabelIds.indexOf(labelId);
+    if (idx > -1) {
+        window.currentTaskLabelIds.splice(idx, 1);
+    } else {
+        window.currentTaskLabelIds.push(labelId);
+    }
+    await saveTaskLabels();
+    searchLabels(document.getElementById('labels-search').value);
+}
+
+async function removeLabelFromTask(labelId) {
+    const idx = window.currentTaskLabelIds.indexOf(labelId);
+    if (idx > -1) {
+        window.currentTaskLabelIds.splice(idx, 1);
+        await saveTaskLabels();
+    }
+}
+
+async function saveTaskLabels() {
+    const taskId = window.activeLabelTaskId || document.getElementById('task-modal-id').value;
+    if (!taskId) return;
+    
+    try {
+        const res = await fetch('/bathyal/api/tasks.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'update_details', task_id: taskId, details: { label_ids: window.currentTaskLabelIds } })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            if (window.labelDropdownContext === 'modal') {
+                openTaskModal(taskId); // Reload modal
+            } else {
+                fetchProjectTasks(); // Reload list view
+                if (document.getElementById('task-modal').classList.contains('hidden') === false && document.getElementById('task-modal-id').value == taskId) {
+                    openTaskModal(taskId); // Reload modal if open
+                }
+            }
+        }
+    } catch (e) {
+        console.error(e);
     }
 }
 

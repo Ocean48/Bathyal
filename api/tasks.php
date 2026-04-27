@@ -192,6 +192,14 @@ switch ($method) {
                             }
                             continue;
                         }
+                        if ($k === 'label_ids') {
+                            $oldDisplay = !empty($oldTaskDetails['label_names']) ? htmlspecialchars($oldTaskDetails['label_names']) : '<em>None</em>';
+                            $newDisplay = !empty($taskDetails['label_names']) ? htmlspecialchars($taskDetails['label_names']) : '<em>None</em>';
+                            if ($oldDisplay !== $newDisplay) {
+                                $changes[] = "<li><strong>Labels:</strong> changed from {$oldDisplay} to {$newDisplay}</li>";
+                            }
+                            continue;
+                        }
                         
                         $oldVal = isset($oldTaskDetails[$k]) ? (string)$oldTaskDetails[$k] : '';
                         $newVal = isset($taskDetails[$k]) ? (string)$taskDetails[$k] : '';

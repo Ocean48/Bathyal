@@ -513,12 +513,26 @@ function renderTaskCard(task) {
     // Add subtask count to the end of the title if it exists
     const titleWithCount = totalSubtasks > 0 ? `${task.title} <span class="text-xs text-slate-400 ml-1">(${totalSubtasks})</span>` : task.title;
     
+    // Create label badges
+    let labelsHtml = '';
+    if (task.label_names) {
+        const names = task.label_names.split(',');
+        const colors = task.label_colors ? task.label_colors.split(',') : [];
+        labelsHtml = '<div class="flex flex-wrap gap-1 mb-2 mt-1">';
+        for(let i=0; i<names.length; i++) {
+            const lColor = colors[i] ? colors[i].trim() : '#38b2ac';
+            labelsHtml += `<div class="w-2.5 h-2.5 rounded-full shadow-sm" style="background-color: ${lColor}" title="${names[i].trim()}"></div>`;
+        }
+        labelsHtml += '</div>';
+    }
+
     return `
         <div class="bg-white p-3.5 rounded-lg shadow-sm border border-slate-200 task-card hover:border-teal-400 hover:shadow transition-all cursor-grab active:cursor-grabbing ${sharedClass}" data-task-id="${task.id}" onclick="openTaskModal(${task.id})">
-            <div class="flex justify-between items-start mb-2">
+            <div class="flex justify-between items-start mb-1">
                 <h4 class="text-sm text-slate-800 font-medium leading-snug">${titleWithCount}</h4>
                 ${assigneesHtml}
             </div>
+            ${labelsHtml}
             ${task.description ? `<p class="text-xs text-slate-500 line-clamp-2 mb-3 mt-1">${task.description}</p>` : ''}
             
             <div class="flex justify-between items-center text-xs mt-3 pt-3 border-t border-slate-50 relative pointer-events-none">
@@ -598,6 +612,19 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
         collaboratorsHtml += `</div>`;
     }
 
+    // Labels Visual Stack
+    let labelsListHtml = '<span class="text-slate-400 italic text-xs">No Labels</span>';
+    if (task.label_names) {
+        const names = task.label_names.split(',');
+        const colors = task.label_colors ? task.label_colors.split(',') : [];
+        labelsListHtml = '<div class="flex flex-wrap gap-1" title="' + task.label_names + '">';
+        for(let i=0; i<names.length; i++) {
+            const lColor = colors[i] ? colors[i].trim() : '#38b2ac';
+            labelsListHtml += `<div class="w-2 h-2 rounded-full shadow-sm" style="background-color: ${lColor}"></div>`;
+        }
+        labelsListHtml += '</div>';
+    }
+
     // Add subtask count to the end of the title if it exists
     const titleWithCount = totalSubtasks > 0 ? `${task.title} <span class="text-xs text-slate-400 ml-1">(${totalSubtasks})</span>` : task.title;
 
@@ -610,13 +637,18 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
             <span class="truncate block max-w-sm">${titleWithCount}</span>
         </td>
         <td class="px-4 py-3">
-            <div class="cursor-pointer inline-flex items-center p-1 hover:bg-slate-100 rounded transition-colors -ml-1" onclick="if(window.openListViewAssigneeDropdown) window.openListViewAssigneeDropdown(event, ${task.id}, '${task.assignee_ids || ''}')">
+            <div class="cursor-pointer inline-flex items-center p-1 hover:bg-slate-100 rounded transition-colors -ml-1 list-assignees-container" onclick="if(window.openListViewAssigneeDropdown) window.openListViewAssigneeDropdown(event, ${task.id}, '${task.assignee_ids || ''}')">
                 ${assigneesHtml}
             </div>
         </td>
         <td class="px-4 py-3">
-            <div class="cursor-pointer inline-flex items-center p-1 hover:bg-slate-100 rounded transition-colors -ml-1" onclick="if(window.openListViewCollaboratorDropdown) window.openListViewCollaboratorDropdown(event, ${task.id}, '${task.collaborator_ids || ''}')">
+            <div class="cursor-pointer inline-flex items-center p-1 hover:bg-slate-100 rounded transition-colors -ml-1 list-collaborators-container" onclick="if(window.openListViewCollaboratorDropdown) window.openListViewCollaboratorDropdown(event, ${task.id}, '${task.collaborator_ids || ''}')">
                 ${collaboratorsHtml}
+            </div>
+        </td>
+        <td class="px-4 py-3">
+            <div class="cursor-pointer inline-flex items-center p-1 hover:bg-slate-100 rounded transition-colors -ml-1 list-labels-container" onclick="if(window.openListViewLabelsDropdown) window.openListViewLabelsDropdown(event, ${task.id}, '${task.label_ids || ''}')">
+                ${labelsListHtml}
             </div>
         </td>
         <td class="px-4 py-3 text-slate-500 text-sm whitespace-nowrap">${task.completed_date ? task.completed_date.split(' ')[0] : '-'}</td>

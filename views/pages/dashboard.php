@@ -165,7 +165,21 @@ require_once 'views/layouts/header.php';
                             </button>
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-medium text-slate-800 truncate"><?= htmlspecialchars($task['title']) ?></p>
-                                <p class="text-xs text-slate-400 mt-0.5 truncate"><?= htmlspecialchars($task['project_name'] ?? 'No Project') ?></p>
+                                <div class="flex items-center mt-0.5">
+                                    <p class="text-xs text-slate-400 truncate mr-2"><?= htmlspecialchars($task['project_name'] ?? 'No Project') ?></p>
+                                    <?php if (!empty($task['label_names'])): ?>
+                                        <div class="flex flex-wrap gap-1">
+                                            <?php 
+                                            $lNames = explode(',', $task['label_names']);
+                                            $lColors = explode(',', $task['label_colors']);
+                                            foreach($lNames as $idx => $lName): 
+                                                $lColor = !empty($lColors[$idx]) ? trim($lColors[$idx]) : '#38b2ac';
+                                            ?>
+                                                <div class="w-2 h-2 rounded-full" style="background-color: <?= $lColor ?>" title="<?= htmlspecialchars(trim($lName)) ?>"></div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                             <div class="ml-4 flex-shrink-0 flex items-center text-xs text-slate-400">
                                 <?php if ($task['expected_due_date']): ?>
@@ -189,7 +203,21 @@ require_once 'views/layouts/header.php';
                             </button>
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-medium text-slate-800 truncate"><?= htmlspecialchars($task['title']) ?></p>
-                                <p class="text-xs text-slate-400 mt-0.5 truncate"><?= htmlspecialchars($task['project_name'] ?? 'No Project') ?></p>
+                                <div class="flex items-center mt-0.5">
+                                    <p class="text-xs text-slate-400 truncate mr-2"><?= htmlspecialchars($task['project_name'] ?? 'No Project') ?></p>
+                                    <?php if (!empty($task['label_names'])): ?>
+                                        <div class="flex flex-wrap gap-1">
+                                            <?php 
+                                            $lNames = explode(',', $task['label_names']);
+                                            $lColors = explode(',', $task['label_colors']);
+                                            foreach($lNames as $idx => $lName): 
+                                                $lColor = !empty($lColors[$idx]) ? trim($lColors[$idx]) : '#38b2ac';
+                                            ?>
+                                                <div class="w-2 h-2 rounded-full" style="background-color: <?= $lColor ?>" title="<?= htmlspecialchars(trim($lName)) ?>"></div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                             <div class="ml-4 flex-shrink-0 flex items-center text-xs text-slate-400">
                                 <?php if ($task['expected_due_date']): ?>

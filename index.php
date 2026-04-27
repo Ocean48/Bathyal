@@ -74,6 +74,11 @@ switch ($route) {
         require 'views/pages/reports.php';
         break;
         
+    case 'labels.php':
+    case 'labels':
+        require 'views/pages/labels.php';
+        break;
+        
     default:
         http_response_code(404);
         echo "<h1 style='text-align:center; margin-top: 50px; font-family:sans-serif;'>404 - Page Not Found</h1>";

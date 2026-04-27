@@ -191,6 +191,9 @@ class DBQueries {
                    GROUP_CONCAT(u.id SEPARATOR ',') as assignee_ids,
                    (SELECT GROUP_CONCAT(u2.name SEPARATOR ', ') FROM task_collaborators tc JOIN users u2 ON tc.user_id = u2.id WHERE tc.task_id = t.id) as collaborator_name,
                    (SELECT GROUP_CONCAT(tc.user_id SEPARATOR ',') FROM task_collaborators tc WHERE tc.task_id = t.id) as collaborator_ids,
+                   (SELECT GROUP_CONCAT(tg.name SEPARATOR ', ') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_names,
+                   (SELECT GROUP_CONCAT(tg.id SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_ids,
+                   (SELECT GROUP_CONCAT(tg.color SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_colors,
                    (
                        (SELECT COUNT(*) FROM tasks sub WHERE sub.parent_task_id = t.id) + 
                        (SELECT COUNT(*) FROM task_links tl WHERE tl.parent_id = t.id)
@@ -221,6 +224,9 @@ class DBQueries {
                    GROUP_CONCAT(u.id SEPARATOR ',') as assignee_ids,
                    (SELECT GROUP_CONCAT(u2.name SEPARATOR ', ') FROM task_collaborators tc JOIN users u2 ON tc.user_id = u2.id WHERE tc.task_id = t.id) as collaborator_name,
                    (SELECT GROUP_CONCAT(tc.user_id SEPARATOR ',') FROM task_collaborators tc WHERE tc.task_id = t.id) as collaborator_ids,
+                   (SELECT GROUP_CONCAT(tg.name SEPARATOR ', ') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_names,
+                   (SELECT GROUP_CONCAT(tg.id SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_ids,
+                   (SELECT GROUP_CONCAT(tg.color SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_colors,
                    (
                        (SELECT COUNT(*) FROM tasks sub WHERE sub.parent_task_id = t.id) + 
                        (SELECT COUNT(*) FROM task_links tl WHERE tl.parent_id = t.id)
@@ -251,6 +257,9 @@ class DBQueries {
                    GROUP_CONCAT(u.id SEPARATOR ',') as assignee_ids,
                    (SELECT GROUP_CONCAT(u2.name SEPARATOR ', ') FROM task_collaborators tc JOIN users u2 ON tc.user_id = u2.id WHERE tc.task_id = t.id) as collaborator_name,
                    (SELECT GROUP_CONCAT(tc.user_id SEPARATOR ',') FROM task_collaborators tc WHERE tc.task_id = t.id) as collaborator_ids,
+                   (SELECT GROUP_CONCAT(tg.name SEPARATOR ', ') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_names,
+                   (SELECT GROUP_CONCAT(tg.id SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_ids,
+                   (SELECT GROUP_CONCAT(tg.color SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_colors,
                    (
                        (SELECT COUNT(*) FROM tasks sub WHERE sub.parent_task_id = t.id) +
                        (SELECT COUNT(*) FROM task_links tl2 WHERE tl2.parent_id = t.id)
@@ -332,6 +341,9 @@ class DBQueries {
             SELECT t.*,
                    (SELECT GROUP_CONCAT(p.name SEPARATOR ', ') FROM task_projects tp JOIN projects p ON tp.project_id = p.id WHERE tp.task_id = t.id) AS project_names,
                    (SELECT GROUP_CONCAT(tp.project_id SEPARATOR ',') FROM task_projects tp WHERE tp.task_id = t.id) AS project_ids,
+                   (SELECT GROUP_CONCAT(tg.name SEPARATOR ', ') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_names,
+                   (SELECT GROUP_CONCAT(tg.id SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_ids,
+                   (SELECT GROUP_CONCAT(tg.color SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_colors,
                    (
                        (SELECT COUNT(*) FROM tasks sub WHERE sub.parent_task_id = t.id) + 
                        (SELECT COUNT(*) FROM task_links tl WHERE tl.parent_id = t.id)
@@ -360,7 +372,10 @@ class DBQueries {
         $stmt = $this->pdo->prepare("
             SELECT t.*, 
                    COALESCE(p1.name, p2.name, p3.name) AS project_name, 
-                   COALESCE(tp1.project_id, tp2.project_id, tp3.project_id) AS project_id
+                   COALESCE(tp1.project_id, tp2.project_id, tp3.project_id) AS project_id,
+                   (SELECT GROUP_CONCAT(tg.name SEPARATOR ', ') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_names,
+                   (SELECT GROUP_CONCAT(tg.id SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_ids,
+                   (SELECT GROUP_CONCAT(tg.color SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_colors
             FROM tasks t
             JOIN task_assignees ta ON t.id = ta.task_id
             
@@ -1337,7 +1352,10 @@ class DBQueries {
                    (SELECT GROUP_CONCAT(u.name SEPARATOR ', ') FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE ta.task_id = t.id) as assignee_name,
                    (SELECT GROUP_CONCAT(ta.user_id SEPARATOR ',') FROM task_assignees ta WHERE ta.task_id = t.id) as assignee_ids,
                    (SELECT GROUP_CONCAT(u.name SEPARATOR ', ') FROM task_collaborators tc JOIN users u ON tc.user_id = u.id WHERE tc.task_id = t.id) as collaborator_name,
-                   (SELECT GROUP_CONCAT(tc.user_id SEPARATOR ',') FROM task_collaborators tc WHERE tc.task_id = t.id) as collaborator_ids
+                   (SELECT GROUP_CONCAT(tc.user_id SEPARATOR ',') FROM task_collaborators tc WHERE tc.task_id = t.id) as collaborator_ids,
+                   (SELECT GROUP_CONCAT(tg.name SEPARATOR ', ') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_names,
+                   (SELECT GROUP_CONCAT(tg.id SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_ids,
+                   (SELECT GROUP_CONCAT(tg.color SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_colors
             FROM tasks t 
             WHERE t.id = :id
         ");
@@ -1366,6 +1384,9 @@ class DBQueries {
                    GROUP_CONCAT(u.id SEPARATOR ',') as assignee_ids,
                    (SELECT GROUP_CONCAT(u2.name SEPARATOR ', ') FROM task_collaborators tc JOIN users u2 ON tc.user_id = u2.id WHERE tc.task_id = t.id) as collaborator_name,
                    (SELECT GROUP_CONCAT(tc.user_id SEPARATOR ',') FROM task_collaborators tc WHERE tc.task_id = t.id) as collaborator_ids,
+                   (SELECT GROUP_CONCAT(tg.name SEPARATOR ', ') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_names,
+                   (SELECT GROUP_CONCAT(tg.id SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_ids,
+                   (SELECT GROUP_CONCAT(tg.color SEPARATOR ',') FROM task_labels tt JOIN labels tg ON tt.label_id = tg.id WHERE tt.task_id = t.id) as label_colors,
                    (SELECT COUNT(*) FROM task_projects tp2 WHERE tp2.task_id = t.id) AS project_count
             FROM tasks t 
             LEFT JOIN task_assignees ta ON t.id = ta.task_id
@@ -1526,6 +1547,21 @@ class DBQueries {
             }
         }
         
+        if (array_key_exists('label_ids', $data)) {
+            $stmtDelLabels = $this->pdo->prepare("DELETE FROM task_labels WHERE task_id = :id");
+            $stmtDelLabels->bindValue(':id', (int)$taskId, PDO::PARAM_INT);
+            $stmtDelLabels->execute();
+            
+            if (!empty($data['label_ids']) && is_array($data['label_ids'])) {
+                $stmtInsLabels = $this->pdo->prepare("INSERT INTO task_labels (task_id, label_id) VALUES (:tid, :lid)");
+                foreach ($data['label_ids'] as $lid) {
+                    $stmtInsLabels->bindValue(':tid', (int)$taskId, PDO::PARAM_INT);
+                    $stmtInsLabels->bindValue(':lid', (int)$lid, PDO::PARAM_INT);
+                    $stmtInsLabels->execute();
+                }
+            }
+        }
+
         return true;
     }
 
@@ -2028,5 +2064,28 @@ class DBQueries {
             'collaborators' => (int)$collaborators,
             'tasks_due_soon' => (int)$tasksDueSoon
         ];
+    }
+
+    // --- LABELS ---
+    public function getLabels() {
+        $stmt = $this->pdo->prepare("SELECT * FROM labels ORDER BY name ASC");
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function createLabel($name, $color) {
+        $stmt = $this->pdo->prepare("INSERT INTO labels (name, color) VALUES (:name, :color)");
+        $stmt->execute([':name' => $name, ':color' => $color]);
+        return $this->pdo->lastInsertId();
+    }
+
+    public function updateLabel($id, $name, $color) {
+        $stmt = $this->pdo->prepare("UPDATE labels SET name = :name, color = :color WHERE id = :id");
+        return $stmt->execute([':name' => $name, ':color' => $color, ':id' => (int)$id]);
+    }
+
+    public function deleteLabel($id) {
+        $stmt = $this->pdo->prepare("DELETE FROM labels WHERE id = :id");
+        return $stmt->execute([':id' => (int)$id]);
     }
 }
