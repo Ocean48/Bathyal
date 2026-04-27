@@ -23,32 +23,57 @@ class DBQueries {
     }
 
     public function getRecentProjects($userId, $limit = 10) {
-        $stmt = $this->pdo->prepare("
-            SELECT p.id, p.name 
-            FROM projects p
-            JOIN user_recent_projects urp ON p.id = urp.project_id
-            JOIN project_members pm ON p.id = pm.project_id
-            WHERE urp.user_id = :userId1 AND pm.user_id = :userId2
-            ORDER BY urp.last_accessed DESC 
-            LIMIT :limit
-        ");
-        $stmt->bindValue(':userId1', (int)$userId, PDO::PARAM_INT);
-        $stmt->bindValue(':userId2', (int)$userId, PDO::PARAM_INT);
+        $stmtUser = $this->pdo->prepare("SELECT role FROM users WHERE id = ?");
+        $stmtUser->execute([(int)$userId]);
+        $userRole = $stmtUser->fetchColumn();
+
+        if ($userRole === 'admin') {
+            $stmt = $this->pdo->prepare("
+                SELECT p.id, p.name 
+                FROM projects p
+                JOIN user_recent_projects urp ON p.id = urp.project_id
+                WHERE urp.user_id = :userId
+                ORDER BY urp.last_accessed DESC 
+                LIMIT :limit
+            ");
+            $stmt->bindValue(':userId', (int)$userId, PDO::PARAM_INT);
+        } else {
+            $stmt = $this->pdo->prepare("
+                SELECT p.id, p.name 
+                FROM projects p
+                JOIN user_recent_projects urp ON p.id = urp.project_id
+                JOIN project_members pm ON p.id = pm.project_id
+                WHERE urp.user_id = :userId1 AND pm.user_id = :userId2
+                ORDER BY urp.last_accessed DESC 
+                LIMIT :limit
+            ");
+            $stmt->bindValue(':userId1', (int)$userId, PDO::PARAM_INT);
+            $stmt->bindValue(':userId2', (int)$userId, PDO::PARAM_INT);
+        }
         $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
         $recentProjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Fallback to latest created projects the user is a member of if user has no recent history
         if (empty($recentProjects)) {
-            $recentProjectsStmt = $this->pdo->prepare("
-                SELECT p.id, p.name 
-                FROM projects p
-                JOIN project_members pm ON p.id = pm.project_id
-                WHERE pm.user_id = :userId
-                ORDER BY p.created_at DESC 
-                LIMIT :limit
-            ");
-            $recentProjectsStmt->bindValue(':userId', (int)$userId, PDO::PARAM_INT);
+            if ($userRole === 'admin') {
+                $recentProjectsStmt = $this->pdo->prepare("
+                    SELECT p.id, p.name 
+                    FROM projects p
+                    ORDER BY p.created_at DESC 
+                    LIMIT :limit
+                ");
+            } else {
+                $recentProjectsStmt = $this->pdo->prepare("
+                    SELECT p.id, p.name 
+                    FROM projects p
+                    JOIN project_members pm ON p.id = pm.project_id
+                    WHERE pm.user_id = :userId
+                    ORDER BY p.created_at DESC 
+                    LIMIT :limit
+                ");
+                $recentProjectsStmt->bindValue(':userId', (int)$userId, PDO::PARAM_INT);
+            }
             $recentProjectsStmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
             $recentProjectsStmt->execute();
             $recentProjects = $recentProjectsStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -139,6 +164,14 @@ class DBQueries {
     }
 
     public function isProjectMember($projectId, $userId) {
+        // Check if user is a system admin
+        $stmtUser = $this->pdo->prepare("SELECT role FROM users WHERE id = ?");
+        $stmtUser->execute([(int)$userId]);
+        $userRole = $stmtUser->fetchColumn();
+        if ($userRole === 'admin') {
+            return true;
+        }
+
         $stmt = $this->pdo->prepare("SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?");
         $stmt->execute([(int)$projectId, (int)$userId]);
         return (bool)$stmt->fetchColumn();
@@ -352,11 +385,20 @@ class DBQueries {
         ";
         
         if ($userId) {
-            $sql .= " WHERE EXISTS (SELECT 1 FROM task_projects tp JOIN project_members pm ON tp.project_id = pm.project_id WHERE tp.task_id = t.id AND pm.user_id = :userId)";
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->bindValue(':userId', (int)$userId, PDO::PARAM_INT);
-            $stmt->execute();
-            $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $stmtUser = $this->pdo->prepare("SELECT role FROM users WHERE id = ?");
+            $stmtUser->execute([(int)$userId]);
+            $userRole = $stmtUser->fetchColumn();
+
+            if ($userRole === 'admin') {
+                $stmt = $this->pdo->query($sql);
+                $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } else {
+                $sql .= " WHERE EXISTS (SELECT 1 FROM task_projects tp JOIN project_members pm ON tp.project_id = pm.project_id WHERE tp.task_id = t.id AND pm.user_id = :userId)";
+                $stmt = $this->pdo->prepare($sql);
+                $stmt->bindValue(':userId', (int)$userId, PDO::PARAM_INT);
+                $stmt->execute();
+                $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
         } else {
             $stmt = $this->pdo->query($sql);
             $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -672,9 +714,19 @@ class DBQueries {
     }
 
     public function getProjectMemberRole($projectId, $userId) {
+        $stmtUser = $this->pdo->prepare("SELECT role FROM users WHERE id = ?");
+        $stmtUser->execute([(int)$userId]);
+        $userRole = $stmtUser->fetchColumn();
+        
         $stmt = $this->pdo->prepare("SELECT role FROM project_members WHERE project_id = :pid AND user_id = :uid");
         $stmt->execute(['pid' => (int)$projectId, 'uid' => (int)$userId]);
-        return $stmt->fetchColumn();
+        $role = $stmt->fetchColumn();
+        
+        if (!$role && $userRole === 'admin') {
+            return 'manager';
+        }
+        
+        return $role;
     }
 
     public function sendProjectMemberNotification($projectId, $userId, $role, $action) {
@@ -1973,15 +2025,29 @@ class DBQueries {
     }
 
     public function searchProjects($query, $userId, $limit = 10) {
-        $stmt = $this->pdo->prepare("
-            SELECT p.id, p.name 
-            FROM projects p 
-            JOIN project_members pm ON p.id = pm.project_id
-            WHERE pm.user_id = :userId AND p.name LIKE :query 
-            LIMIT " . (int)$limit
-        );
-        $stmt->bindValue(':userId', (int)$userId, PDO::PARAM_INT);
-        $stmt->bindValue(':query', "%$query%", PDO::PARAM_STR);
+        $stmtUser = $this->pdo->prepare("SELECT role FROM users WHERE id = ?");
+        $stmtUser->execute([(int)$userId]);
+        $userRole = $stmtUser->fetchColumn();
+
+        if ($userRole === 'admin') {
+            $stmt = $this->pdo->prepare("
+                SELECT p.id, p.name 
+                FROM projects p 
+                WHERE p.name LIKE :query 
+                LIMIT " . (int)$limit
+            );
+            $stmt->bindValue(':query', "%$query%", PDO::PARAM_STR);
+        } else {
+            $stmt = $this->pdo->prepare("
+                SELECT p.id, p.name 
+                FROM projects p 
+                JOIN project_members pm ON p.id = pm.project_id
+                WHERE pm.user_id = :userId AND p.name LIKE :query 
+                LIMIT " . (int)$limit
+            );
+            $stmt->bindValue(':userId', (int)$userId, PDO::PARAM_INT);
+            $stmt->bindValue(':query', "%$query%", PDO::PARAM_STR);
+        }
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -2087,5 +2153,177 @@ class DBQueries {
     public function deleteLabel($id) {
         $stmt = $this->pdo->prepare("DELETE FROM labels WHERE id = :id");
         return $stmt->execute([':id' => (int)$id]);
+    }
+
+    public function getProjectsForUser($userId) {
+        $stmtUser = $this->pdo->prepare("SELECT role FROM users WHERE id = ?");
+        $stmtUser->execute([(int)$userId]);
+        $userRole = $stmtUser->fetchColumn();
+
+        if ($userRole === 'admin') {
+            $stmt = $this->pdo->prepare("
+                SELECT p.* 
+                FROM projects p
+                ORDER BY p.created_at DESC
+            ");
+            $stmt->execute();
+        } else {
+            $stmt = $this->pdo->prepare("
+                SELECT p.* 
+                FROM projects p
+                JOIN project_members pm ON p.id = pm.project_id
+                WHERE pm.user_id = ?
+                ORDER BY p.created_at DESC
+            ");
+            $stmt->execute([(int)$userId]);
+        }
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getDashboardProjects($userId) {
+        $stmtUser = $this->pdo->prepare("SELECT role FROM users WHERE id = ?");
+        $stmtUser->execute([(int)$userId]);
+        $userRole = $stmtUser->fetchColumn();
+
+        if ($userRole === 'admin') {
+            $stmt = $this->pdo->prepare("
+                SELECT p.* 
+                FROM projects p
+                ORDER BY p.created_at DESC 
+                LIMIT 5
+            ");
+            $stmt->execute();
+        } else {
+            $stmt = $this->pdo->prepare("
+                SELECT p.* 
+                FROM projects p
+                JOIN project_members pm ON p.id = pm.project_id
+                WHERE pm.user_id = ?
+                ORDER BY p.created_at DESC 
+                LIMIT 5
+            ");
+            $stmt->execute([(int)$userId]);
+        }
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getReportTaskStatus($userId) {
+        $stmtUser = $this->pdo->prepare("SELECT role FROM users WHERE id = ?");
+        $stmtUser->execute([(int)$userId]);
+        $userRole = $stmtUser->fetchColumn();
+
+        if ($userRole === 'admin') {
+            $stmtStatus = $this->pdo->prepare("
+                SELECT t.status, COUNT(DISTINCT t.id) as count 
+                FROM tasks t
+                GROUP BY t.status
+            ");
+            $stmtStatus->execute();
+        } else {
+            $stmtStatus = $this->pdo->prepare("
+                SELECT t.status, COUNT(DISTINCT t.id) as count 
+                FROM tasks t
+                JOIN task_projects tp ON t.id = tp.task_id
+                JOIN project_members pm ON tp.project_id = pm.project_id
+                WHERE pm.user_id = :userId
+                GROUP BY t.status
+            ");
+            $stmtStatus->execute(['userId' => (int)$userId]);
+        }
+        return $stmtStatus->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getReportTasksByProject($userId) {
+        $stmtUser = $this->pdo->prepare("SELECT role FROM users WHERE id = ?");
+        $stmtUser->execute([(int)$userId]);
+        $userRole = $stmtUser->fetchColumn();
+
+        if ($userRole === 'admin') {
+            $stmtProject = $this->pdo->prepare("
+                SELECT p.name, COUNT(tp.task_id) as task_count 
+                FROM projects p 
+                LEFT JOIN task_projects tp ON p.id = tp.project_id 
+                GROUP BY p.id 
+                ORDER BY task_count DESC 
+                LIMIT 5
+            ");
+            $stmtProject->execute();
+        } else {
+            $stmtProject = $this->pdo->prepare("
+                SELECT p.name, COUNT(tp.task_id) as task_count 
+                FROM projects p 
+                JOIN project_members pm ON p.id = pm.project_id
+                LEFT JOIN task_projects tp ON p.id = tp.project_id 
+                WHERE pm.user_id = :userId
+                GROUP BY p.id 
+                ORDER BY task_count DESC 
+                LIMIT 5
+            ");
+            $stmtProject->execute(['userId' => (int)$userId]);
+        }
+        return $stmtProject->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getReportUserWorkload($userId) {
+        $stmtUser = $this->pdo->prepare("SELECT role FROM users WHERE id = ?");
+        $stmtUser->execute([(int)$userId]);
+        $userRole = $stmtUser->fetchColumn();
+
+        if ($userRole === 'admin') {
+            $stmtWorkload = $this->pdo->prepare("
+                SELECT u.name as assignee_name, COUNT(DISTINCT ta.task_id) as count 
+                FROM users u 
+                JOIN task_assignees ta ON u.id = ta.user_id 
+                JOIN tasks t ON ta.task_id = t.id
+                WHERE t.status != 'completed'
+                GROUP BY u.id 
+                ORDER BY count DESC 
+                LIMIT 5
+            ");
+            $stmtWorkload->execute();
+        } else {
+            $stmtWorkload = $this->pdo->prepare("
+                SELECT u.name as assignee_name, COUNT(DISTINCT ta.task_id) as count 
+                FROM users u 
+                JOIN task_assignees ta ON u.id = ta.user_id 
+                JOIN tasks t ON ta.task_id = t.id
+                JOIN task_projects tp ON t.id = tp.task_id
+                JOIN project_members pm ON tp.project_id = pm.project_id
+                WHERE t.status != 'completed' AND pm.user_id = :userId
+                GROUP BY u.id 
+                ORDER BY count DESC 
+                LIMIT 5
+            ");
+            $stmtWorkload->execute(['userId' => (int)$userId]);
+        }
+        return $stmtWorkload->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getReportOverdueTasksCount($userId) {
+        $stmtUser = $this->pdo->prepare("SELECT role FROM users WHERE id = ?");
+        $stmtUser->execute([(int)$userId]);
+        $userRole = $stmtUser->fetchColumn();
+
+        if ($userRole === 'admin') {
+            $stmtOverdue = $this->pdo->prepare("
+                SELECT COUNT(DISTINCT t.id) as count 
+                FROM tasks t
+                WHERE t.expected_due_date < NOW() 
+                AND t.status != 'completed'
+            ");
+            $stmtOverdue->execute();
+        } else {
+            $stmtOverdue = $this->pdo->prepare("
+                SELECT COUNT(DISTINCT t.id) as count 
+                FROM tasks t
+                JOIN task_projects tp ON t.id = tp.task_id
+                JOIN project_members pm ON tp.project_id = pm.project_id
+                WHERE t.expected_due_date < NOW() 
+                AND t.status != 'completed'
+                AND pm.user_id = :userId
+            ");
+            $stmtOverdue->execute(['userId' => (int)$userId]);
+        }
+        return $stmtOverdue->fetchColumn();
     }
 }

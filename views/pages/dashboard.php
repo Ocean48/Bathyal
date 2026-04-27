@@ -14,16 +14,7 @@ $db = new DBQueries($pdo);
 $recent_projects = [];
 if (isset($pdo) && isset($currentUser['id'])) {
     try {
-        $stmt = $pdo->prepare("
-            SELECT p.* 
-            FROM projects p
-            JOIN project_members pm ON p.id = pm.project_id
-            WHERE pm.user_id = ?
-            ORDER BY p.created_at DESC 
-            LIMIT 5
-        ");
-        $stmt->execute([$currentUser['id']]);
-        $recent_projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $recent_projects = $db->getDashboardProjects($currentUser['id']);
     } catch (\PDOException $e) {
         // Table might not exist yet
     }
