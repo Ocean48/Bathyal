@@ -125,6 +125,24 @@ bathyal/
    - Point your Nginx virtual host `root` to `/var/www/bathyal`.
    - Ensure it is configured to pass `.php` files to PHP-FPM.
 
+## Folder permissions fix
+How to fix the folder permissions:
+You can fix the folder permissions by running the following commands in your terminal:
+```bash
+sudo mkdir -p assets/uploads
+sudo chown -R www-data:www-data assets/uploads
+sudo chmod -R 775 assets/uploads
+```
+
+How to fix the file size limit (if applicable):
+
+- If your files are larger than 2MB, you will need to edit your php.ini file and update these two lines, then restart apache:
+```bash
+upload_max_filesize = 20M
+post_max_size = 25M
+```
+
+
 ## API Endpoints
 
 All endpoints return JSON and expect authenticated sessions.

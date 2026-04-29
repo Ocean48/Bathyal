@@ -105,7 +105,7 @@ switch ($method) {
             
             $uploadDir = '../assets/uploads/';
             if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
+                @mkdir($uploadDir, 0755, true);
             }
             
             $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
@@ -133,8 +133,41 @@ switch ($method) {
                     exit;
                 }
             }
+            
+            $error_message = 'Failed to upload attachment.';
+            if (isset($file['error']) && $file['error'] !== UPLOAD_ERR_OK) {
+                switch ($file['error']) {
+                    case UPLOAD_ERR_INI_SIZE:
+                        $error_message = 'The uploaded file exceeds the upload_max_filesize directive in php.ini.';
+                        break;
+                    case UPLOAD_ERR_FORM_SIZE:
+                        $error_message = 'The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form.';
+                        break;
+                    case UPLOAD_ERR_PARTIAL:
+                        $error_message = 'The uploaded file was only partially uploaded.';
+                        break;
+                    case UPLOAD_ERR_NO_FILE:
+                        $error_message = 'No file was uploaded.';
+                        break;
+                    case UPLOAD_ERR_NO_TMP_DIR:
+                        $error_message = 'Missing a temporary folder.';
+                        break;
+                    case UPLOAD_ERR_CANT_WRITE:
+                        $error_message = 'Failed to write file to disk. Check folder permissions.';
+                        break;
+                    case UPLOAD_ERR_EXTENSION:
+                        $error_message = 'A PHP extension stopped the file upload.';
+                        break;
+                    default:
+                        $error_message .= ' Error code: ' . $file['error'];
+                        break;
+                }
+            } elseif (!is_dir($uploadDir) || !is_writable($uploadDir)) {
+                $error_message = 'Upload directory does not exist or is not writable by the web server.';
+            }
+            
             http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => 'Failed to upload attachment']);
+            echo json_encode(['status' => 'error', 'message' => $error_message, 'file_error' => isset($file['error']) ? $file['error'] : 'none']);
             exit;
         }
 
@@ -263,6 +296,26 @@ switch ($method) {
                 } else {
                     http_response_code(500);
                     echo json_encode(['status' => 'error', 'message' => 'Failed to update task details']);
+                }
+            } elseif ($data['action'] === 'reset_timer') {
+                $userId = $_SESSION['user_id'] ?? 1;
+                $projectId = isset($data['project_id']) ? (int)$data['project_id'] : 1;
+                $role = $db->getProjectMemberRole($projectId, $userId);
+                
+                $stmtUser = $pdo->prepare("SELECT role FROM users WHERE id = ?");
+                $stmtUser->execute([(int)$userId]);
+                $sysRole = $stmtUser->fetchColumn();
+                
+                if ($sysRole === 'admin' || in_array($role, ['admin', 'manager', 'owner'])) {
+                    if ($db->resetTaskTime($data['task_id'])) {
+                        echo json_encode(['status' => 'success']);
+                    } else {
+                        http_response_code(500);
+                        echo json_encode(['status' => 'error', 'message' => 'Failed to reset timer']);
+                    }
+                } else {
+                    http_response_code(403);
+                    echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
                 }
             } elseif ($data['action'] === 'add_comment') {
                 // Mock user ID 1 for now (admin user)

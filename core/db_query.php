@@ -1809,6 +1809,11 @@ class DBQueries {
         }
     }
 
+    public function resetTaskTime($taskId) {
+        $stmt = $this->pdo->prepare("DELETE FROM task_time_logs WHERE task_id = :task_id");
+        return $stmt->execute([':task_id' => (int)$taskId]);
+    }
+
     public function sendAssigneeNotification($taskId, $userId) {
         try {
             if (isset($this->notifiedUsers[$taskId]) && in_array($userId, $this->notifiedUsers[$taskId])) {

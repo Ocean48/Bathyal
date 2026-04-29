@@ -206,6 +206,9 @@ require_once 'views/layouts/header.php';
                 </button>
                 <div class="h-6 border-l border-slate-300 mx-1 hidden" id="task-modal-divider"></div>
                 <div class="text-sm font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded transition-colors" id="timer-display">00:00:00</div>
+                <button id="btn-reset-timer" class="hidden text-slate-400 hover:text-rose-500 hover:bg-rose-50 p-1.5 rounded transition-colors" title="Reset Task Timer" onclick="resetTaskTimer()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                </button>
             </div>
             <div class="flex items-center space-x-4 text-slate-500">
                 <button class="hover:text-slate-800" title="Copy Task Link" onclick="copyTaskLink()"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg></button>
@@ -1401,6 +1404,16 @@ async function openTaskModal(taskId) {
             const display = document.getElementById('timer-display');
             if (display) {
                 display.innerText = '00:00:00';
+            }
+        }
+        
+        const resetBtn = document.getElementById('btn-reset-timer');
+        if (resetBtn) {
+            const isSystemAdmin = <?= json_encode(($currentUser['role'] ?? '') === 'admin') ?>;
+            if (isSystemAdmin || ['admin', 'manager', 'owner'].includes(window.currentUserProjectRole)) {
+                resetBtn.classList.remove('hidden');
+            } else {
+                resetBtn.classList.add('hidden');
             }
         }
         
@@ -2620,6 +2633,36 @@ function stopTimer(reset = false) {
         display.classList.add('text-slate-500', 'bg-slate-100');
     }
     if (reset) timerSeconds = 0;
+}
+
+async function resetTaskTimer() {
+    if (!await showConfirm('Reset Timer', 'Are you sure you want to reset the time tracked for this task? This action cannot be undone.', 'danger')) return;
+    
+    const taskId = document.getElementById('task-modal-id').value;
+    if (!taskId) return;
+
+    showSavingOverlay();
+    try {
+        const res = await fetch('api/tasks.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'reset_timer', task_id: taskId, project_id: typeof currentProjectId !== 'undefined' ? currentProjectId : null })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            stopTimer(true);
+            const display = document.getElementById('timer-display');
+            if (display) display.innerText = '00:00:00';
+            openTaskModal(taskId);
+        } else {
+            showAlert('Error', data.message || 'Failed to reset timer', 'danger');
+        }
+    } catch(e) {
+        console.error(e);
+        showAlert('Error', 'Failed to reset timer', 'danger');
+    } finally {
+        hideSavingOverlay();
+    }
 }
 
 function addSection() {
