@@ -169,6 +169,24 @@ switch ($method) {
                 if ($db->updateTaskDetails($data['task_id'], $data['details'], $projectId)) {
                     $response = ['status' => 'success'];
                     
+                    // Mention Notification for Description Update
+                    if (isset($data['details']['description'])) {
+                        $oldDesc = isset($oldTaskDetails['description']) ? $oldTaskDetails['description'] : '';
+                        $newDesc = $data['details']['description'];
+                        
+                        preg_match_all('/data-mention-user-id="(\d+)"/', $oldDesc, $oldMatches);
+                        $oldMentions = isset($oldMatches[1]) ? array_unique(array_map('intval', $oldMatches[1])) : [];
+                        
+                        preg_match_all('/data-mention-user-id="(\d+)"/', $newDesc, $newMatches);
+                        $newMentions = isset($newMatches[1]) ? array_unique(array_map('intval', $newMatches[1])) : [];
+                        
+                        $addedMentions = array_diff($newMentions, $oldMentions);
+                        
+                        if (!empty($addedMentions)) {
+                            $db->sendMentionNotification($data['task_id'], $addedMentions, $changerName, nl2br(htmlspecialchars($newDesc)));
+                        }
+                    }
+
                     // Notify admins and collaborators on ANY detail update
                     $taskDetails = $db->getTaskById($data['task_id']);
                     $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $data['task_id'];
@@ -251,6 +269,13 @@ switch ($method) {
                 $userId = 1;
                 $commentId = $db->createComment($data['task_id'], $userId, $data['content']);
                 if ($commentId) {
+                    // Mention Notification for New Comment
+                    preg_match_all('/data-mention-user-id="(\d+)"/', $data['content'], $matches);
+                    $mentions = isset($matches[1]) ? array_unique(array_map('intval', $matches[1])) : [];
+                    if (!empty($mentions)) {
+                        $db->sendMentionNotification($data['task_id'], $mentions, $changerName, nl2br(htmlspecialchars($data['content'])));
+                    }
+
                     $taskDetails = $db->getTaskById($data['task_id']);
                     $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $data['task_id'];
                     $subject = "New Comment on Task: " . $taskTitle;
@@ -272,16 +297,38 @@ switch ($method) {
                 }
             } elseif ($data['action'] === 'edit_comment') {
                 $userId = 1; // Assuming mock user ID 1
+                
+                // Fetch old comment content
+                global $pdo;
+                $stmtOldComm = $pdo->prepare("SELECT content FROM comments WHERE id = :cid");
+                $stmtOldComm->execute(['cid' => $data['comment_id']]);
+                $oldContent = $stmtOldComm->fetchColumn();
+
                 $success = $db->updateComment($data['comment_id'], $userId, $data['content']);
                 if ($success) {
                     $response = ['status' => 'success'];
                     
                     // Add notification for comment edit
-                    global $pdo;
                     $stmtComm = $pdo->prepare("SELECT task_id FROM comments WHERE id = :cid");
                     $stmtComm->execute(['cid' => $data['comment_id']]);
                     $taskId = $stmtComm->fetchColumn();
                     if ($taskId) {
+                        // Mention Notification for Edited Comment
+                        $oldContentStr = $oldContent ? $oldContent : '';
+                        $newContentStr = $data['content'] ? $data['content'] : '';
+                        
+                        preg_match_all('/data-mention-user-id="(\d+)"/', $oldContentStr, $oldMatches);
+                        $oldMentions = isset($oldMatches[1]) ? array_unique(array_map('intval', $oldMatches[1])) : [];
+                        
+                        preg_match_all('/data-mention-user-id="(\d+)"/', $newContentStr, $newMatches);
+                        $newMentions = isset($newMatches[1]) ? array_unique(array_map('intval', $newMatches[1])) : [];
+                        
+                        $addedMentions = array_diff($newMentions, $oldMentions);
+                        
+                        if (!empty($addedMentions)) {
+                            $db->sendMentionNotification($taskId, $addedMentions, $changerName, nl2br(htmlspecialchars($newContentStr)));
+                        }
+
                         $taskDetails = $db->getTaskById($taskId);
                         $taskTitle = $taskDetails ? htmlspecialchars($taskDetails['title']) : "Task " . $taskId;
                         $subject = "Comment Edited on Task: " . $taskTitle;

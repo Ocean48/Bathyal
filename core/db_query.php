@@ -551,9 +551,31 @@ class DBQueries {
         }
     }
 
-    public function sendTaskNotification($taskId, $message, $category = 'task_update', $subject = null, $bodyHtml = null, $projectId = null, $excludeUserId = null) {
+    public function sendTaskNotification($taskId, $actionText, $category, $subject = null, $bodyHtml = null, $excludeUserId = null) {
         try {
-            $notifyUsers = [];
+            $stmtTask = $this->pdo->prepare("
+                SELECT t.title, p.project_id, prj.name as project_name 
+                FROM tasks t 
+                LEFT JOIN task_projects p ON t.id = p.task_id 
+                LEFT JOIN projects prj ON p.project_id = prj.id 
+                WHERE t.id = :tid LIMIT 1
+            ");
+            $stmtTask->execute(['tid' => $taskId]);
+            $taskInfo = $stmtTask->fetch(PDO::FETCH_ASSOC);
+
+            if (!$taskInfo) {
+                return ['success' => false, 'error' => "Task not found"];
+            }
+
+            $projectId = $taskInfo['project_id'] ?? null;
+            $projectName = $taskInfo['project_name'] ? $taskInfo['project_name'] : "Project " . $taskId;
+            $taskTitle = $taskInfo['title'] ?? "Task " . $taskId;
+
+            $userId = $excludeUserId ?: $_SESSION['user_id'] ?? 1; // Fallback to 1 for tests
+
+            if ($excludeUserId && $userId === $excludeUserId) {
+                return ['success' => true, 'message' => 'You are not notified for this task'];
+            }
 
             // By default we do NOT exclude the user making the change so testing works as expected
             // unless an excludeUserId is explicitly provided.
@@ -579,14 +601,8 @@ class DBQueries {
 
             // Find project ID if not provided
             if (!$projectId) {
-                $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
-                $stmtProj->execute(['tid' => $taskId]);
-                $projectId = $stmtProj->fetchColumn();
-
                 // If not found in task_projects, it might be a subtask, look up recursively
-                if (!$projectId) {
-                    $projectId = $this->getProjectIdRecursive($taskId);
-                }
+                $projectId = $this->getProjectIdRecursive($taskId);
             }
 
             if ($projectId) {
@@ -646,6 +662,78 @@ class DBQueries {
             ];
         } catch (\PDOException $e) {
             error_log("Notification error: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    public function sendMentionNotification($taskId, $userIds, $mentionerName, $messageContextHtml) {
+        try {
+            if (empty($userIds)) {
+                return ['success' => true, 'message' => 'No users to notify'];
+            }
+
+            // Get user details
+            $inQuery = implode(',', array_fill(0, count($userIds), '?'));
+            $stmtUsers = $this->pdo->prepare("SELECT id, email, name FROM users WHERE id IN ($inQuery)");
+            $stmtUsers->execute($userIds);
+            $users = $stmtUsers->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($users)) {
+                return ['success' => true, 'message' => 'No valid users found to notify'];
+            }
+
+            // Find project ID for the URL
+            $projectId = null;
+            $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
+            $stmtProj->execute(['tid' => $taskId]);
+            $projectId = $stmtProj->fetchColumn();
+
+            // If not found in task_projects, it might be a subtask, look up recursively
+            if (!$projectId) {
+                $projectId = $this->getProjectIdRecursive($taskId);
+            }
+
+            $stmtInsertNotif = $this->pdo->prepare("INSERT INTO notifications (user_id, task_id, category, message, is_read) VALUES (:uid, :tid, :cat, :msg, 0)");
+
+            require_once __DIR__ . '/email_service.php';
+            $emailService = new EmailService();
+
+            $allSent = true;
+            $errors = [];
+            
+            $projectUrlId = $projectId ? $projectId : 1;
+            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $projectUrlId . "&task_id=" . $taskId;
+
+            $category = 'mention';
+            $message = "{$mentionerName} mentioned you in a task";
+            $subject = "{$mentionerName} mentioned you in Task #{$taskId}";
+
+            foreach ($users as $u) {
+                // Insert DB notification
+                $stmtInsertNotif->execute([
+                    'uid' => $u['id'],
+                    'tid' => $taskId,
+                    'cat' => $category,
+                    'msg' => $message
+                ]);
+
+                // Send email
+                $to = $u['email'];
+                $mailBody = "Hello {$u['name']},<br><br>{$mentionerName} mentioned you in Task #{$taskId}:<br><br><blockquote>{$messageContextHtml}</blockquote><br><p><a href='{$taskUrl}'>Click here to view the task</a></p>";
+                
+                $emailResult = $emailService->sendEmail($to, $u['name'], $subject, $mailBody);
+                if (!$emailResult['success']) {
+                    $allSent = false;
+                    $errors[] = $emailResult['error'];
+                }
+            }
+
+            return [
+                'success' => $allSent, 
+                'error' => $allSent ? null : implode('; ', $errors)
+            ];
+        } catch (\PDOException $e) {
+            error_log("Mention notification error: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }

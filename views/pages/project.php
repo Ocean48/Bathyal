@@ -696,20 +696,36 @@ async function fetchMentions(query) {
     mentionSelectedIndex = 0;
     
     try {
-        const resTasks = await fetch('api/tasks.php');
-        const allTasks = await resTasks.json();
-        
-        const filteredTasks = allTasks.filter(t => t.title.toLowerCase().includes(query.toLowerCase()) || String(t.id).includes(query));
-        mentionResults.push(...filteredTasks.map(t => ({...t, itemType: 'task'})));
-        
-        const resProj = await fetch('api/projects.php', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ action: 'search', query: query })
-        });
-        const projData = await resProj.json();
-        if (projData.status === 'success') {
-            mentionResults.push(...projData.projects.map(p => ({...p, itemType: 'project'})));
+        if (mentionType === '@') {
+            if (window.allUsersCache.length === 0) {
+                const projectIdParam = (typeof currentProjectId !== 'undefined') ? `&project_id=${currentProjectId}` : '';
+                const resUsers = await fetch(`api/users.php?search=${projectIdParam}`);
+                window.allUsersCache = await resUsers.json();
+            }
+            
+            const q = query.toLowerCase();
+            const filteredUsers = window.allUsersCache.filter(u => 
+                u.name.toLowerCase().includes(q) || 
+                u.email.toLowerCase().includes(q)
+            );
+            
+            mentionResults.push(...filteredUsers.map(u => ({...u, itemType: 'user'})));
+        } else if (mentionType === '#') {
+            const resTasks = await fetch('api/tasks.php');
+            const allTasks = await resTasks.json();
+            
+            const filteredTasks = allTasks.filter(t => t.title.toLowerCase().includes(query.toLowerCase()) || String(t.id).includes(query));
+            mentionResults.push(...filteredTasks.map(t => ({...t, itemType: 'task'})));
+            
+            const resProj = await fetch('api/projects.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ action: 'search', query: query })
+            });
+            const projData = await resProj.json();
+            if (projData.status === 'success') {
+                mentionResults.push(...projData.projects.map(p => ({...p, itemType: 'project'})));
+            }
         }
         
         mentionResults = mentionResults.slice(0, 10);
@@ -725,7 +741,8 @@ function renderMentionPopover() {
     list.innerHTML = '';
     
     if (mentionResults.length === 0) {
-        list.innerHTML = '<li class="p-2 text-slate-400 italic text-xs">No matching tasks or projects</li>';
+        const noResultsText = mentionType === '@' ? 'No matching users' : 'No matching tasks or projects';
+        list.innerHTML = `<li class="p-2 text-slate-400 italic text-xs">${noResultsText}</li>`;
         return;
     }
     
@@ -734,7 +751,14 @@ function renderMentionPopover() {
         const isSelected = index === mentionSelectedIndex;
         li.className = `p-2 cursor-pointer flex items-center justify-between text-slate-700 hover:bg-slate-100 rounded mt-0.5 ${isSelected ? 'bg-teal-50' : ''}`;
         
-        if (item.itemType === 'task') {
+        if (item.itemType === 'user') {
+            li.innerHTML = `
+                <div class="flex items-center truncate">
+                    <svg class="w-3.5 h-3.5 mr-2 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    <span class="truncate"><span class="text-xs text-slate-700 font-medium">@${item.name}</span> <span class="text-xs text-slate-400 ml-1">(${item.email})</span></span>
+                </div>
+            `;
+        } else if (item.itemType === 'task') {
             li.innerHTML = `
                 <div class="flex items-center truncate">
                     <svg class="w-3.5 h-3.5 mr-2 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
@@ -787,7 +811,9 @@ function insertMention() {
     }
     
     let html = '';
-    if (item.itemType === 'task') {
+    if (item.itemType === 'user') {
+        html = `<a href="mailto:${item.email}" data-mention-user-id="${item.id}" class="text-blue-600 font-medium hover:underline px-1 py-0.5 rounded bg-blue-50" contenteditable="false">@${item.name}</a>&nbsp;`;
+    } else if (item.itemType === 'task') {
         const url = window.location.origin + window.location.pathname + '?id=' + (typeof currentProjectId !== 'undefined' ? currentProjectId : 1) + '&task_id=' + item.id;
         html = `<a href="${url}" class="text-indigo-600 font-medium hover:underline px-1 py-0.5 rounded bg-indigo-50" contenteditable="false" target="_blank">#${item.id} ${item.title}</a>&nbsp;`;
     } else {
