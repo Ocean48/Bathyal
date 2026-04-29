@@ -493,7 +493,18 @@ class DBQueries {
 
     public function updateTaskStatus($taskId, $status) {
         $completed_date = ($status === 'completed' || $status === 'done') ? date('Y-m-d H:i:s') : null;
-        $stmt = $this->pdo->prepare("UPDATE tasks SET status = :status, completed_date = :completed_date WHERE id = :id");
+        
+        // Auto-populate start_date if going to in_progress and it's null
+        $startDateStr = "";
+        if ($status === 'in_progress') {
+            $stmtCheck = $this->pdo->prepare("SELECT start_date FROM tasks WHERE id = :id");
+            $stmtCheck->execute([':id' => $taskId]);
+            if (empty($stmtCheck->fetchColumn())) {
+                $startDateStr = ", start_date = NOW()";
+            }
+        }
+        
+        $stmt = $this->pdo->prepare("UPDATE tasks SET status = :status, completed_date = :completed_date {$startDateStr} WHERE id = :id");
         $stmt->bindValue(':status', $status, PDO::PARAM_STR);
         $stmt->bindValue(':completed_date', $completed_date, $completed_date ? PDO::PARAM_STR : PDO::PARAM_NULL);
         $stmt->bindValue(':id', (int)$taskId, PDO::PARAM_INT);
@@ -503,6 +514,20 @@ class DBQueries {
             $this->checkAndFireTaskTriggers($taskId, 'on_status_change');
             if ($completed_date) {
                 $this->checkAndFireTaskTriggers($taskId, 'on_complete');
+            }
+            
+            // Handle automatic time tracking side-effects
+            $userId = $_SESSION['user_id'] ?? 1; // Fallback to 1 for tests
+            $timeStatus = $this->getTaskTimeLogStatus($taskId, $userId);
+            
+            if ($status === 'in_progress') {
+                if (!$timeStatus['is_running']) {
+                    $this->toggleTaskTimeTrack($taskId, $userId);
+                }
+            } else { // paused, completed, todo
+                if ($timeStatus['is_running']) {
+                    $this->toggleTaskTimeTrack($taskId, $userId);
+                }
             }
         }
         return $res;
@@ -1476,6 +1501,17 @@ class DBQueries {
             $params[':status'] = $data['status'];
             $setClauses[] = "completed_date = :completed_date";
             $params[':completed_date'] = ($data['status'] === 'completed' || $data['status'] === 'done') ? date('Y-m-d H:i:s') : null;
+            
+            // Re-use logic from updateTaskStatus for start_date
+            if ($data['status'] === 'in_progress') {
+                $stmtCheck = $this->pdo->prepare("SELECT start_date FROM tasks WHERE id = :id");
+                $stmtCheck->execute([':id' => $taskId]);
+                if (empty($stmtCheck->fetchColumn()) && empty($data['start_date'])) {
+                    $setClauses[] = "start_date = NOW()";
+                    // Need to remove start_date from data so it doesn't get overridden later
+                    unset($data['start_date']);
+                }
+            }
         }
         if (array_key_exists('start_date', $data)) {
             $setClauses[] = "start_date = :start_date";
@@ -1528,6 +1564,20 @@ class DBQueries {
                 $this->checkAndFireTaskTriggers($taskId, 'on_status_change');
                 if ($data['status'] === 'completed' || $data['status'] === 'done') {
                     $this->checkAndFireTaskTriggers($taskId, 'on_complete');
+                }
+                
+                // Handle automatic time tracking side-effects
+                $userId = $_SESSION['user_id'] ?? 1; // Fallback to 1 for tests
+                $timeStatus = $this->getTaskTimeLogStatus($taskId, $userId);
+                
+                if ($data['status'] === 'in_progress') {
+                    if (!$timeStatus['is_running']) {
+                        $this->toggleTaskTimeTrack($taskId, $userId);
+                    }
+                } else { // paused, completed, todo
+                    if ($timeStatus['is_running']) {
+                        $this->toggleTaskTimeTrack($taskId, $userId);
+                    }
                 }
             }
         }

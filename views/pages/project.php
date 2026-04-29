@@ -205,11 +205,7 @@ require_once 'views/layouts/header.php';
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 </button>
                 <div class="h-6 border-l border-slate-300 mx-1 hidden" id="task-modal-divider"></div>
-                <button id="btn-start-progress" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded text-sm font-medium shadow-sm flex items-center transition-colors" onclick="toggleProgress()">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    <span>Start Progress</span>
-                </button>
-                <div class="text-sm font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded" id="timer-display">00:00:00</div>
+                <div class="text-sm font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded transition-colors" id="timer-display">00:00:00</div>
             </div>
             <div class="flex items-center space-x-4 text-slate-500">
                 <button class="hover:text-slate-800" title="Copy Task Link" onclick="copyTaskLink()"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg></button>
@@ -1074,6 +1070,7 @@ async function openTaskModal(taskId) {
         document.getElementById('task-modal-title').value = task.title;
         const statusSelect = document.getElementById('task-modal-status');
         statusSelect.value = task.status;
+        statusSelect.dataset.originalStatus = task.status;
         statusSelect.className = `text-sm border-none focus:ring-0 p-0 rounded bg-transparent font-medium ${window.getStatusTextClass(task.status)}`;
         
         let startDateVal = '';
@@ -1337,8 +1334,6 @@ async function openTaskModal(taskId) {
         
         // Handle Time Tracker
         if (task.time_log_status) {
-            const btn = document.getElementById('btn-start-progress');
-            const span = btn.querySelector('span');
             const display = document.getElementById('timer-display');
             
             stopTimer(false); // Stop current interval if any
@@ -1352,9 +1347,8 @@ async function openTaskModal(taskId) {
                 timerSeconds = totalSecs + (diff > 0 ? diff : 0);
                 
                 isProgressRunning = true;
-                btn.classList.replace('bg-emerald-500', 'bg-amber-500');
-                btn.classList.replace('hover:bg-emerald-600', 'hover:bg-amber-600');
-                span.innerText = "Pause Progress";
+                display.classList.remove('text-slate-500', 'bg-slate-100');
+                display.classList.add('text-amber-600', 'bg-amber-100');
                 
                 timerInterval = setInterval(() => {
                     timerSeconds++;
@@ -1373,9 +1367,14 @@ async function openTaskModal(taskId) {
                 display.innerText = `${h}:${m}:${s}`;
                 
                 isProgressRunning = false;
-                btn.classList.replace('bg-amber-500', 'bg-emerald-500');
-                btn.classList.replace('hover:bg-amber-600', 'hover:bg-emerald-600');
-                span.innerText = "Start Progress";
+                display.classList.remove('text-amber-600', 'bg-amber-100');
+                display.classList.add('text-slate-500', 'bg-slate-100');
+            }
+        } else {
+            stopTimer(true);
+            const display = document.getElementById('timer-display');
+            if (display) {
+                display.innerText = '00:00:00';
             }
         }
         
@@ -1394,7 +1393,17 @@ async function updateTaskDetails(forceSaveDescription = false) {
     const status = statusSelect.value;
     statusSelect.className = `text-sm border-none focus:ring-0 p-0 rounded bg-transparent font-medium ${window.getStatusTextClass(status)}`;
 
-    const startDate = document.getElementById('task-modal-start-date').value;
+    let startDate = document.getElementById('task-modal-start-date').value;
+    
+    // Auto set start date if going to in_progress and it's empty
+    if (status === 'in_progress' && !startDate) {
+        const d = new Date();
+        const yy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        startDate = `${yy}-${mm}-${dd}`;
+        document.getElementById('task-modal-start-date').value = startDate;
+    }
     
     let expectedStartDate = document.getElementById('task-modal-expected-start-date').value;
     if (expectedStartDate) { expectedStartDate = expectedStartDate + ' 00:00:00'; }
@@ -1439,6 +1448,15 @@ async function updateTaskDetails(forceSaveDescription = false) {
             project_id: typeof currentProjectId !== 'undefined' ? currentProjectId : null
         })
     });
+    
+    // Compare new status with original
+    const originalStatus = statusSelect.dataset.originalStatus || '';
+    
+    // Status change is now handled by backend including side-effects
+    if (status !== originalStatus) {
+        statusSelect.dataset.originalStatus = status;
+        openTaskModal(id); // Reload modal to get new dates & timer state
+    }
     
     if (forceSaveDescription) {
         showAlert('Success', 'Description saved successfully.', 'success');
@@ -2567,38 +2585,13 @@ function copyTaskLink() {
     });
 }
 
-function toggleProgress() {
-    showSavingOverlay();
-    const taskId = document.getElementById('task-modal-id').value;
-    if (!taskId) {
-        hideSavingOverlay();
-        return;
-    }
-
-    fetch('api/tasks.php', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ action: 'toggle_time_track', task_id: taskId })
-    }).then(res => res.json())
-      .then(data => {
-          if (data.status === 'success') {
-              // Refresh the modal to sync state from database
-              openTaskModal(taskId);
-          } else {
-              showAlert('Error', 'Failed to toggle time track', 'danger');
-          }
-          hideSavingOverlay();
-      });
-}
-
 function stopTimer(reset = false) {
     clearInterval(timerInterval);
     isProgressRunning = false;
-    const btn = document.getElementById('btn-start-progress');
-    if(btn) {
-        btn.classList.replace('bg-amber-500', 'bg-emerald-500');
-        btn.classList.replace('hover:bg-amber-600', 'hover:bg-emerald-600');
-        btn.querySelector('span').innerText = "Start Progress";
+    const display = document.getElementById('timer-display');
+    if(display) {
+        display.classList.remove('text-amber-600', 'bg-amber-100');
+        display.classList.add('text-slate-500', 'bg-slate-100');
     }
     if (reset) timerSeconds = 0;
 }

@@ -56,7 +56,7 @@ class EmailService {
      * @param string $subject Email subject
      * @param string $body Email content (HTML by default)
      * @param bool $isHtml Whether the body is HTML
-     * @return bool True if sent, False if failed
+     * @return array Array with 'success' and optional 'error' keys
      */
     public function sendEmail($toEmail, $toName, $subject, $body, $isHtml = true) {
         try {
