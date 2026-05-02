@@ -1783,6 +1783,17 @@ class DBQueries {
         ];
     }
 
+    public function getTaskTotalTimeTaken($taskId) {
+        // Gets the total time across ALL users, including running times estimated
+        $stmtTotal = $this->pdo->prepare("
+            SELECT SUM(TIMESTAMPDIFF(SECOND, start_time, COALESCE(end_time, NOW()))) as total_seconds 
+            FROM task_time_logs 
+            WHERE task_id = :task_id
+        ");
+        $stmtTotal->execute([':task_id' => $taskId]);
+        return (int)$stmtTotal->fetchColumn();
+    }
+
     public function toggleTaskTimeTrack($taskId, $userId) {
         $status = $this->getTaskTimeLogStatus($taskId, $userId);
         if ($status['is_running']) {

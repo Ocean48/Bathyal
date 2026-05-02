@@ -288,12 +288,22 @@ require_once 'views/layouts/header.php';
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block" title="Estimated Time in minutes">Est. Time (min)</label>
                     <input type="number" id="task-modal-estimated" onchange="updateTaskDetails()" min="0" placeholder="0" class="text-sm text-slate-700 border border-transparent hover:border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 p-1 -ml-1 rounded cursor-pointer w-24">
                 </div>
+
                 <!-- Parent Task Selection Removed -->
                 
                 <div class="col-span-2 relative">
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Labels</label>
                     <div class="flex flex-wrap gap-2 items-center" id="task-modal-labels">
                         <!-- Labels will be dynamically populated here -->
+                <div>
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block" title="Current Time Taken">Time Taken</label>
+                    <span id="task-modal-time-taken" class="text-sm font-medium text-slate-700 block p-1 -ml-1">0s</span>
+                </div>
+                <div class="relative">
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Parent Task</label>
+                    <div class="flex items-center justify-between cursor-pointer border border-slate-300 hover:bg-slate-50 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 p-1.5 rounded-lg bg-slate-50 w-full shadow-sm transition-colors text-sm text-slate-700 truncate" onclick="toggleParentTaskDropdown(event)" id="parent-task-display">
+                        <span id="parent-task-name" class="truncate">None</span>
+                        <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
                     <button onclick="toggleLabelsDropdown(event)" class="text-xs text-teal-600 font-medium hover:text-teal-700 whitespace-nowrap px-2 py-1 bg-teal-50 hover:bg-teal-100 rounded transition-colors flex items-center mt-2">
                         <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
@@ -1362,6 +1372,23 @@ async function openTaskModal(taskId) {
         }
         
         // Handle Time Tracker
+        const timeTakenDisplay = document.getElementById('task-modal-time-taken');
+        let overallTotalSecs = task.total_time_taken || 0;
+        
+        const formatTimeTaken = (totalSeconds) => {
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            if (h > 0) return `${h}h ${m}m ${s}s`;
+            if (m > 0) return `${m}m ${s}s`;
+            return `${s}s`;
+        };
+        
+        // Initial setup for static time display
+        if (timeTakenDisplay) {
+            timeTakenDisplay.innerText = formatTimeTaken(overallTotalSecs);
+        }
+
         if (task.time_log_status) {
             const display = document.getElementById('timer-display');
             
@@ -1379,12 +1406,22 @@ async function openTaskModal(taskId) {
                 display.classList.remove('text-slate-500', 'bg-slate-100');
                 display.classList.add('text-amber-600', 'bg-amber-100');
                 
+                // Immediate update
+                const initH = String(Math.floor(timerSeconds / 3600)).padStart(2, '0');
+                const initM = String(Math.floor((timerSeconds % 3600) / 60)).padStart(2, '0');
+                const initS = String(timerSeconds % 60).padStart(2, '0');
+                display.innerText = `${initH}:${initM}:${initS}`;
+                
                 timerInterval = setInterval(() => {
                     timerSeconds++;
+                    overallTotalSecs++;
                     const h = String(Math.floor(timerSeconds / 3600)).padStart(2, '0');
                     const m = String(Math.floor((timerSeconds % 3600) / 60)).padStart(2, '0');
                     const s = String(timerSeconds % 60).padStart(2, '0');
                     display.innerText = `${h}:${m}:${s}`;
+                    if (timeTakenDisplay) {
+                        timeTakenDisplay.innerText = formatTimeTaken(overallTotalSecs);
+                    }
                 }, 1000);
             } else {
                 timerSeconds = totalSecs;
