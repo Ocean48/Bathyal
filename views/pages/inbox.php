@@ -15,12 +15,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['mark_read_id'])) {
         $db->markNotificationRead($_POST['mark_read_id'], $userId);
         $catParam = isset($_GET['category']) ? "?category=" . urlencode($_GET['category']) : "";
-        header("Location: /bathyal/inbox{$catParam}");
+        header("Location: /inbox{$catParam}");
         exit;
     } elseif (isset($_POST['mark_all_read'])) {
         $db->markAllNotificationsRead($userId);
         $catParam = isset($_GET['category']) ? "?category=" . urlencode($_GET['category']) : "";
-        header("Location: /bathyal/inbox{$catParam}");
+        header("Location: /inbox{$catParam}");
         exit;
     }
 }
@@ -83,7 +83,7 @@ require_once 'views/layouts/header.php';
                         </div>
                         <?php if ($n['task_id']): ?>
                             <p class="text-slate-600 mt-1 hover:text-teal-600 inline-block transition-colors">
-                                <a href="/bathyal/tasks?id=<?= $n['task_id'] ?>">Related to Task #<?= $n['task_id'] ?></a>
+                                <a href="/tasks?id=<?= $n['task_id'] ?>">Related to Task #<?= $n['task_id'] ?></a>
                             </p>
                         <?php endif; ?>
                     </div>

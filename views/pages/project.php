@@ -11,7 +11,7 @@ if (isset($currentUser['id'])) {
     $dbQueries = new DBQueries($pdo);
     // Check if user is member of project
     if (!$dbQueries->isProjectMember($projectId, $currentUser['id'])) {
-        header("Location: /bathyal/projects");
+        header("Location: /projects");
         exit;
     }
     $dbQueries->trackProjectAccess($currentUser['id'], $projectId);
@@ -1957,7 +1957,7 @@ window.openListViewLabelsDropdown = async function(event, taskId, labelIdsStr) {
 async function searchLabels(query) {
     if (window.allLabelsCache.length === 0) {
         try {
-            const res = await fetch('/bathyal/api/labels.php');
+            const res = await fetch('/api/labels.php');
             const data = await res.json();
             if (data.status === 'success') {
                 window.allLabelsCache = data.data;
@@ -2017,7 +2017,7 @@ function handleLabelSearchKeydown(e) {
 
 async function createLabelAndAssign(name) {
     try {
-        const res = await fetch('/bathyal/api/labels.php', {
+        const res = await fetch('/api/labels.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'create', name: name })
@@ -2059,7 +2059,7 @@ async function saveTaskLabels() {
     
     showSavingOverlay();
     try {
-        const res = await fetch('/bathyal/api/tasks.php', {
+        const res = await fetch('/api/tasks.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'update_details', task_id: taskId, details: { label_ids: window.currentTaskLabelIds } })

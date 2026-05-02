@@ -8,13 +8,13 @@ require_once 'core/db_query.php';
 $projectId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 if (!$projectId) {
-    die("<div style='padding:20px; font-family:sans-serif; color:red;'>Invalid Project ID. <a href='/bathyal'>Go back</a></div>");
+    die("<div style='padding:20px; font-family:sans-serif; color:red;'>Invalid Project ID. <a href='/'>Go back</a></div>");
 }
 
 $db = new DBQueries($pdo);
 
 if (!isset($currentUser['id']) || !$db->isProjectMember($projectId, $currentUser['id'])) {
-    header("Location: /bathyal/projects");
+    header("Location: /projects");
     exit;
 }
 
@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Redirect back to same tab to avoid resubmission on refresh
         $tab = isset($_GET['tab']) ? $_GET['tab'] : 'members';
-        header("Location: /bathyal/project_settings?id={$projectId}&tab={$tab}");
+        header("Location: /project_settings?id={$projectId}&tab={$tab}");
         exit;
     }
 }
@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $project = $db->getProjectById($projectId);
 
 if (!$project || !$db->getProjectMemberRole($projectId, $currentUser['id'])) {
-    die("<div style='padding:20px; font-family:sans-serif; color:red;'>Project not found or access denied. <a href='/bathyal'>Go back</a></div>");
+    die("<div style='padding:20px; font-family:sans-serif; color:red;'>Project not found or access denied. <a href='/'>Go back</a></div>");
 }
 
 // Fetch project members for settings UI
@@ -132,7 +132,7 @@ require_once 'views/layouts/header.php';
             <h1 class="text-2xl font-semibold text-slate-800">Project Settings</h1>
             <p class="text-sm text-slate-500 mt-1">Manage configuration for <strong><?= htmlspecialchars($project['name']) ?></strong>.</p>
         </div>
-        <a href="/bathyal/project?id=<?= $projectId ?>" class="text-sm font-medium text-teal-600 hover:text-teal-700 bg-teal-50 px-4 py-2 rounded-lg transition-colors">
+        <a href="/project?id=<?= $projectId ?>" class="text-sm font-medium text-teal-600 hover:text-teal-700 bg-teal-50 px-4 py-2 rounded-lg transition-colors">
             Back to Project
         </a>
     </div>
@@ -207,7 +207,7 @@ require_once 'views/layouts/header.php';
                         <?php if ($userProjectRole === 'manager' || $userProjectRole === 'member'): ?>
                         <div class="flex flex-col space-y-3 shrink-0 xl:w-2/3 xl:items-end">
                             <!-- Add Team Form -->
-                            <form method="POST" action="/bathyal/project_settings?id=<?= $projectId ?>&tab=members" class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 m-0 bg-slate-50/50 p-2 rounded-xl border border-slate-200/80 shadow-sm relative overflow-visible w-full md:w-auto">
+                            <form method="POST" action="/project_settings?id=<?= $projectId ?>&tab=members" class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 m-0 bg-slate-50/50 p-2 rounded-xl border border-slate-200/80 shadow-sm relative overflow-visible w-full md:w-auto">
                                 <input type="hidden" name="action" value="add_team_members">
                                 
                                 <div class="relative group flex-1">
@@ -234,7 +234,7 @@ require_once 'views/layouts/header.php';
                             </form>
 
                             <!-- Add Individual Member Form -->
-                            <form method="POST" action="/bathyal/project_settings?id=<?= $projectId ?>&tab=members" id="add-member-form" class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 m-0 bg-slate-50/50 p-2 rounded-xl border border-slate-200/80 shadow-sm relative overflow-visible w-full md:w-auto">
+                            <form method="POST" action="/project_settings?id=<?= $projectId ?>&tab=members" id="add-member-form" class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 m-0 bg-slate-50/50 p-2 rounded-xl border border-slate-200/80 shadow-sm relative overflow-visible w-full md:w-auto">
                                 <input type="hidden" name="action" value="add_member">
                                 
                                 <!-- Custom Searchable Dropdown -->
@@ -309,7 +309,7 @@ require_once 'views/layouts/header.php';
                                     <td class="px-6 py-3 text-right">
                                         <div class="flex items-center justify-end space-x-2">
                                             <?php if ($userProjectRole === 'manager' || $userProjectRole === 'member'): ?>
-                                                <form method="POST" action="/bathyal/project_settings?id=<?= $projectId ?>&tab=members" class="m-0" id="role-form-<?= $member['id'] ?>">
+                                                <form method="POST" action="/project_settings?id=<?= $projectId ?>&tab=members" class="m-0" id="role-form-<?= $member['id'] ?>">
                                                     <input type="hidden" name="action" value="update_member_role">
                                                     <input type="hidden" name="user_id" value="<?= $member['id'] ?>">
                                                     <input type="hidden" name="role" class="real-role-input" value="<?= $member['role'] ?>">
@@ -340,7 +340,7 @@ require_once 'views/layouts/header.php';
                                                 </form>
                                                 
                                                 <?php if ($userProjectRole === 'manager' || ($userProjectRole === 'member' && $member['role'] !== 'manager')): ?>
-                                                <form method="POST" action="/bathyal/project_settings?id=<?= $projectId ?>&tab=members" class="m-0" onsubmit="event.preventDefault(); showConfirm('Remove Member', 'Are you sure you want to remove <strong><?= htmlspecialchars($member['name']) ?></strong> from the project?', 'danger').then(res => { if(res) this.submit(); });">
+                                                <form method="POST" action="/project_settings?id=<?= $projectId ?>&tab=members" class="m-0" onsubmit="event.preventDefault(); showConfirm('Remove Member', 'Are you sure you want to remove <strong><?= htmlspecialchars($member['name']) ?></strong> from the project?', 'danger').then(res => { if(res) this.submit(); });">
                                                     <input type="hidden" name="action" value="remove_member">
                                                     <input type="hidden" name="user_id" value="<?= $member['id'] ?>">
                                                     <button type="submit" class="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 p-[7px] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-sm" title="Remove Member">
@@ -442,7 +442,7 @@ require_once 'views/layouts/header.php';
                 userDropdownUl.innerHTML = '<li class="px-4 py-3 text-slate-500 italic">Searching...</li>';
                 try {
                     // Fetch all users that match query, minus existing project members
-                    const res = await fetch(`/bathyal/api/users.php?search=${encodeURIComponent(term)}&exclude_project_id=<?= $projectId ?>`);
+                    const res = await fetch(`/api/users.php?search=${encodeURIComponent(term)}&exclude_project_id=<?= $projectId ?>`);
                     const json = await res.json();
                     
                     userDropdownUl.innerHTML = '';

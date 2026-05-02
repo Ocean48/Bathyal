@@ -71,7 +71,7 @@ document.getElementById('label-modal-color').addEventListener('input', function(
 
 async function fetchLabels() {
     try {
-        const res = await fetch('/bathyal/api/labels.php');
+        const res = await fetch('/api/labels.php');
         const data = await res.json();
         if (data.status === 'success') {
             allLabels = data.data;
@@ -154,7 +154,7 @@ async function saveLabel() {
     if (id) payload.id = id;
 
     try {
-        const res = await fetch('/bathyal/api/labels.php', {
+        const res = await fetch('/api/labels.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -176,7 +176,7 @@ async function deleteLabel() {
     if (!id || !confirm('Are you sure you want to delete this label? It will be removed from all tasks.')) return;
 
     try {
-        const res = await fetch('/bathyal/api/labels.php', {
+        const res = await fetch('/api/labels.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'delete', id: id })

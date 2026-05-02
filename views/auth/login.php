@@ -3,7 +3,7 @@
 session_start();
 
 if (isset($_SESSION['user_id'])) {
-    header("Location: /bathyal/index.php");
+    header("Location: /index.php");
     exit;
 }
 
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($user && password_verify($password, $user['password_hash'])) {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['role'] = $user['role'];
-            header("Location: /bathyal/index.php");
+            header("Location: /index.php");
             exit;
         } else {
             $error = 'Invalid email or password.';
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $appConfig = file_exists(__DIR__ . '/../../config.php') ? require __DIR__ . '/../../config.php' : ['app_name' => 'Bathyal'];
 $appName = $appConfig['app_name'] ?? 'Bathyal';
 $favicon = $appConfig['favicon'] ?? 'assets/images/favicon.png';
-$basePath = rtrim($appConfig['base_path'] ?? '/bathyal', '/');
+$basePath = rtrim($appConfig['base_path'] ?? '', '/');
 ?>
 <!DOCTYPE html>
 <html lang="en">

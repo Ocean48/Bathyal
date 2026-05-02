@@ -94,21 +94,21 @@ require_once 'views/layouts/header.php';
     <?php if (!empty($prefs['show_stats'])): ?>
     <!-- Quick Stats / Status -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-        <div onclick="window.location.href='/bathyal/tasks?status=completed'" class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm text-center transform transition duration-300 hover:-translate-y-1 hover:shadow-md cursor-pointer">
+        <div onclick="window.location.href='/tasks?status=completed'" class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm text-center transform transition duration-300 hover:-translate-y-1 hover:shadow-md cursor-pointer">
             <p class="text-3xl font-light text-slate-700"><?= $stats['tasks_completed'] ?></p>
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mt-1">Tasks Completed</p>
         </div>
-        <div onclick="window.location.href='/bathyal/teams'" class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm text-center transform transition duration-300 hover:-translate-y-1 hover:shadow-md cursor-pointer">
+        <div onclick="window.location.href='/teams'" class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm text-center transform transition duration-300 hover:-translate-y-1 hover:shadow-md cursor-pointer">
             <p class="text-3xl font-light text-indigo-600"><?= $stats['collaborators'] ?></p>
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mt-1">Collaborators</p>
         </div>
-        <div onclick="window.location.href='/bathyal/tasks?filter=due_soon'" class="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl border border-transparent p-5 shadow-sm text-center text-white transform transition duration-300 hover:-translate-y-1 hover:shadow-md cursor-pointer">
+        <div onclick="window.location.href='/tasks?filter=due_soon'" class="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-xl border border-transparent p-5 shadow-sm text-center text-white transform transition duration-300 hover:-translate-y-1 hover:shadow-md cursor-pointer">
             <p class="text-3xl font-light"><?= $stats['tasks_due_soon'] ?></p>
             <p class="text-xs font-semibold text-cyan-50 uppercase tracking-wide mt-1">Tasks Due Soon</p>
         </div>
         <!-- Time tracked box -->
         <?php if ($activeTimer): ?>
-        <div onclick="window.location.href='/bathyal/project?id=<?= $activeTimer['project_id'] ?>&task_id=<?= $activeTimer['task_id'] ?>'" class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col justify-center items-center cursor-pointer hover:-translate-y-1 hover:shadow-md transition duration-300">
+        <div onclick="window.location.href='/project?id=<?= $activeTimer['project_id'] ?>&task_id=<?= $activeTimer['task_id'] ?>'" class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm flex flex-col justify-center items-center cursor-pointer hover:-translate-y-1 hover:shadow-md transition duration-300">
             <div class="flex items-center text-emerald-600">
                 <span class="relative flex h-3 w-3 mr-2">
                   <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -150,7 +150,7 @@ require_once 'views/layouts/header.php';
                         <li class="px-3 py-4 text-center text-sm text-slate-400">No upcoming tasks!</li>
                     <?php else: ?>
                         <?php foreach ($upcomingTasks as $task): ?>
-                        <li id="dash-task-<?= $task['id'] ?>" class="flex items-center px-3 py-2.5 hover:bg-slate-50 rounded-lg group cursor-pointer border border-transparent hover:border-slate-200 transition-all" onclick="window.location.href='/bathyal/project?id=<?= $task['project_id'] ?>&task_id=<?= $task['id'] ?>'">
+                        <li id="dash-task-<?= $task['id'] ?>" class="flex items-center px-3 py-2.5 hover:bg-slate-50 rounded-lg group cursor-pointer border border-transparent hover:border-slate-200 transition-all" onclick="window.location.href='/project?id=<?= $task['project_id'] ?>&task_id=<?= $task['id'] ?>'">
                             <button onclick="completeDashboardTask(event, <?= $task['id'] ?>)" class="w-5 h-5 rounded-full border border-slate-300 mr-3 flex items-center justify-center hover:border-teal-500 hover:bg-teal-50 flex-shrink-0 transition-colors">
                                 <svg class="w-3 h-3 text-transparent group-hover:text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </button>
@@ -188,7 +188,7 @@ require_once 'views/layouts/header.php';
                         <li class="px-3 py-4 text-center text-sm text-slate-400">No overdue tasks!</li>
                     <?php else: ?>
                         <?php foreach ($overdueTasks as $task): ?>
-                        <li id="dash-task-<?= $task['id'] ?>" class="flex items-center px-3 py-2.5 hover:bg-slate-50 rounded-lg group cursor-pointer border border-transparent hover:border-slate-200 transition-all" onclick="window.location.href='/bathyal/project?id=<?= $task['project_id'] ?>&task_id=<?= $task['id'] ?>'">
+                        <li id="dash-task-<?= $task['id'] ?>" class="flex items-center px-3 py-2.5 hover:bg-slate-50 rounded-lg group cursor-pointer border border-transparent hover:border-slate-200 transition-all" onclick="window.location.href='/project?id=<?= $task['project_id'] ?>&task_id=<?= $task['id'] ?>'">
                             <button onclick="completeDashboardTask(event, <?= $task['id'] ?>)" class="w-5 h-5 rounded-full border border-slate-300 mr-3 flex items-center justify-center hover:border-teal-500 hover:bg-teal-50 flex-shrink-0 transition-colors">
                                 <svg class="w-3 h-3 text-transparent group-hover:text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                             </button>
@@ -220,7 +220,7 @@ require_once 'views/layouts/header.php';
                     <?php endif; ?>
                 </ul>
                 
-                <button onclick="window.location.href='/bathyal/tasks'" class="flex items-center text-sm text-slate-500 hover:text-teal-600 mt-3 px-3 py-2 transition-colors group w-full">
+                <button onclick="window.location.href='/tasks'" class="flex items-center text-sm text-slate-500 hover:text-teal-600 mt-3 px-3 py-2 transition-colors group w-full">
                     <div class="w-5 h-5 rounded-full border border-slate-300 group-hover:border-teal-500 mr-3 flex items-center justify-center">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                     </div>
@@ -260,7 +260,7 @@ require_once 'views/layouts/header.php';
                         $theme = $colors[$idx % count($colors)];
                     ?>
                     <!-- Project Item -->
-                    <div class="group flex items-center p-3 border border-slate-100 rounded-lg <?= $theme[2] ?> hover:shadow-sm cursor-pointer transition-all" onclick="window.location.href='/bathyal/project?id=<?= $proj['id'] ?>'">
+                    <div class="group flex items-center p-3 border border-slate-100 rounded-lg <?= $theme[2] ?> hover:shadow-sm cursor-pointer transition-all" onclick="window.location.href='/project?id=<?= $proj['id'] ?>'">
                         <div class="w-10 h-10 rounded-lg <?= $theme[0] ?> flex items-center justify-center <?= $theme[1] ?> font-bold mr-4">
                             <?= htmlspecialchars($initials) ?>
                         </div>
@@ -277,7 +277,7 @@ require_once 'views/layouts/header.php';
                     </div>
                 <?php endif; ?>
             </div>
-            <div onclick="window.location.href='/bathyal/projects'" class="px-5 py-3 bg-slate-50 text-center border-t border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
+            <div onclick="window.location.href='/projects'" class="px-5 py-3 bg-slate-50 text-center border-t border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
                 <span class="text-sm text-teal-600 font-medium">View all projects</span>
             </div>
         </div>
@@ -303,7 +303,7 @@ function togglePriorityTab(tab) {
 function completeDashboardTask(e, taskId) {
     e.stopPropagation();
     
-    fetch('/bathyal/api/tasks.php', {
+    fetch('/api/tasks.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_status', task_id: taskId, status: 'completed' })
@@ -327,7 +327,7 @@ function saveDashboardPreferences() {
         show_projects: document.getElementById('pref_projects').checked
     };
 
-    fetch('/bathyal/api/users.php', {
+    fetch('/api/users.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_preferences', preferences: prefs })

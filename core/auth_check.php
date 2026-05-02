@@ -2,8 +2,11 @@
 // /includes/auth_check.php
 session_start();
 
+$config = require __DIR__ . '/../config.php';
+$base_path = $config['base_path'] ?? '';
+
 if (!isset($_SESSION['user_id'])) {
-    header("Location: /bathyal/login.php");
+    header("Location: {$base_path}/login");
     exit;
 }
 
@@ -16,7 +19,7 @@ $currentUser = $db->getUserById($_SESSION['user_id']);
 
 if (!$currentUser) {
     session_destroy();
-    header("Location: /bathyal/login.php");
+    header("Location: {$base_path}/login");
     exit;
 }
 ?>

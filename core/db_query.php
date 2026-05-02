@@ -1,6 +1,9 @@
 <?php
 // /includes/db_query.php
 
+$config = require __DIR__ . '/../config.php';
+$GLOBALS['base_path'] = $config['base_path'] ?? '';
+
 class DBQueries {
     private $pdo;
     
@@ -628,10 +631,11 @@ class DBQueries {
             $errors = [];
             
             $projectUrlId = $projectId ? $projectId : 1;
-            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $projectUrlId . "&task_id=" . $taskId;
+            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . $GLOBALS['base_path'] . "/project?id=" . $projectUrlId . "&task_id=" . $taskId;
             
-            // Replace any generic /bathyal/tasks?id= URL in the provided body with the rich taskUrl
-            $bodyHtmlFixed = preg_replace('/http:\/\/[^\'"]+\/bathyal\/tasks\?id=\d+/', $taskUrl, $bodyHtml);
+            // Replace any generic /tasks?id= URL in the provided body with the rich taskUrl
+            $basePathSafe = preg_quote($GLOBALS['base_path'], '/');
+            $bodyHtmlFixed = preg_replace('/http:\/\/[^\'"]+' . $basePathSafe . '\/tasks\?id=\d+/', $taskUrl, $bodyHtml);
 
             foreach ($notifyUsers as $u) {
                 // Mark user as notified for this task
@@ -702,7 +706,7 @@ class DBQueries {
             $errors = [];
             
             $projectUrlId = $projectId ? $projectId : 1;
-            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $projectUrlId . "&task_id=" . $taskId;
+            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . $GLOBALS['base_path'] . "/project?id=" . $projectUrlId . "&task_id=" . $taskId;
 
             $category = 'mention';
             $message = "{$mentionerName} mentioned you in a task";
@@ -888,7 +892,7 @@ class DBQueries {
                 $bodyHtml .= "<p>Your new role is: <strong>" . htmlspecialchars($role) . "</strong></p>";
             }
             
-            $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/projects'>Click here to view your projects</a></p>";
+            $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . $GLOBALS['base_path'] . "/projects'>Click here to view your projects</a></p>";
             
             // Insert DB notification
             $stmtInsertNotif = $this->pdo->prepare("INSERT INTO notifications (user_id, category, message, is_read) VALUES (:uid, :cat, :msg, 0)");
@@ -1852,7 +1856,7 @@ class DBQueries {
             $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
             $stmtProj->execute(['tid' => $taskId]);
             $projectId = $stmtProj->fetchColumn() ?: 1;
-            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $projectId . "&task_id=" . $taskId;
+            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . $GLOBALS['base_path'] . "/project?id=" . $projectId . "&task_id=" . $taskId;
             
             // Send Email
             require_once __DIR__ . '/email_service.php';
@@ -1904,7 +1908,7 @@ class DBQueries {
             $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
             $stmtProj->execute(['tid' => $taskId]);
             $projectId = $stmtProj->fetchColumn() ?: 1;
-            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $projectId . "&task_id=" . $taskId;
+            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . $GLOBALS['base_path'] . "/project?id=" . $projectId . "&task_id=" . $taskId;
             
             // Send Email
             require_once __DIR__ . '/email_service.php';
@@ -1962,7 +1966,7 @@ class DBQueries {
             $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
             $stmtProj->execute(['tid' => $taskId]);
             $projectId = $stmtProj->fetchColumn() ?: 1;
-            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $projectId . "&task_id=" . $taskId;
+            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . $GLOBALS['base_path'] . "/project?id=" . $projectId . "&task_id=" . $taskId;
             
             // Send Email
             require_once __DIR__ . '/email_service.php';
@@ -2014,7 +2018,7 @@ class DBQueries {
             $stmtProj = $this->pdo->prepare("SELECT project_id FROM task_projects WHERE task_id = :tid LIMIT 1");
             $stmtProj->execute(['tid' => $taskId]);
             $projectId = $stmtProj->fetchColumn() ?: 1;
-            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $projectId . "&task_id=" . $taskId;
+            $taskUrl = "http://" . $_SERVER['HTTP_HOST'] . $GLOBALS['base_path'] . "/project?id=" . $projectId . "&task_id=" . $taskId;
             
             // Send Email
             require_once __DIR__ . '/email_service.php';

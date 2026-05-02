@@ -224,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = new FormData(formCreate);
         
         try {
-            const res = await fetch(`/bathyal/api/teams.php?action=create`, {
+            const res = await fetch(`/api/teams.php?action=create`, {
                 method: 'POST',
                 body: data
             });
@@ -282,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-slate-500">Loading...</td></tr>';
         
         try {
-            const res = await fetch(`/bathyal/api/teams.php?action=members&team_id=${teamId}`);
+            const res = await fetch(`/api/teams.php?action=members&team_id=${teamId}`);
             const json = await res.json();
             if (json.success) {
                 tbody.innerHTML = '';
@@ -363,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fd.append('team_id', teamId);
             fd.append('user_id', userId);
             
-            const res = await fetch(`/bathyal/api/teams.php?action=remove_member`, { method: 'POST', body: fd });
+            const res = await fetch(`/api/teams.php?action=remove_member`, { method: 'POST', body: fd });
             const json = await res.json();
             
             if (json.success) {
@@ -394,7 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fd.append('user_id', userId);
             fd.append('role', role);
             
-            const res = await fetch(`/bathyal/api/teams.php?action=update_role`, { method: 'POST', body: fd });
+            const res = await fetch(`/api/teams.php?action=update_role`, { method: 'POST', body: fd });
             const json = await res.json();
             
             if (json.success) {
@@ -417,11 +417,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const fd = new FormData();
             fd.append('team_id', currentTeamId);
             
-            const res = await fetch(`/bathyal/api/teams.php?action=delete`, { method: 'POST', body: fd });
+            const res = await fetch(`/api/teams.php?action=delete`, { method: 'POST', body: fd });
             const json = await res.json();
             
             if (json.success) {
-                window.location.href = '/bathyal/teams.php';
+                window.location.href = '/teams.php';
             } else {
                 showAlert('Error', json.error || 'Failed to delete team', 'danger');
             }
@@ -458,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
         searchTimeout = setTimeout(async () => {
             try {
                 // Pass currentTeamId to exclude existing team members
-                const res = await fetch(`/bathyal/api/teams.php?action=search_users&q=${encodeURIComponent(q)}&team_id=${currentTeamId}`);
+                const res = await fetch(`/api/teams.php?action=search_users&q=${encodeURIComponent(q)}&team_id=${currentTeamId}`);
                 const json = await res.json();
                 
                 searchResults.innerHTML = '';
@@ -509,7 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
          e.preventDefault();
          const data = new FormData(document.getElementById('form-add-member'));
          try {
-             const res = await fetch(`/bathyal/api/teams.php?action=add_member`, { method: 'POST', body: data });
+             const res = await fetch(`/api/teams.php?action=add_member`, { method: 'POST', body: data });
              const json = await res.json();
              
              if (json.success) {

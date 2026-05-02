@@ -25,6 +25,6 @@
     <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="/bathyal/assets/js/app.js?v=3"></script>
+    <script src="/assets/js/app.js?v=3"></script>
 </body>
 </html>

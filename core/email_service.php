@@ -15,16 +15,15 @@ class EmailService {
         try {
             $appConfig = file_exists(__DIR__ . '/../config.php') ? require __DIR__ . '/../config.php' : [];
             $appName = $appConfig['app_name'] ?? 'Bathyal';
-            $smtpConfig = $appConfig['smtp'] ?? [];
 
-            // Fetch from Environment Variables (SetEnv in .htaccess) first, then config.php, then defaults
-            $smtpUser = getenv('SMTP_USER') ?: ($smtpConfig['username'] ?? '');
-            $smtpPass = getenv('SMTP_PASS') ?: ($smtpConfig['password'] ?? '');
-            $smtpHost = getenv('SMTP_HOST') ?: ($smtpConfig['host'] ?? 'smtp.gmail.com');
-            $smtpPort = getenv('SMTP_PORT') ?: ($smtpConfig['port'] ?? 587);
-            $smtpSecure = getenv('SMTP_SECURE') ?: ($smtpConfig['secure'] ?? 'tls');
-            $smtpFromEmail = getenv('SMTP_FROM_EMAIL') ?: ($smtpConfig['from_email'] ?? $smtpUser);
-            $smtpFromName = getenv('SMTP_FROM_NAME') ?: ($smtpConfig['from_name'] ?? ($appName . ' System'));
+            // Fetch from Environment Variables
+            $smtpUser = getenv('SMTP_USER') ?: '';
+            $smtpPass = getenv('SMTP_PASS') ?: '';
+            $smtpHost = getenv('SMTP_HOST') ?: 'smtp.gmail.com';
+            $smtpPort = getenv('SMTP_PORT') ?: 587;
+            $smtpSecure = getenv('SMTP_SECURE') ?: 'tls';
+            $smtpFromEmail = getenv('SMTP_FROM_EMAIL') ?: $smtpUser;
+            $smtpFromName = getenv('SMTP_FROM_NAME') ?: ($appName . ' System');
 
             // Server settings
             if (!empty($smtpUser) && $smtpUser !== 'YOUR_EMAIL@gmail.com') {

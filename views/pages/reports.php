@@ -232,7 +232,7 @@ function exportToJSON() {
     const tempElement = document.createElement("a");
     const url = URL.createObjectURL(blob);
     tempElement.href = url;
-    tempElement.download = "<?= strtolower($appName ?? 'bathyal') ?>-project-report.json";
+    tempElement.download = "<?= strtolower($appName ?? 'app') ?>-project-report.json";
     
     document.body.appendChild(tempElement);
     tempElement.click();

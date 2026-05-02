@@ -3,7 +3,7 @@
 session_start();
 
 if (isset($_SESSION['user_id'])) {
-    header("Location: /bathyal/index.php");
+    header("Location: /index.php");
     exit;
 }
 
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($userId) {
                 $_SESSION['user_id'] = $userId;
                 $_SESSION['role'] = 'member';
-                header("Location: /bathyal/index.php");
+                header("Location: /index.php");
                 exit;
             } else {
                 $error = 'Failed to register. Please try again.';
@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $appConfig = file_exists(__DIR__ . '/../../config.php') ? require __DIR__ . '/../../config.php' : ['app_name' => 'Bathyal'];
 $appName = $appConfig['app_name'] ?? 'Bathyal';
 $favicon = $appConfig['favicon'] ?? 'assets/images/favicon.png';
-$basePath = rtrim($appConfig['base_path'] ?? '/bathyal', '/');
+$basePath = rtrim($appConfig['base_path'] ?? '', '/');
 ?>
 <!DOCTYPE html>
 <html lang="en">

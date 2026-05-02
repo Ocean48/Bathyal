@@ -1,4 +1,4 @@
-# /var/www/html/bathyal/.htaccess
+# /var/www/html/.htaccess
 
 # Security to prevent directory listing
 Options -Indexes
@@ -22,7 +22,7 @@ SetEnv SMTP_FROM_NAME "YourAppName System"
 # Basic routing (if you want all traffic through index.php later)
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /bathyal/
+    RewriteBase /
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^(.*)$ index.php [QSA,L]

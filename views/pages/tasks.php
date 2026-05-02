@@ -108,7 +108,7 @@ $tasks = $db->getTasksByAssigneeId($userId);
                                 ?>
 
                                 <!-- Single Task Row -->
-                                <div class="task-item flex items-center px-4 py-3 hover:bg-slate-50/80 group transition-colors cursor-pointer border-l-2 border-transparent hover:border-teal-400" style="<?= $isCompleted ? 'display: none;' : '' ?>" data-status="<?= htmlspecialchars($task['status']) ?>" <?= $task['project_id'] ? 'onclick="window.location.href=\'/bathyal/project?id='.$task['project_id'].'&task_id='.$task['id'].'\'"' : '' ?>>
+                                <div class="task-item flex items-center px-4 py-3 hover:bg-slate-50/80 group transition-colors cursor-pointer border-l-2 border-transparent hover:border-teal-400" style="<?= $isCompleted ? 'display: none;' : '' ?>" data-status="<?= htmlspecialchars($task['status']) ?>" <?= $task['project_id'] ? 'onclick="window.location.href=\'/project?id='.$task['project_id'].'&task_id='.$task['id'].'\'"' : '' ?>>
                                     
                                     <!-- Task Name -->
                                     <div class="flex-1 min-w-[200px] flex items-center">
@@ -120,7 +120,7 @@ $tasks = $db->getTasksByAssigneeId($userId);
                                     <!-- Project -->
                                     <div class="w-48 shrink-0 hidden md:flex items-center text-xs text-slate-500">
                                          <?php if($task['project_id']): ?>
-                                            <a href="/bathyal/project?id=<?= $task['project_id'] ?>" class="hover:text-teal-600 hover:underline truncate mr-2 max-w-full" onclick="event.stopPropagation()">
+                                            <a href="/project?id=<?= $task['project_id'] ?>" class="hover:text-teal-600 hover:underline truncate mr-2 max-w-full" onclick="event.stopPropagation()">
                                                 <?= htmlspecialchars($task['project_name'] ?? 'Unknown Project') ?>
                                             </a>
                                          <?php else: ?>

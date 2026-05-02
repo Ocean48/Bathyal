@@ -2,6 +2,9 @@
 // /api/tasks.php
 session_start();
 
+$config = require __DIR__ . '/../config.php';
+$base_path = $config['base_path'] ?? '';
+
 require_once '../core/database.php';
 require_once '../core/db_query.php';
 
@@ -121,7 +124,7 @@ switch ($method) {
                     $subject = "New Attachment on Task: " . $taskTitle;
                     $bodyHtml = "<h2>A new attachment was added to the task: " . $taskTitle . "</h2>";
                     $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> attached the file: " . htmlspecialchars($file['name']) . "</p>";
-                    $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
+                    $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . $base_path . "/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
                     $notifResult = $db->sendTaskNotification($taskId, "New attachment added: " . $file['name'], 'task_update', $subject, $bodyHtml);
 
                     $response = ['status' => 'success', 'attachment_id' => $insertedId];
@@ -182,7 +185,7 @@ switch ($method) {
                     $bodyHtml = "<h2>Task status was updated</h2>";
                     $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
                     $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> updated the status to: <strong>" . htmlspecialchars($data['status']) . "</strong></p>";
-                    $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
+                    $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . $base_path . "/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
                     $notifResult = $db->sendTaskNotification($data['task_id'], "Task status updated to " . $data['status'], 'task_update', $subject, $bodyHtml);
 
                     $response = ['status' => 'success'];
@@ -283,7 +286,7 @@ switch ($method) {
                         $bodyHtml .= "<p><strong>Task:</strong> " . $taskTitle . "</p>";
                         $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> updated the following fields:</p>";
                         $bodyHtml .= "<ul>" . $changesStr . "</ul>";
-                        $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
+                        $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . $base_path . "/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
                         
                         $notifResult = $db->sendTaskNotification($data['task_id'], "Task details updated", 'task_update', $subject, $bodyHtml);
 
@@ -335,7 +338,7 @@ switch ($method) {
                     $bodyHtml = "<h2>A new comment was added to the task: " . $taskTitle . "</h2>";
                     $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> commented:</p>";
                     $bodyHtml .= "<blockquote style='border-left: 4px solid #ddd; padding-left: 10px; margin-left: 0;'>" . nl2br(htmlspecialchars($data['content'])) . "</blockquote>";
-                    $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
+                    $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . $base_path . "/tasks?id=" . $data['task_id'] . "'>Click here to view the task</a></p>";
                     $notifResult = $db->sendTaskNotification($data['task_id'], "New comment added", 'task_update', $subject, $bodyHtml);
 
                     $response = ['status' => 'success', 'comment_id' => $commentId];
@@ -388,7 +391,7 @@ switch ($method) {
                         $bodyHtml = "<h2>A comment was edited on the task: " . $taskTitle . "</h2>";
                         $bodyHtml .= "<p><strong>" . htmlspecialchars($changerName) . "</strong> updated their comment:</p>";
                         $bodyHtml .= "<blockquote style='border-left: 4px solid #ddd; padding-left: 10px; margin-left: 0;'>" . nl2br(htmlspecialchars($data['content'])) . "</blockquote>";
-                        $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
+                        $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . $base_path . "/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
                         $notifResult = $db->sendTaskNotification($taskId, "Comment edited", 'task_update', $subject, $bodyHtml);
 
                         if (isset($notifResult['success']) && !$notifResult['success']) {
@@ -479,7 +482,7 @@ switch ($method) {
                 if (!empty($data['expected_due_date'])) {
                     $bodyHtml .= "<p><strong>Expected End Date:</strong> " . htmlspecialchars(explode(' ', $data['expected_due_date'])[0]) . "</p>";
                 }
-                $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
+                $bodyHtml .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . $base_path . "/tasks?id=" . $taskId . "'>Click here to view the task</a></p>";
                 
                 $notifResult = $db->sendTaskNotification($taskId, "New task created: " . $data['title'], 'task_update', $subject, $bodyHtml, $data['project_id'] ?? null);
                 

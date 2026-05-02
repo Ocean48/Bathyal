@@ -5,7 +5,7 @@
     $appConfig = file_exists(__DIR__ . '/../../config.php') ? require __DIR__ . '/../../config.php' : ['app_name' => 'Bathyal'];
     $appName = $appConfig['app_name'] ?? 'Bathyal';
     $favicon = $appConfig['favicon'] ?? 'assets/images/favicon.png';
-    $basePath = rtrim($appConfig['base_path'] ?? '/bathyal', '/');
+    $basePath = rtrim($appConfig['base_path'] ?? '', '/');
     ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -29,7 +29,7 @@
         <nav class="flex-1 overflow-y-auto py-4">
             <?php
             $currentUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-            $baseRoute = rtrim($appConfig['base_path'] ?? '/bathyal', '/');
+            $baseRoute = rtrim($appConfig['base_path'] ?? '', '/');
             $route = strtolower(trim(str_replace($baseRoute, '', $currentUri), '/'));
             if ($route === 'index.php') $route = '';
 

@@ -1,12 +1,6 @@
--- TEAMS AND USERS
-CREATE TABLE teams (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    created_by INT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
-);
+SET FOREIGN_KEY_CHECKS=0;
 
+-- USERS AND TEAMS
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -15,6 +9,14 @@ CREATE TABLE users (
     role ENUM('admin', 'member', 'data_analyst') DEFAULT 'member',
     dashboard_preferences TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE teams (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE team_members (
@@ -228,6 +230,22 @@ CREATE TABLE user_recent_projects (
 -- FAKE TEST DATA
 -- ==========================================
 
+-- Insert Users (Passwords are set to 'user123')
+INSERT INTO users (name, email, password_hash, role) VALUES
+('Default User', 'default@bathyalemail.com', '$2y$10$e..rHysD5ZF5OXazTP1p9OnmpDQ1o98U.XpGxuLdjwR1uZy/WpkJ.', 'admin'),
+('User', 'user@bathyalemail.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'admin'),
+('John Doe', 'john1@bathyalemail.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('Jane Data', 'jane1@bathyalemail.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'data_analyst'),
+('Mark Smith', 'mark1@bathyalemail.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('Emily Davis', 'emily1@bathyalemail.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('Michael Brown', 'michael1@bathyalemail.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('Sarah Wilson', 'sarah1@bathyalemail.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('David Lee', 'david1@bathyalemail.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('Laura Martinez', 'laura1@bathyalemail.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('James Anderson', 'james1@bathyalemail.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
+('Olivia Thomas', 'olivia1@bathyalemail.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member');
+
+
 -- Insert a Team
 INSERT INTO teams (name, created_by) VALUES ('Engineering', 1);
 
@@ -235,22 +253,6 @@ INSERT INTO `team_members` (`team_id`, `user_id`, `role`, `joined_at`) VALUES
 (1, 1, 'owner', '2026-04-19 21:55:10'),
 (1, 2, 'member', '2026-04-19 21:55:10'),
 (1, 3, 'member', '2026-04-19 21:55:10');
-
-
--- Insert Users (Passwords are set to 'user123')
-INSERT INTO users (name, email, password_hash, role) VALUES
-('Default User', 'default@bathyal_test.com', '$2y$10$e..rHysD5ZF5OXazTP1p9OnmpDQ1o98U.XpGxuLdjwR1uZy/WpkJ.', 'admin'),
-('User', 'user@bathyal_test.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'admin'),
-('John Doe', 'john1@bathyal_test.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
-('Jane Data', 'jane1@bathyal_test.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'data_analyst'),
-('Mark Smith', 'mark1@bathyal_test.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
-('Emily Davis', 'emily1@bathyal_test.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
-('Michael Brown', 'michael1@bathyal_test.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
-('Sarah Wilson', 'sarah1@bathyal_test.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
-('David Lee', 'david1@bathyal_test.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
-('Laura Martinez', 'laura1@bathyal_test.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
-('James Anderson', 'james1@bathyal_test.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member'),
-('Olivia Thomas', 'olivia1@bathyal_test.com', '$2y$10$Bzvnfr5Xu1xOOQpp.M0.fuANSp9G530af.GTooEo9zsRGuE4.az8G', 'member');
 
 
 -- Insert Projects
@@ -359,3 +361,5 @@ INSERT INTO task_projects (task_id, project_id, section_id, position) VALUES
 (40, 3, 14, 1), (41, 3, 14, 2), (42, 3, 14, 3),
 (43, 3, 15, 1), (44, 3, 15, 2), (45, 3, 15, 3);
 
+
+SET FOREIGN_KEY_CHECKS=1;
