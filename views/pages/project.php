@@ -9,6 +9,11 @@ require_once 'core/db_query.php';
 $projectId = isset($_GET['id']) ? (int)$_GET['id'] : 1;
 if (isset($currentUser['id'])) {
     $dbQueries = new DBQueries($pdo);
+    // Check if user is member of project
+    if (!$dbQueries->isProjectMember($projectId, $currentUser['id'])) {
+        header("Location: /projects");
+        exit;
+    }
     $dbQueries->trackProjectAccess($currentUser['id'], $projectId);
 }
 
@@ -50,10 +55,10 @@ require_once 'views/layouts/header.php';
             </div>
 
             <button class="text-slate-500 hover:text-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors border border-slate-200 bg-white shadow-sm" onclick="copyProjectShareLink()">Share</button>
-            <button onclick="promptAddTask(null)" class="bg-teal-500 hover:bg-teal-600 text-white px-4 py-1.5 rounded-md text-sm font-medium shadow-sm transition-colors flex items-center">
+            <!-- <button onclick="promptAddTask(null)" class="bg-teal-500 hover:bg-teal-600 text-white px-4 py-1.5 rounded-md text-sm font-medium shadow-sm transition-colors flex items-center">
                 <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                 Add Task
-            </button>
+            </button> -->
         </div>
     </header>
 
@@ -78,7 +83,7 @@ require_once 'views/layouts/header.php';
                         <button class="text-slate-400 hover:text-slate-600 p-1" title="Uncheck all subtasks" onclick="uncheckSectionSubtasks(this)">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                         </button>
-                        <button class="text-slate-400 hover:text-slate-600 p-1" onclick="alert('Section options open')"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg></button>
+                        <button class="text-slate-400 hover:text-slate-600 p-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg></button>
                     </div>
                 </div>
                 <div class="p-2 overflow-y-auto flex-1 space-y-2 min-h-[50px] dropzone">
@@ -155,7 +160,9 @@ require_once 'views/layouts/header.php';
                         <tr>
                             <th class="px-4 py-3 font-medium">Tasks</th>
                             <th class="px-4 py-3 font-medium">Assignees</th>
-                            <th class="px-4 py-3 font-medium">Due Date</th>
+                            <th class="px-4 py-3 font-medium">Collaborators</th>
+                            <th class="px-4 py-3 font-medium">Labels</th>
+                            <th class="px-4 py-3 font-medium">Completed On</th>
                             <th class="px-4 py-3 font-medium">Status / Actions</th>
                         </tr>
                     </thead>
@@ -188,9 +195,9 @@ require_once 'views/layouts/header.php';
 </div>
 
 <!-- Task Detail Modal Backdrop -->
-<div id="task-modal" class="fixed inset-0 bg-slate-900/50 hidden z-50 flex justify-end" onclick="if(event.target === this) closeTaskModal()">
+<div id="task-modal" class="fixed inset-0 pointer-events-none hidden z-40 flex justify-end">
     <!-- Sliding Panel -->
-    <div class="bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col animate-slide-in-right">
+    <div class="bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col animate-slide-in-right pointer-events-auto border-l border-slate-200">
         <!-- Modal Header -->
         <div class="flex justify-between items-center px-6 py-4 border-b border-slate-200">
             <div class="flex space-x-3 items-center">
@@ -198,11 +205,10 @@ require_once 'views/layouts/header.php';
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 </button>
                 <div class="h-6 border-l border-slate-300 mx-1 hidden" id="task-modal-divider"></div>
-                <button id="btn-start-progress" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded text-sm font-medium shadow-sm flex items-center transition-colors" onclick="toggleProgress()">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    <span>Start Progress</span>
+                <div class="text-sm font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded transition-colors" id="timer-display">00:00:00</div>
+                <button id="btn-reset-timer" class="hidden text-slate-400 hover:text-rose-500 hover:bg-rose-50 p-1.5 rounded transition-colors" title="Reset Task Timer" onclick="resetTaskTimer()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                 </button>
-                <div class="text-sm font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded" id="timer-display">00:00:00</div>
             </div>
             <div class="flex items-center space-x-4 text-slate-500">
                 <button class="hover:text-slate-800" title="Copy Task Link" onclick="copyTaskLink()"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg></button>
@@ -234,13 +240,36 @@ require_once 'views/layouts/header.php';
                         </ul>
                     </div>
                 </div>
+
+                <div class="relative">
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Collaborators</label>
+                    <div class="flex items-center space-x-2 cursor-pointer hover:bg-slate-50 p-1.5 -ml-1.5 rounded-md transition-colors" onclick="toggleCollaboratorDropdown(event)">
+                        <div id="task-modal-collaborators-stack" class="flex -space-x-2 overflow-hidden items-center hidden">
+                        </div>
+                        <span class="text-sm text-slate-700 ml-2" id="task-modal-collaborator-name">No collaborators</span>
+                    </div>
+                    <!-- Dropdown for collaborators -->
+                    <div id="collaborator-dropdown" class="hidden absolute top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-64 flex-col">
+                        <div class="p-2 border-b border-slate-100">
+                            <input type="text" id="collaborator-search" oninput="searchCollaborators(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search people by name or email..." onclick="event.stopPropagation()">
+                        </div>
+                        <ul id="collaborator-dropdown-list" class="overflow-y-auto flex-1 p-1 text-sm text-slate-600">
+                            <!-- Items here -->
+                        </ul>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Expected Start Date</label>
+                    <input type="date" id="task-modal-expected-start-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Expected End Date</label>
+                    <input type="date" id="task-modal-expected-due-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
+                </div>
                 <div>
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Start Date</label>
                     <input type="date" id="task-modal-start-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
-                </div>
-                <div>
-                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Due Date</label>
-                    <input type="date" id="task-modal-due-date" onchange="updateTaskDetails()" class="text-sm text-slate-700 border-none focus:ring-0 p-0 hover:bg-slate-50 rounded cursor-pointer">
                 </div>
                 <div class="hidden" id="task-modal-completed-date-container">
                     <label class="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-1 block">Completed On</label>
@@ -259,6 +288,13 @@ require_once 'views/layouts/header.php';
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block" title="Estimated Time in minutes">Est. Time (min)</label>
                     <input type="number" id="task-modal-estimated" onchange="updateTaskDetails()" min="0" placeholder="0" class="text-sm text-slate-700 border border-transparent hover:border-slate-200 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 p-1 -ml-1 rounded cursor-pointer w-24">
                 </div>
+
+                <!-- Parent Task Selection Removed -->
+                
+                <div class="col-span-2 relative">
+                    <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Labels</label>
+                    <div class="flex flex-wrap gap-2 items-center" id="task-modal-labels">
+                        <!-- Labels will be dynamically populated here -->
                 <div>
                     <label class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block" title="Current Time Taken">Time Taken</label>
                     <span id="task-modal-time-taken" class="text-sm font-medium text-slate-700 block p-1 -ml-1">0s</span>
@@ -269,23 +305,52 @@ require_once 'views/layouts/header.php';
                         <span id="parent-task-name" class="truncate">None</span>
                         <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
-                    <input type="hidden" id="task-modal-parent-id" onchange="updateTaskDetails()">
-                    
-                    <!-- Dropdown for Parent Task -->
-                    <div id="parent-task-dropdown" class="hidden absolute top-full left-0 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg z-[60] max-h-64 flex-col">
-                        <div class="p-2 border-b border-slate-100 flex">
-                            <input type="text" id="parent-task-search" oninput="searchParentTasks(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search tasks by title..." onclick="event.stopPropagation()">
+                    <button onclick="toggleLabelsDropdown(event)" class="text-xs text-teal-600 font-medium hover:text-teal-700 whitespace-nowrap px-2 py-1 bg-teal-50 hover:bg-teal-100 rounded transition-colors flex items-center mt-2">
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        Add Label
+                    </button>
+                    <!-- Dropdown for labels -->
+                    <div id="labels-dropdown" class="hidden absolute top-full left-0 mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-64 flex-col">
+                        <div class="p-2 border-b border-slate-100">
+                            <input type="text" id="labels-search" oninput="searchLabels(this.value)" onkeydown="handleLabelSearchKeydown(event)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search or create label..." onclick="event.stopPropagation()">
                         </div>
-                        <ul id="parent-task-list" class="overflow-y-auto flex-1 p-1 text-sm text-slate-600">
+                        <ul id="labels-dropdown-list" class="overflow-y-auto flex-1 p-1 text-sm text-slate-600">
                             <!-- Items here -->
                         </ul>
                     </div>
                 </div>
             </div>
+            
+            <!-- Projects -->
+            <div class="mb-8">
+                <div class="flex justify-between items-center mb-2">
+                    <label class="font-semibold text-slate-800">Projects</label>
+                    <div class="relative">
+                        <button onclick="toggleProjectLinkDropdown()" class="text-xs text-teal-600 font-medium hover:text-teal-700 whitespace-nowrap px-2 py-1 bg-teal-50 hover:bg-teal-100 rounded transition-colors flex items-center">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                            Add to Project
+                        </button>
+                        <div id="project-link-dropdown" class="hidden absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-lg shadow-xl z-50 flex-col whitespace-normal">
+                            <div class="p-2 border-b border-slate-100 flex">
+                                <input type="text" id="project-link-search" oninput="searchProjectsToLink(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search projects..." autofocus>
+                            </div>
+                            <ul id="project-link-list" class="overflow-y-auto max-h-48 p-1 text-sm text-slate-600">
+                                <li class="p-2 text-slate-400 italic text-xs">Type to search...</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div id="task-modal-projects" class="space-y-2">
+                    <!-- Project rows added dynamically -->
+                </div>
+            </div>
 
             <!-- Description -->
             <div class="mb-8">
-                <label class="font-semibold text-slate-800 mb-2 block">Description</label>
+                <div class="flex justify-between items-center mb-2">
+                    <label class="font-semibold text-slate-800 block">Description</label>
+                    <button onclick="updateTaskDetails(true)" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded text-xs font-medium shadow-sm transition-colors">Save Description</button>
+                </div>
                 <div class="border border-slate-300 rounded bg-white overflow-hidden flex flex-col min-h-[200px]">
                     <!-- RTE Toolbar -->
                     <div class="bg-slate-50 border-b border-slate-200 px-2 py-1.5 flex flex-wrap gap-1 items-center">
@@ -297,6 +362,9 @@ require_once 'views/layouts/header.php';
                         </button>
                         <button type="button" onmousedown="event.preventDefault(); formatText('underline', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Underline">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3m-9 18h6"></path></svg>
+                        </button>
+                        <button type="button" onmousedown="event.preventDefault(); insertLink('task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Link">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
                         </button>
                         <div class="w-px h-5 bg-slate-300 mx-1"></div>
                         <button type="button" onmousedown="event.preventDefault(); formatText('insertUnorderedList', 'task-modal-desc')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bullet List">
@@ -313,6 +381,9 @@ require_once 'views/layouts/header.php';
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                         </button>
                         <input type="file" id="rte-image-upload-desc" accept="image/*" class="hidden" onchange="uploadRteImage(this, 'task-modal-desc')">
+                        <button type="button" onclick="insertMention();" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Mention">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                        </button>
                         <div class="w-px h-5 bg-slate-300 mx-1"></div>
                         <button type="button" onmousedown="event.preventDefault(); editTable('addRow', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Row">+Row</button>
                         <button type="button" onmousedown="event.preventDefault(); editTable('addCol', 'task-modal-desc')" class="px-1.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded" title="Add Column">+Col</button>
@@ -323,9 +394,9 @@ require_once 'views/layouts/header.php';
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l-4 3 4 3m8-6l4 3-4 3"></path></svg>
                         </button>
                     </div>
-                    <div id="task-modal-desc" class="prose prose-sm text-slate-600 p-4 outline-none flex-1 max-w-none break-words min-h-[100px] border border-transparent focus:border-slate-200" contenteditable="true" onkeydown="handleRteTab(event)" onblur="updateTaskDetails()">
+                    <div id="task-modal-desc" class="prose prose-sm text-slate-600 p-4 outline-none flex-1 max-w-none break-words min-h-[100px] border border-transparent focus:border-slate-200" contenteditable="true" onkeydown="handleRteKeyDown(event)" oninput="handleRteInput(event)">
                     </div>
-                    <textarea id="task-modal-desc-code" class="hidden font-mono text-sm p-4 w-full flex-1 outline-none text-slate-700 bg-slate-50 break-words min-h-[100px]" onblur="updateTaskDetails()"></textarea>
+                    <textarea id="task-modal-desc-code" class="hidden font-mono text-sm p-4 w-full flex-1 outline-none text-slate-700 bg-slate-50 break-words min-h-[100px]"></textarea>
                 </div>
             </div>
 
@@ -346,17 +417,6 @@ require_once 'views/layouts/header.php';
                 <div class="flex justify-between items-center mb-3">
                     <label class="font-semibold text-slate-800">Subtasks</label>
                     <div class="flex space-x-3 items-center shrink-0">
-                        <div class="relative flex items-center">
-                            <button onclick="toggleLinkSubtaskDropdown()" class="text-xs text-teal-600 font-medium hover:text-teal-700 focus:outline-none whitespace-nowrap">Link Existing Task</button>
-                            <div id="link-subtask-dropdown" class="hidden absolute right-0 bottom-full mb-2 w-72 bg-white border border-slate-200 rounded-lg shadow-xl z-50 flex-col whitespace-normal">
-                                <div class="p-2 border-b border-slate-100 flex">
-                                    <input type="text" id="link-subtask-search" oninput="searchTasksToLink(this.value)" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Search tasks by title..." autofocus>
-                                </div>
-                                <ul id="link-subtask-list" class="overflow-y-auto max-h-48 p-1 text-sm text-slate-600">
-                                    <li class="p-2 text-slate-400 italic text-xs">Type to search...</li>
-                                </ul>
-                            </div>
-                        </div>
                         <button onclick="promptAddSubtask(document.getElementById('task-modal-id').value)" class="text-xs text-teal-600 font-medium hover:text-teal-700 whitespace-nowrap">Add Subtask</button>
                     </div>
                 </div>
@@ -386,6 +446,9 @@ require_once 'views/layouts/header.php';
                                 <button type="button" onmousedown="event.preventDefault(); formatText('underline', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Underline">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3m-9 18h6"></path></svg>
                                 </button>
+                                <button type="button" onmousedown="event.preventDefault(); insertLink('task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Link">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                                </button>
                                 <div class="w-px h-5 bg-slate-300 mx-1"></div>
                                 <button type="button" onmousedown="event.preventDefault(); formatText('insertUnorderedList', 'task-modal-new-comment')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bullet List">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
@@ -412,7 +475,7 @@ require_once 'views/layouts/header.php';
                                 </button>
                             </div>
                             
-                            <div id="task-modal-new-comment" class="prose prose-sm text-slate-600 p-3 outline-none flex-1 max-w-none break-words" contenteditable="true" data-placeholder="Ask a question or post an update..." onkeydown="handleRteTab(event)" onfocus="if(this.innerHTML==='<p><br></p>') this.innerHTML='';" onblur="if(this.innerHTML==='') this.innerHTML='<p><br></p>';"></div>
+                            <div id="task-modal-new-comment" class="prose prose-sm text-slate-600 p-3 outline-none flex-1 max-w-none break-words" contenteditable="true" data-placeholder="Ask a question or post an update..." onkeydown="handleRteKeyDown(event)" oninput="handleRteInput(event)" onfocus="if(this.innerHTML==='<p><br></p>') this.innerHTML='';" onblur="if(this.innerHTML==='') this.innerHTML='<p><br></p>';"></div>
                             <textarea id="task-modal-new-comment-code" class="hidden font-mono text-sm p-3 w-full flex-1 outline-none text-slate-700 bg-slate-50 break-words min-h-[100px]"></textarea>
                         </div>
                         <div class="mt-2 flex justify-end flex-wrap gap-2">
@@ -427,6 +490,11 @@ require_once 'views/layouts/header.php';
             </div>
         </div>
     </div>
+</div>
+
+<!-- Mention Popover -->
+<div id="mention-popover" class="hidden fixed z-[100] bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto w-64 flex-col text-sm text-slate-700">
+    <ul id="mention-popover-list" class="p-1"></ul>
 </div>
 
 <!-- Create Entry Modals (Ocean Theme) -->
@@ -465,7 +533,7 @@ require_once 'views/layouts/header.php';
                     Cancel
                 </button>
                 <button type="submit" class="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 shadow-sm transition-colors flex items-center">
-                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7m-4-4v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2z"></path></svg>
                     <span id="create-btn-text">Create</span>
                 </button>
             </div>
@@ -475,6 +543,29 @@ require_once 'views/layouts/header.php';
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script>
+// showSavingOverlay and hideSavingOverlay are now globally defined in header.php
+
+document.addEventListener('click', function(event) {
+    const projDropdown = document.getElementById('project-link-dropdown');
+    const projButton = document.querySelector('button[onclick="toggleProjectLinkDropdown()"]');
+    
+    if (projDropdown && !projDropdown.classList.contains('hidden')) {
+        if (!projDropdown.contains(event.target) && (!projButton || !projButton.contains(event.target))) {
+            projDropdown.classList.add('hidden');
+        }
+    }
+
+    const link = event.target.closest('a');
+    if (link && link.href) {
+        const editable = link.closest('[contenteditable="true"]');
+        if (editable) {
+            // Check if user is clicking on a link inside an editor
+            event.preventDefault();
+            window.open(link.href, link.target || '_blank');
+        }
+    }
+});
+
 window.getStatusBadgeClass = function(status) {
     const s = (status || 'todo').toLowerCase();
     if (s === 'completed' || s === 'done') {
@@ -505,20 +596,349 @@ window.getStatusTextClass = function(status) {
 let timerInterval;
 
 // Custom Rich Text Editor Functions
-function handleRteTab(event) {
+let mentionQuery = null;
+let mentionRange = null;
+let mentionType = null; 
+let mentionActiveEditor = null;
+let mentionResults = [];
+let mentionSelectedIndex = 0;
+
+function handleRteKeyDown(event) {
     if (event.key === 'Tab') {
+        if (!document.getElementById('mention-popover').classList.contains('hidden')) {
+            event.preventDefault();
+            insertMention();
+            return;
+        }
         event.preventDefault();
         if (event.shiftKey) {
             document.execCommand('outdent', false, null);
         } else {
             document.execCommand('indent', false, null);
         }
+        return;
+    }
+
+    const popover = document.getElementById('mention-popover');
+    if (!popover.classList.contains('hidden')) {
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            mentionSelectedIndex = (mentionSelectedIndex + 1) % mentionResults.length;
+            renderMentionPopover();
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            mentionSelectedIndex = (mentionSelectedIndex - 1 + mentionResults.length) % mentionResults.length;
+            renderMentionPopover();
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            insertMention();
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            closeMentionPopover();
+        }
+    }
+}
+
+function handleRteInput(event) {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+    const node = selection.anchorNode;
+    if (!node || node.nodeType !== Node.TEXT_NODE) {
+        closeMentionPopover();
+        return;
+    }
+
+    const textBeforeCursor = node.textContent.substring(0, range.startOffset);
+    const match = textBeforeCursor.match(/(?:^|\s)([@#])([a-zA-Z0-9\-_ ]*)$/);
+
+    if (match && match[2].length < 30) {
+        mentionType = match[1];
+        mentionQuery = match[2].trim();
+        
+        mentionRange = document.createRange();
+        // match[0] contains the matched string including the leading space if present
+        // we only want to replace the @word part.
+        const matchedText = match[0].trimStart(); // remove leading space
+        mentionRange.setStart(node, range.startOffset - matchedText.length);
+        mentionRange.setEnd(node, range.startOffset);
+        
+        mentionActiveEditor = event.currentTarget;
+        
+        const rect = range.getBoundingClientRect();
+        showMentionPopover(rect);
+        fetchMentions(mentionQuery);
+    } else {
+        closeMentionPopover();
+    }
+}
+
+function showMentionPopover(rect) {
+    const popover = document.getElementById('mention-popover');
+    popover.classList.remove('hidden');
+    popover.classList.add('flex');
+    popover.style.left = rect.left + 'px';
+    popover.style.top = (rect.bottom + 5) + 'px';
+}
+
+function closeMentionPopover() {
+    const popover = document.getElementById('mention-popover');
+    if(popover) {
+        popover.classList.add('hidden');
+        popover.classList.remove('flex');
+    }
+    mentionQuery = null;
+    mentionRange = null;
+    mentionActiveEditor = null;
+    mentionResults = [];
+    mentionSelectedIndex = 0;
+}
+
+document.addEventListener('mousedown', function(event) {
+    const popover = document.getElementById('mention-popover');
+    if (popover && !popover.classList.contains('hidden')) {
+        if (!popover.contains(event.target)) {
+            closeMentionPopover();
+        }
+    }
+});
+
+async function fetchMentions(query) {
+    mentionResults = [];
+    mentionSelectedIndex = 0;
+    
+    try {
+        if (mentionType === '@') {
+            if (window.allUsersCache.length === 0) {
+                const projectIdParam = (typeof currentProjectId !== 'undefined') ? `&project_id=${currentProjectId}` : '';
+                const resUsers = await fetch(`api/users.php?search=${projectIdParam}`);
+                window.allUsersCache = await resUsers.json();
+            }
+            
+            const q = query.toLowerCase();
+            const filteredUsers = window.allUsersCache.filter(u => 
+                u.name.toLowerCase().includes(q) || 
+                u.email.toLowerCase().includes(q)
+            );
+            
+            mentionResults.push(...filteredUsers.map(u => ({...u, itemType: 'user'})));
+        } else if (mentionType === '#') {
+            const resTasks = await fetch('api/tasks.php');
+            const allTasks = await resTasks.json();
+            
+            const filteredTasks = allTasks.filter(t => t.title.toLowerCase().includes(query.toLowerCase()) || String(t.id).includes(query));
+            mentionResults.push(...filteredTasks.map(t => ({...t, itemType: 'task'})));
+            
+            const resProj = await fetch('api/projects.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ action: 'search', query: query })
+            });
+            const projData = await resProj.json();
+            if (projData.status === 'success') {
+                mentionResults.push(...projData.projects.map(p => ({...p, itemType: 'project'})));
+            }
+        }
+        
+        mentionResults = mentionResults.slice(0, 10);
+        renderMentionPopover();
+        
+    } catch(e) {
+        console.error('Mention fetch error', e);
+    }
+}
+
+function renderMentionPopover() {
+    const list = document.getElementById('mention-popover-list');
+    list.innerHTML = '';
+    
+    if (mentionResults.length === 0) {
+        const noResultsText = mentionType === '@' ? 'No matching users' : 'No matching tasks or projects';
+        list.innerHTML = `<li class="p-2 text-slate-400 italic text-xs">${noResultsText}</li>`;
+        return;
+    }
+    
+    mentionResults.forEach((item, index) => {
+        const li = document.createElement('li');
+        const isSelected = index === mentionSelectedIndex;
+        li.className = `p-2 cursor-pointer flex items-center justify-between text-slate-700 hover:bg-slate-100 rounded mt-0.5 ${isSelected ? 'bg-teal-50' : ''}`;
+        
+        if (item.itemType === 'user') {
+            li.innerHTML = `
+                <div class="flex items-center truncate">
+                    <svg class="w-3.5 h-3.5 mr-2 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    <span class="truncate"><span class="text-xs text-slate-700 font-medium">@${item.name}</span> <span class="text-xs text-slate-400 ml-1">(${item.email})</span></span>
+                </div>
+            `;
+        } else if (item.itemType === 'task') {
+            li.innerHTML = `
+                <div class="flex items-center truncate">
+                    <svg class="w-3.5 h-3.5 mr-2 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                    <span class="truncate"><span class="text-xs text-slate-400 font-medium">#${item.id}</span> ${item.title}</span>
+                </div>
+            `;
+        } else {
+            li.innerHTML = `
+                <div class="flex items-center truncate">
+                    <svg class="w-3.5 h-3.5 mr-2 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+                    <span class="truncate"><span class="text-xs text-slate-400 font-medium">PRJ-${item.id}</span> ${item.name}</span>
+                </div>
+            `;
+        }
+        
+        li.onmousedown = (e) => {
+            e.preventDefault();
+            mentionSelectedIndex = index;
+            insertMention();
+        };
+        li.onmouseenter = () => {
+            mentionSelectedIndex = index;
+            Array.from(list.children).forEach((child, i) => {
+                if (i === index) child.classList.add('bg-teal-50');
+                else child.classList.remove('bg-teal-50');
+            });
+        };
+        
+        list.appendChild(li);
+    });
+}
+
+function insertMention() {
+    if (mentionResults.length === 0) {
+        closeMentionPopover();
+        return;
+    }
+    
+    const item = mentionResults[mentionSelectedIndex];
+    
+    if (mentionActiveEditor) {
+        mentionActiveEditor.focus();
+    }
+    
+    const selection = window.getSelection();
+    
+    selection.removeAllRanges();
+    if (mentionRange) {
+        selection.addRange(mentionRange);
+    }
+    
+    let html = '';
+    if (item.itemType === 'user') {
+        html = `<a href="mailto:${item.email}" data-mention-user-id="${item.id}" class="text-blue-600 font-medium hover:underline px-1 py-0.5 rounded bg-blue-50" contenteditable="false">@${item.name}</a>&nbsp;`;
+    } else if (item.itemType === 'task') {
+        const url = window.location.origin + window.location.pathname + '?id=' + (typeof currentProjectId !== 'undefined' ? currentProjectId : 1) + '&task_id=' + item.id;
+        html = `<a href="${url}" class="text-indigo-600 font-medium hover:underline px-1 py-0.5 rounded bg-indigo-50" contenteditable="false" target="_blank">#${item.id} ${item.title}</a>&nbsp;`;
+    } else {
+        const url = window.location.origin + window.location.pathname + '?id=' + item.id;
+        html = `<a href="${url}" class="text-emerald-600 font-medium hover:underline px-1 py-0.5 rounded bg-emerald-50" contenteditable="false" target="_blank">PRJ-${item.id} ${item.name}</a>&nbsp;`;
+    }
+    
+    document.execCommand('insertHTML', false, html);
+    closeMentionPopover();
+    
+    if (mentionActiveEditor && mentionActiveEditor.id === 'task-modal-desc') {
+        updateTaskDetails();
     }
 }
 
 function formatText(command, editorId) {
     document.getElementById(editorId).focus();
     document.execCommand(command, false, null);
+}
+
+function showPromptModal(title, label, defaultValue) {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('global-modal-overlay');
+        const box = document.getElementById('global-modal-box');
+        const titleEl = document.getElementById('global-modal-title');
+        const msgEl = document.getElementById('global-modal-message');
+        const iconContainer = document.getElementById('global-modal-icon');
+        const btnCancel = document.getElementById('global-modal-cancel');
+        const btnConfirm = document.getElementById('global-modal-confirm');
+
+        if (!overlay) return resolve(null);
+
+        // Setup UI for prompt
+        titleEl.textContent = title;
+        msgEl.innerHTML = `
+            <label class="block text-sm font-medium text-slate-700 mb-1">${label}</label>
+            <input type="text" id="global-prompt-input" value="${defaultValue}" class="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-slate-800" autofocus>
+        `;
+        
+        iconContainer.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>`;
+        iconContainer.className = 'w-10 h-10 rounded-full flex flex-shrink-0 items-center justify-center shrink-0 bg-blue-100 text-blue-600';
+
+        btnCancel.classList.remove('hidden');
+        btnCancel.onclick = () => { closeModal(); resolve(null); };
+        
+        btnConfirm.textContent = 'Insert';
+        btnConfirm.className = 'px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 active:scale-[0.98]';
+        
+        const inputEl = document.getElementById('global-prompt-input');
+        
+        btnConfirm.onclick = () => { 
+            const val = inputEl.value;
+            closeModal(); 
+            resolve(val); 
+        };
+        
+        inputEl.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                btnConfirm.click();
+            } else if (e.key === 'Escape') {
+                btnCancel.click();
+            }
+        };
+
+        function closeModal() {
+            overlay.classList.remove('opacity-100', 'pointer-events-auto');
+            overlay.classList.add('opacity-0', 'pointer-events-none');
+            box.classList.remove('scale-100');
+            box.classList.add('scale-95');
+        }
+
+        // Open Modal
+        overlay.classList.remove('opacity-0', 'pointer-events-none');
+        overlay.classList.add('opacity-100', 'pointer-events-auto');
+        box.classList.remove('scale-95');
+        box.classList.add('scale-100');
+        
+        setTimeout(() => {
+            inputEl.focus();
+            inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+        }, 100);
+    });
+}
+
+async function insertLink(editorId) {
+    document.getElementById(editorId).focus();
+    const selection = window.getSelection();
+    
+    if (!selection.rangeCount) return;
+    
+    // Save the selection range so we can restore it after the async modal closes
+    const range = selection.getRangeAt(0).cloneRange();
+    const selectedText = selection.toString();
+    
+    const url = await showPromptModal('Insert Link', 'URL:', '');
+    
+    if (!url || url === 'https://') return;
+    
+    // Restore the selection to the editor
+    document.getElementById(editorId).focus();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    const textToDisplay = selectedText.length > 0 ? selectedText : url;
+    const html = `<a href="${url}" target="_blank" class="text-blue-600 hover:underline">${textToDisplay}</a>`;
+    
+    document.execCommand('insertHTML', false, html);
+    
+    if (editorId === 'task-modal-desc') {
+        updateTaskDetails();
+    }
 }
 
 function toggleCodeView(editorId) {
@@ -560,7 +980,8 @@ function editTable(action, editorId) {
     
     const td = node.closest('td, th');
     if (!td || !document.getElementById(editorId).contains(td)) {
-        return alert('Please place your cursor inside a table cell to modify the table.');
+        showAlert('Invalid Selection', 'Please place your cursor inside a table cell to modify the table.', 'warning');
+        return;
     }
     
     const tr = td.closest('tr');
@@ -629,11 +1050,11 @@ async function uploadRteImage(input, editorId) {
             document.execCommand('insertImage', false, data.location);
         } else {
             console.error("Upload response data:", data);
-            alert('Image upload failed. Error details: ' + JSON.stringify(data));
+            showAlert('Upload Failed', 'Image upload failed. Error details: ' + JSON.stringify(data), 'danger');
         }
     } catch(e) {
         console.error(e);
-        alert('Image upload error');
+        showAlert('Upload Error', 'Image upload error', 'danger');
     } finally {
         input.value = '';
     }
@@ -679,12 +1100,16 @@ async function openTaskModal(taskId) {
     try {
         const res = await fetch(`api/tasks.php?id=${taskId}`);
         const task = await res.json();
-        if(task.error) return alert(task.error);
+        if(task.error) {
+            showAlert('Error', task.error, 'danger');
+            return;
+        }
         
         document.getElementById('task-modal-id').value = task.id;
         document.getElementById('task-modal-title').value = task.title;
         const statusSelect = document.getElementById('task-modal-status');
         statusSelect.value = task.status;
+        statusSelect.dataset.originalStatus = task.status;
         statusSelect.className = `text-sm border-none focus:ring-0 p-0 rounded bg-transparent font-medium ${window.getStatusTextClass(task.status)}`;
         
         let startDateVal = '';
@@ -693,11 +1118,17 @@ async function openTaskModal(taskId) {
         }
         document.getElementById('task-modal-start-date').value = startDateVal;
 
-        let dateVal = '';
-        if(task.due_date) {
-            dateVal = task.due_date.split(' ')[0];
+        let expectedStartDateVal = '';
+        if(task.expected_start_date) {
+            expectedStartDateVal = task.expected_start_date.split(' ')[0]; // format: YYYY-MM-DD
         }
-        document.getElementById('task-modal-due-date').value = dateVal;
+        document.getElementById('task-modal-expected-start-date').value = expectedStartDateVal;
+
+        let expectedDueDateVal = '';
+        if(task.expected_due_date) {
+            expectedDueDateVal = task.expected_due_date.split(' ')[0]; // format: YYYY-MM-DD
+        }
+        document.getElementById('task-modal-expected-due-date').value = expectedDueDateVal;
         
         const completedContainer = document.getElementById('task-modal-completed-date-container');
         if (task.completed_date) {
@@ -707,27 +1138,7 @@ async function openTaskModal(taskId) {
             completedContainer.classList.add('hidden');
         }
 
-        // Fetch parent tasks for dropdown cache
-        const allTasksRes = await fetch('api/tasks.php');
-        window.allTasksParentCache = await allTasksRes.json();
-
-        let pId = '';
-        let pName = 'None';
-        
-        if (task.parent_task_id) {
-            pId = task.parent_task_id;
-            const pTask = window.allTasksParentCache.find(t => t.id == task.parent_task_id);
-            if (pTask) {
-                const countStr = pTask.subtask_count > 0 ? ` (${pTask.subtask_count})` : '';
-                const projStr = pTask.project_names ? ` [${pTask.project_names}]` : '';
-                pName = `${pTask.title}${projStr}${countStr}`;
-            } else {
-                pName = `Task #${task.parent_task_id}`;
-            }
-        }
-        
-        document.getElementById('task-modal-parent-id').value = pId;
-        document.getElementById('parent-task-name').innerText = pName;
+        // Parent Task UI removed
         
         // Track current assignee IDs globally for the dropdown
         window.currentTaskAssigneeIds = task.assignee_ids ? task.assignee_ids.split(',').map(id => parseInt(id)) : [];
@@ -751,7 +1162,50 @@ async function openTaskModal(taskId) {
             }
         }
         
+        window.currentTaskCollaboratorIds = task.collaborator_ids ? task.collaborator_ids.split(',').map(id => parseInt(id)) : [];
+        
+        document.getElementById('task-modal-collaborator-name').innerText = task.collaborator_name || 'No collaborators';
+        const collabStack = document.getElementById('task-modal-collaborators-stack');
+        if (collabStack) {
+            collabStack.innerHTML = '';
+            if (task.collaborator_name) {
+                collabStack.classList.remove('hidden');
+                const names = task.collaborator_name.split(',');
+                names.slice(0, 3).forEach(n => {
+                    const initial = n.trim().charAt(0).toUpperCase();
+                    collabStack.innerHTML += `<div class="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white text-indigo-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+                });
+                if (names.length > 3) {
+                    collabStack.innerHTML += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${names.length - 3}</div>`;
+                }
+            } else {
+                collabStack.classList.add('hidden');
+            }
+        }
+        
         document.getElementById('task-modal-estimated').value = task.estimated_minutes || 0;
+        
+        // Render Labels
+        window.currentTaskLabelIds = task.label_ids ? task.label_ids.split(',').map(id => parseInt(id)) : [];
+        const labelsContainer = document.getElementById('task-modal-labels');
+        if (labelsContainer) {
+            labelsContainer.innerHTML = '';
+            if (task.label_names) {
+                const names = task.label_names.split(',');
+                const ids = task.label_ids.split(',');
+                const colors = task.label_colors.split(',');
+                for(let i=0; i<names.length; i++) {
+                    const lName = names[i].trim();
+                    const lColor = colors[i] ? colors[i].trim() : '#38b2ac';
+                    const lId = parseInt(ids[i]);
+                    // Auto-determine text color based on background (simple heuristic)
+                    labelsContainer.innerHTML += `<div class="px-2 py-0.5 rounded text-xs font-medium text-white flex items-center" style="background-color: ${lColor}">
+                        ${lName}
+                        <svg onclick="removeLabelFromTask(${lId})" class="w-3 h-3 ml-1 cursor-pointer opacity-70 hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </div>`;
+                }
+            }
+        }
         
         // Render custom editor content
         document.getElementById('task-modal-desc').innerHTML = task.description || '<p><br></p>';
@@ -777,6 +1231,34 @@ async function openTaskModal(taskId) {
             attachmentsContainer.innerHTML = '<div class="text-sm text-slate-400 italic">No attachments</div>';
         }
         
+        // Render Projects
+        const projectsContainer = document.getElementById('task-modal-projects');
+        if (projectsContainer) {
+            projectsContainer.innerHTML = '';
+            if (task.projects && task.projects.length > 0) {
+                task.projects.forEach(p => {
+                    let options = '';
+                    if (p.all_sections) {
+                        p.all_sections.forEach(sec => {
+                            const sel = sec.id == p.section_id ? 'selected' : '';
+                            options += `<option value="${sec.id}" ${sel}>${sec.name}</option>`;
+                        });
+                    }
+                    
+                    projectsContainer.innerHTML += `
+                        <div class="flex items-center justify-between bg-slate-50 border border-slate-200 p-2 rounded">
+                            <span class="text-sm font-medium text-slate-700 truncate w-1/2">${p.project_name}</span>
+                            <select onchange="changeTaskProjectSection(${p.project_id}, this)" class="text-sm border-slate-300 focus:ring-teal-500 focus:border-teal-500 rounded p-1 w-1/2 ml-2 text-slate-600 bg-white shadow-sm">
+                                ${options}
+                            </select>
+                        </div>
+                    `;
+                });
+            } else {
+                projectsContainer.innerHTML = '<div class="text-sm text-slate-400 italic">Task is not in any project</div>';
+            }
+        }
+        
         // Render Subtasks
         const subtasksContainer = document.getElementById('task-modal-subtasks');
         subtasksContainer.innerHTML = '';
@@ -785,6 +1267,8 @@ async function openTaskModal(taskId) {
             window.currentTaskSubtaskIds = task.subtasks.map(s => s.id);
             task.subtasks.forEach(sub => {
                 const isLinked = sub.parent_task_id !== task.id;
+                const isShared = parseInt(sub.project_count || 1, 10) > 1;
+                const sharedClass = isShared ? 'shared-task' : '';
                 const unlinkBtn = isLinked 
                     ? `<button onclick="unlinkSubtask(${task.id}, ${sub.id})" class="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-1 rounded transition-colors" title="Unlink Subtask">
                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -792,16 +1276,69 @@ async function openTaskModal(taskId) {
                     : `<div class="w-6 h-6"></div>`;
 
                 subtasksContainer.innerHTML += `
-                    <div class="flex flex-col mb-1 group items-start justify-between bg-white border border-transparent hover:bg-slate-50 hover:border-slate-200 rounded px-2 py-1.5 transition-colors">
-                        <div class="flex items-center space-x-3 w-full">
+                    <div class="flex flex-col mb-1 group items-start justify-between bg-white border border-transparent hover:bg-slate-50 hover:border-slate-200 rounded px-2 py-1.5 transition-colors task-row task-row-${sub.id} ${sharedClass}" data-task-id="${sub.id}" data-parent-id="${task.id}" data-depth="1">
+                        <div class="flex items-center space-x-2 w-full">
+                            <div class="cursor-grab text-slate-300 hover:text-slate-500 flex items-center justify-center" title="Drag to reorder">
+                                <svg class="w-4 h-4 pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z"></path></svg>
+                            </div>
                             <input type="checkbox" ${sub.status==='completed'?'checked':''} onchange="updateSubtaskStatus(${sub.id}, this)" class="rounded text-teal-500 focus:ring-teal-500 focus:ring-offset-0 w-4 h-4 cursor-pointer">
-                            <span class="flex-1 text-sm cursor-pointer truncate ${sub.status==='completed'?'line-through text-slate-400':'text-slate-700'}" onclick="openTaskModal(${sub.id})" title="${sub.title}">${sub.title}</span>
+                            <span class="flex-1 text-sm cursor-pointer truncate pl-1 ${sub.status==='completed'?'line-through text-slate-400':'text-slate-700'}" onclick="openTaskModal(${sub.id})" title="${sub.title}">${sub.title}</span>
                             <span class="text-[10px] items-center px-1.5 py-0.5 rounded font-medium tracking-wide uppercase shadow-sm border ${window.getStatusBadgeClass(sub.status)}">${sub.status.replace('_', ' ')}</span>
                             ${unlinkBtn}
                         </div>
                     </div>
                 `;
             });
+            
+            // Initialize Sortable for subtasks
+            if (window.modalSubtasksSortable) {
+                window.modalSubtasksSortable.destroy();
+            }
+            if (typeof Sortable !== 'undefined') {
+                window.modalSubtasksSortable = new Sortable(subtasksContainer, {
+                    group: { name: 'modal-subtasks', put: ['main-board-list', 'shared-board'], pull: ['main-board-list', 'shared-board'] }, // Shared with main board
+                    animation: 150,
+                    handle: '.cursor-grab',
+                    onMove: function(evt) {
+                        // Prevent dropping a shared task into a subtask zone
+                        if (evt.dragged.classList.contains('shared-task')) {
+                            return false;
+                        }
+                        return true;
+                    },
+                    onEnd: function(evt) {
+                        if (typeof window.handleTaskReorder === 'function') {
+                            window.handleTaskReorder(evt);
+                        }
+                    }
+                });
+            }
+        } else {
+            subtasksContainer.innerHTML = '<div class="text-sm text-slate-400 italic">No subtasks</div>';
+            
+            // Allow dropping even if empty
+            if (window.modalSubtasksSortable) {
+                window.modalSubtasksSortable.destroy();
+            }
+            if (typeof Sortable !== 'undefined') {
+                window.modalSubtasksSortable = new Sortable(subtasksContainer, {
+                    group: { name: 'modal-subtasks', put: ['main-board-list', 'shared-board'], pull: ['main-board-list', 'shared-board'] }, // Shared with main board
+                    animation: 150,
+                    handle: '.cursor-grab',
+                    onMove: function(evt) {
+                        // Prevent dropping a shared task into a subtask zone
+                        if (evt.dragged.classList.contains('shared-task')) {
+                            return false;
+                        }
+                        return true;
+                    },
+                    onEnd: function(evt) {
+                        if (typeof window.handleTaskReorder === 'function') {
+                            window.handleTaskReorder(evt);
+                        }
+                    }
+                });
+            }
         }
         
         // Render Comments
@@ -809,7 +1346,7 @@ async function openTaskModal(taskId) {
         commentsContainer.innerHTML = '';
         if(task.comments) {
             task.comments.forEach(comment => {
-                const dt = new Date(comment.created_at).toLocaleString();
+                const dt = new Date(comment.created_at.replace(/-/g, '/')).toLocaleString();
                 const initials = comment.user_name ? comment.user_name.substring(0, 2) : 'U';
                 
                 // Assumes mock user ID 1 OR user can edit their own comment
@@ -853,8 +1390,6 @@ async function openTaskModal(taskId) {
         }
 
         if (task.time_log_status) {
-            const btn = document.getElementById('btn-start-progress');
-            const span = btn.querySelector('span');
             const display = document.getElementById('timer-display');
             
             stopTimer(false); // Stop current interval if any
@@ -868,9 +1403,8 @@ async function openTaskModal(taskId) {
                 timerSeconds = totalSecs + (diff > 0 ? diff : 0);
                 
                 isProgressRunning = true;
-                btn.classList.replace('bg-emerald-500', 'bg-amber-500');
-                btn.classList.replace('hover:bg-emerald-600', 'hover:bg-amber-600');
-                span.innerText = "Pause Progress";
+                display.classList.remove('text-slate-500', 'bg-slate-100');
+                display.classList.add('text-amber-600', 'bg-amber-100');
                 
                 // Immediate update
                 const initH = String(Math.floor(timerSeconds / 3600)).padStart(2, '0');
@@ -899,38 +1433,68 @@ async function openTaskModal(taskId) {
                 display.innerText = `${h}:${m}:${s}`;
                 
                 isProgressRunning = false;
-                btn.classList.replace('bg-amber-500', 'bg-emerald-500');
-                btn.classList.replace('hover:bg-amber-600', 'hover:bg-emerald-600');
-                span.innerText = "Start Progress";
+                display.classList.remove('text-amber-600', 'bg-amber-100');
+                display.classList.add('text-slate-500', 'bg-slate-100');
+            }
+        } else {
+            stopTimer(true);
+            const display = document.getElementById('timer-display');
+            if (display) {
+                display.innerText = '00:00:00';
+            }
+        }
+        
+        const resetBtn = document.getElementById('btn-reset-timer');
+        if (resetBtn) {
+            const isSystemAdmin = <?= json_encode(($currentUser['role'] ?? '') === 'admin') ?>;
+            if (isSystemAdmin || ['admin', 'manager', 'owner'].includes(window.currentUserProjectRole)) {
+                resetBtn.classList.remove('hidden');
+            } else {
+                resetBtn.classList.add('hidden');
             }
         }
         
         modal.classList.remove('hidden');
     } catch(e) {
         console.error(e);
-        alert('Failed to load task details');
+        showAlert('Load Failed', 'Failed to load task details', 'danger');
     }
 }
 
-async function updateTaskDetails() {
+async function updateTaskDetails(forceSaveDescription = false) {
+    showSavingOverlay();
     const id = document.getElementById('task-modal-id').value;
     const title = document.getElementById('task-modal-title').value;
     const statusSelect = document.getElementById('task-modal-status');
     const status = statusSelect.value;
     statusSelect.className = `text-sm border-none focus:ring-0 p-0 rounded bg-transparent font-medium ${window.getStatusTextClass(status)}`;
 
-    const startDate = document.getElementById('task-modal-start-date').value;
-    const dueDate = document.getElementById('task-modal-due-date').value;
+    let startDate = document.getElementById('task-modal-start-date').value;
+    
+    // Auto set start date if going to in_progress and it's empty
+    if (status === 'in_progress' && !startDate) {
+        const d = new Date();
+        const yy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        startDate = `${yy}-${mm}-${dd}`;
+        document.getElementById('task-modal-start-date').value = startDate;
+    }
+    
+    let expectedStartDate = document.getElementById('task-modal-expected-start-date').value;
+    if (expectedStartDate) { expectedStartDate = expectedStartDate + ' 00:00:00'; }
+    let expectedDueDate = document.getElementById('task-modal-expected-due-date').value;
+    if (expectedDueDate) { expectedDueDate = expectedDueDate + ' 00:00:00'; }
     
     const estimatedMinutesInput = document.getElementById('task-modal-estimated').value;
     const estimatedMinutes = estimatedMinutesInput ? parseInt(estimatedMinutesInput, 10) : 0;
     
-    // Get content from custom editor or code block
-    let desc = getEditorContent('task-modal-desc');
-    if (desc === '<p><br></p>') desc = '';
-    
-    let parentId = document.getElementById('task-modal-parent-id').value;
-    parentId = parentId === '' ? null : parentId;
+    // Only save the description when the Save Description button is pressed
+    let desc;
+    if (forceSaveDescription) {
+        desc = getEditorContent('task-modal-desc');
+        if (desc === '<p><br></p>') desc = '';
+    }
     
     if(!id) return;
     
@@ -945,21 +1509,42 @@ async function updateTaskDetails() {
         completedContainer.classList.add('hidden');
     }
 
+    const payloadDetails = { title, status, start_date: startDate, expected_start_date: expectedStartDate, expected_due_date: expectedDueDate, estimated_minutes: estimatedMinutes };
+    if (forceSaveDescription) {
+        payloadDetails.description = desc;
+    }
+
     await fetch('api/tasks.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             action: 'update_details',
             task_id: id,
-            details: { title, status, start_date: startDate, due_date: dueDate, description: desc, parent_task_id: parentId, estimated_minutes: estimatedMinutes }
+            details: payloadDetails,
+            project_id: typeof currentProjectId !== 'undefined' ? currentProjectId : null
         })
     });
     
+    // Compare new status with original
+    const originalStatus = statusSelect.dataset.originalStatus || '';
+    
+    // Status change is now handled by backend including side-effects
+    if (status !== originalStatus) {
+        statusSelect.dataset.originalStatus = status;
+        openTaskModal(id); // Reload modal to get new dates & timer state
+    }
+    
+    if (forceSaveDescription) {
+        showAlert('Success', 'Description saved successfully.', 'success');
+    }
+    
     // Refresh board in background
     if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
+    hideSavingOverlay();
 }
 
 async function updateSubtaskStatus(id, checkbox) {
+    showSavingOverlay();
     const status = checkbox.checked ? 'completed' : 'todo';
     await fetch('api/tasks.php', {
         method: 'POST',
@@ -987,14 +1572,19 @@ async function updateSubtaskStatus(id, checkbox) {
             statusSpan.className = `text-[10px] items-center px-1.5 py-0.5 rounded font-medium tracking-wide uppercase shadow-sm border ${window.getStatusBadgeClass(status)}`;
         }
     }
+    hideSavingOverlay();
 }
 
 async function submitTaskComment() {
+    showSavingOverlay();
     const id = document.getElementById('task-modal-id').value;
     let content = getEditorContent('task-modal-new-comment').trim();
     if (content === '<p><br></p>') content = '';
     
-    if(!id || !content) return;
+    if(!id || !content) {
+        hideSavingOverlay();
+        return;
+    }
 
     const res = await fetch('api/tasks.php', {
         method: 'POST',
@@ -1015,6 +1605,7 @@ async function submitTaskComment() {
         
         openTaskModal(id); // Reload modal to show new comment and attachments
     }
+    hideSavingOverlay();
 }
 
 function enableCommentEdit(commentId) {
@@ -1039,6 +1630,9 @@ function enableCommentEdit(commentId) {
                     </button>
                     <button type="button" onmousedown="event.preventDefault(); formatText('underline', 'edit-comment-area-${commentId}')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Underline">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3m-9 18h6"></path></svg>
+                    </button>
+                    <button type="button" onmousedown="event.preventDefault(); insertLink('edit-comment-area-${commentId}')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Insert Link">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
                     </button>
                     <div class="w-px h-5 bg-slate-300 mx-1"></div>
                     <button type="button" onmousedown="event.preventDefault(); formatText('insertUnorderedList', 'edit-comment-area-${commentId}')" class="p-1.5 text-slate-600 hover:bg-slate-200 rounded" title="Bullet List">
@@ -1068,7 +1662,8 @@ function enableCommentEdit(commentId) {
                 <div 
                     id="edit-comment-area-${commentId}" 
                     contenteditable="true" 
-                    onkeydown="handleRteTab(event)"
+                    onkeydown="handleRteKeyDown(event)"
+                    oninput="handleRteInput(event)"
                     class="p-3 min-h-[60px] max-h-48 overflow-y-auto focus:outline-none text-sm text-slate-700 bg-white list-disc list-inside prose prose-sm max-w-none"
                     style="outline: none;"
                 >${existingHtml}</div>
@@ -1094,11 +1689,13 @@ function cancelCommentEdit(commentId) {
 }
 
 async function submitEditedComment(commentId) {
+    showSavingOverlay();
     let content = getEditorContent('edit-comment-area-' + commentId).trim();
     if (content === '<p><br></p>') content = '';
     
     if (!content) {
-        alert('Comment cannot be empty.');
+        showAlert('Invalid Input', 'Comment cannot be empty.', 'warning');
+        hideSavingOverlay();
         return;
     }
 
@@ -1112,13 +1709,15 @@ async function submitEditedComment(commentId) {
         const taskId = document.getElementById('task-modal-id').value;
         openTaskModal(taskId); // refresh task modal
     } else {
-        alert('Failed to edit comment. Ensure you have permission.');
+        showAlert('Edit Failed', 'Failed to edit comment. Ensure you have permission.', 'danger');
     }
+    hideSavingOverlay();
 }
 
 async function deleteAttachment(attachmentId) {
     if(!confirm('Are you sure you want to delete this attachment?')) return;
     
+    showSavingOverlay();
     const res = await fetch('api/tasks.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -1128,6 +1727,7 @@ async function deleteAttachment(attachmentId) {
         const id = document.getElementById('task-modal-id').value;
         openTaskModal(id);
     }
+    hideSavingOverlay();
 }
 
 async function uploadTaskAttachment(input) {
@@ -1143,6 +1743,7 @@ async function uploadTaskAttachment(input) {
     const oldText = btn.innerText;
     btn.innerText = 'Uploading...';
     btn.disabled = true;
+    showSavingOverlay();
     
     try {
         const res = await fetch('api/tasks.php', {
@@ -1151,17 +1752,20 @@ async function uploadTaskAttachment(input) {
         });
         
         if (res.ok) {
+            const data = await res.json();
+            if (window.handleApiError) window.handleApiError(data);
             openTaskModal(id);
         } else {
-            alert('Upload failed');
+            showAlert('Upload Failed', 'Upload failed', 'danger');
         }
     } catch(e) {
         console.error(e);
-        alert('Upload completely failed.');
+        showAlert('Upload Failed', 'Upload completely failed.', 'danger');
     } finally {
         input.value = '';
         btn.innerText = oldText;
         btn.disabled = false;
+        hideSavingOverlay();
     }
 }
 
@@ -1169,13 +1773,15 @@ async function uploadTaskAttachment(input) {
 window.allUsersCache = [];
 window.allProjectUsersCache = [];
 window.currentProjectMemberIds = [];
+window.allCollaboratorsCache = [];
+window.lastSearchedCollaborators = [];
 
 // ==========================================
 // Project Member Assignment UI
 // ==========================================
 async function toggleProjectMemberDropdown(event) {
     if (window.currentUserProjectRole === 'viewer') {
-        alert('You must be a manager or member of this project to edit default notifications.');
+        showAlert('Permission Denied', 'You must be a manager or member of this project to edit default notifications.', 'warning');
         return;
     }
 
@@ -1260,6 +1866,7 @@ function renderProjectMemberList(users) {
 }
 
 async function toggleProjectMemberAssignment(userId) {
+    showSavingOverlay();
     const index = window.currentProjectMemberIds.indexOf(userId);
     if (index === -1) {
         window.currentProjectMemberIds.push(userId);
@@ -1304,6 +1911,216 @@ async function toggleProjectMemberAssignment(userId) {
         }
     } catch (e) {
         console.error('Error updating project members:', e);
+    } finally {
+        hideLoadingOverlay();
+    }
+}
+
+// ==========================================
+// Task Labels UI
+// ==========================================
+
+window.allLabelsCache = [];
+window.currentTaskLabelIds = [];
+window.activeLabelTaskId = null;
+window.labelDropdownContext = 'modal';
+
+async function toggleLabelsDropdown(event) {
+    window.labelDropdownContext = 'modal';
+    window.activeLabelTaskId = document.getElementById('task-modal-id').value || null;
+
+    const dropdown = document.getElementById('labels-dropdown');
+    
+    if (dropdown.classList.contains('hidden')) {
+        if (dropdown.parentElement !== document.body) {
+            document.body.appendChild(dropdown);
+        }
+
+        const rect = event.currentTarget.getBoundingClientRect();
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 4) + 'px';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.zIndex = '61';
+
+        dropdown.classList.remove('hidden');
+        dropdown.classList.add('flex');
+
+        await searchLabels('');
+
+        setTimeout(() => document.getElementById('labels-search').focus(), 50);
+
+        openAssigneeBackdrop(() => {
+            dropdown.classList.add('hidden');
+            dropdown.classList.remove('flex');
+        });
+    } else {
+        dropdown.classList.add('hidden');
+        dropdown.classList.remove('flex');
+        closeAssigneeBackdrop();
+    }
+}
+
+window.openListViewLabelsDropdown = async function(event, taskId, labelIdsStr) {
+    event.stopPropagation();
+    window.labelDropdownContext = 'list';
+    window.activeLabelTaskId = taskId;
+    window.currentTaskLabelIds = labelIdsStr ? String(labelIdsStr).split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : [];
+
+    const dropdown = document.getElementById('labels-dropdown');
+    
+    if (dropdown.parentElement !== document.body) {
+        document.body.appendChild(dropdown);
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    dropdown.style.position = 'fixed';
+    dropdown.style.top = (rect.bottom + 4) + 'px';
+    dropdown.style.left = rect.left + 'px';
+    dropdown.style.zIndex = '61';
+    
+    dropdown.classList.remove('hidden');
+    dropdown.classList.add('flex');
+
+    await searchLabels('');
+
+    setTimeout(() => document.getElementById('labels-search').focus(), 50);
+
+    openAssigneeBackdrop(() => {
+        dropdown.classList.add('hidden');
+        dropdown.classList.remove('flex');
+    });
+};
+
+async function searchLabels(query) {
+    if (window.allLabelsCache.length === 0) {
+        try {
+            const res = await fetch('/api/labels.php');
+            const data = await res.json();
+            if (data.status === 'success') {
+                window.allLabelsCache = data.data;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+    
+    const q = query.toLowerCase().trim();
+    const filtered = window.allLabelsCache.filter(l => l.name.toLowerCase().includes(q));
+    const list = document.getElementById('labels-dropdown-list');
+    list.innerHTML = '';
+    
+    filtered.forEach(label => {
+        const isSelected = window.currentTaskLabelIds.includes(parseInt(label.id));
+        list.innerHTML += `
+            <li class="px-3 py-2 hover:bg-slate-50 cursor-pointer flex items-center justify-between group" onclick="toggleTaskLabel(${label.id})">
+                <div class="flex items-center">
+                    <span class="w-3 h-3 rounded-full mr-2" style="background-color: ${label.color}"></span>
+                    <span class="${isSelected ? 'font-medium text-slate-800' : 'text-slate-600'}">${label.name}</span>
+                </div>
+                ${isSelected ? '<svg class="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' : ''}
+            </li>
+        `;
+    });
+
+    // Check role for creation
+    const userRole = <?= json_encode($currentUser['role'] ?? 'member') ?>;
+    if (q.length > 0 && filtered.length === 0 && (userRole === 'admin' || userRole === 'member')) {
+        list.innerHTML += `
+            <li class="px-3 py-2 hover:bg-slate-50 cursor-pointer flex items-center text-teal-600 font-medium" onclick="createLabelAndAssign('${q.replace(/'/g, "\\'")}')">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Create "${q}"
+            </li>
+        `;
+    } else if (filtered.length === 0) {
+        list.innerHTML += `<li class="px-3 py-2 text-slate-400 italic">No labels found</li>`;
+    }
+}
+
+function handleLabelSearchKeydown(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const query = e.target.value.trim();
+        const userRole = <?= json_encode($currentUser['role'] ?? 'member') ?>;
+        if (query.length > 0 && (userRole === 'admin' || userRole === 'member')) {
+            const exactMatch = window.allLabelsCache.find(l => l.name.toLowerCase() === query.toLowerCase());
+            if (exactMatch) {
+                toggleTaskLabel(exactMatch.id);
+            } else {
+                createLabelAndAssign(query);
+            }
+        }
+    }
+}
+
+async function createLabelAndAssign(name) {
+    try {
+        const res = await fetch('/api/labels.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'create', name: name })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            window.allLabelsCache.push(data.data);
+            await toggleTaskLabel(data.data.id);
+            document.getElementById('labels-search').value = '';
+            searchLabels('');
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function toggleTaskLabel(labelId) {
+    const idx = window.currentTaskLabelIds.indexOf(labelId);
+    if (idx > -1) {
+        window.currentTaskLabelIds.splice(idx, 1);
+    } else {
+        window.currentTaskLabelIds.push(labelId);
+    }
+    await saveTaskLabels();
+    searchLabels(document.getElementById('labels-search').value);
+}
+
+async function removeLabelFromTask(labelId) {
+    const idx = window.currentTaskLabelIds.indexOf(labelId);
+    if (idx > -1) {
+        window.currentTaskLabelIds.splice(idx, 1);
+        await saveTaskLabels();
+    }
+}
+
+async function saveTaskLabels() {
+    const taskId = window.activeLabelTaskId || document.getElementById('task-modal-id').value;
+    if (!taskId) return;
+    
+    showSavingOverlay();
+    try {
+        const res = await fetch('/api/tasks.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'update_details', task_id: taskId, details: { label_ids: window.currentTaskLabelIds } })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            if (window.labelDropdownContext === 'modal') {
+                openTaskModal(taskId); // Reload modal
+            } else {
+                if (typeof loadProjectBoard === 'function' && typeof currentProjectId !== 'undefined') {
+                    loadProjectBoard(currentProjectId); // Refresh list view
+                } else if (typeof window.location.reload === 'function') {
+                    window.location.reload(); // Fallback for other pages like My Tasks
+                }
+                
+                if (document.getElementById('task-modal').classList.contains('hidden') === false && document.getElementById('task-modal-id').value == taskId) {
+                    openTaskModal(taskId); // Reload modal if open
+                }
+            }
+        }
+    } catch (e) {
+        console.error(e);
+    } finally {
+        hideSavingOverlay();
     }
 }
 
@@ -1341,31 +2158,6 @@ function closeAssigneeBackdrop() {
     if (backdrop) {
         backdrop.style.display = 'none';
         backdrop.onclick = null;
-    }
-}
-
-function showLoadingOverlay() {
-    let loader = document.getElementById('global-loading-overlay');
-    if (!loader) {
-        loader = document.createElement('div');
-        loader.id = 'global-loading-overlay';
-        // Add absolute clear, non-grayscale background to block clicks during saving
-        loader.className = 'fixed inset-0 z-[70] bg-transparent flex items-center justify-center';
-        loader.innerHTML = `
-            <div class="bg-white px-4 py-2 rounded shadow text-slate-700 font-medium flex items-center space-x-3 border border-slate-200">
-                <svg class="animate-spin h-5 w-5 text-teal-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                <span class="text-sm">Updating...</span>
-            </div>
-        `;
-        document.body.appendChild(loader);
-    }
-    loader.style.display = 'flex';
-}
-
-function hideLoadingOverlay() {
-    const loader = document.getElementById('global-loading-overlay');
-    if (loader) {
-        loader.style.display = 'none';
     }
 }
 
@@ -1450,7 +2242,8 @@ window.openListViewAssigneeDropdown = async function(event, taskId, assigneeIdsS
 
 async function searchAssignees(query) {
     try {
-        const res = await fetch(`api/users.php?search=${encodeURIComponent(query)}`);
+        const projectIdParam = (typeof currentProjectId !== 'undefined') ? `&project_id=${currentProjectId}` : '';
+        const res = await fetch(`api/users.php?search=${encodeURIComponent(query)}${projectIdParam}`);
         const users = await res.json();
         
         if (query === '') {
@@ -1473,16 +2266,16 @@ function renderAssigneeList(users) {
     }
     
     users.forEach(user => {
-        const isSelected = window.currentTaskAssigneeIds.includes(user.id);
+        const isSelected = window.currentTaskAssigneeIds.includes(Number(user.id));
         const checkIcon = isSelected 
-            ? `<svg class="w-4 h-4 text-teal-500 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>` 
+            ? `<svg class="w-4 h-4 text-indigo-500 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>` 
             : `<div class="w-4 h-4 ml-auto"></div>`;
             
         const li = document.createElement('li');
         li.className = 'p-1.5 hover:bg-slate-100 rounded flex justify-between items-center cursor-pointer transition-colors mt-0.5';
         li.onclick = (e) => {
             e.stopPropagation(); // prevent closing
-            toggleUserAssignment(user.id);
+            toggleUserAssignment(Number(user.id));
         };
         li.innerHTML = `
             <div class="flex items-center space-x-2">
@@ -1501,6 +2294,7 @@ function renderAssigneeList(users) {
 }
 
 async function toggleUserAssignment(userId) {
+    showSavingOverlay();
     const index = window.currentTaskAssigneeIds.indexOf(userId);
     if (index === -1) {
         window.currentTaskAssigneeIds.push(userId);
@@ -1513,52 +2307,341 @@ async function toggleUserAssignment(userId) {
     
     const taskId = window.activeAssigneeTaskId || document.getElementById('task-modal-id').value;
     if (!taskId) return;
+
+    // Calculate selected users for soft DOM updates
+    const allPossibleUsers = [...window.allUsersCache, ...window.lastSearchedUsers];
+    const selectedUsers = [];
+    window.currentTaskAssigneeIds.forEach(id => {
+        const u = allPossibleUsers.find(user => Number(user.id) === id);
+        if (u && !selectedUsers.find(su => su.id === u.id)) selectedUsers.push(u);
+    });
+
+    const assigneesString = window.currentTaskAssigneeIds.join(',');
+
+    // 1. Immediately update modal UI locally
+    const nameEl = document.getElementById('task-modal-assignee-name');
+    const stack = document.getElementById('task-modal-assignees-stack');
+    if (nameEl) {
+        if (selectedUsers.length === 0) {
+            nameEl.innerText = 'Unassigned';
+            if (stack) {
+                stack.innerHTML = '';
+                stack.classList.add('hidden');
+            }
+        } else {
+            nameEl.innerText = selectedUsers.map(u => u.name).join(', ') || 'Unassigned';
+            if (stack) {
+                stack.classList.remove('hidden');
+                stack.innerHTML = '';
+                selectedUsers.slice(0, 3).forEach(u => {
+                    const initial = u.name.charAt(0).toUpperCase();
+                    stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-teal-100 border-2 border-white text-teal-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+                });
+                if (selectedUsers.length > 3) {
+                    stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${selectedUsers.length - 3}</div>`;
+                }
+            }
+        }
+    }
+
+    // 2. Soft update List View Row
+    const rows = document.querySelectorAll('.task-row-' + taskId);
+    rows.forEach(row => {
+        row.dataset.assigneeIds = assigneesString;
+        const cells = row.querySelectorAll('td');
+        if (cells.length > 1) {
+            const container = cells[1].querySelector('.inline-flex');
+            if (container) {
+                container.setAttribute('onclick', `if(window.openListViewAssigneeDropdown) window.openListViewAssigneeDropdown(event, ${taskId}, '${assigneesString}')`);
+                let html = '<span class="text-slate-400 italic">Unassigned</span>';
+                if (selectedUsers.length > 0) {
+                    const nameStr = selectedUsers.map(u => u.name).join(', ');
+                    html = `<div class="flex -space-x-2 overflow-hidden" title="${nameStr}">`;
+                    selectedUsers.slice(0, 3).forEach(u => {
+                        const initial = u.name.charAt(0).toUpperCase();
+                        html += `<div class="w-6 h-6 rounded-full bg-teal-100 border-2 border-white text-teal-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+                    });
+                    if (selectedUsers.length > 3) {
+                        html += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${selectedUsers.length - 3}</div>`;
+                    }
+                    html += `</div>`;
+                }
+                container.innerHTML = html;
+            }
+        }
+    });
+
+    // 3. Soft update Kanban Board Card
+    const cards = document.querySelectorAll(`.task-card[data-task-id="${taskId}"]`);
+    cards.forEach(card => {
+        const header = card.querySelector('.flex.justify-between.items-start.mb-2');
+        if (header) {
+            const oldStack = header.querySelector('.flex.-space-x-2.overflow-hidden');
+            if (oldStack) oldStack.remove();
+
+            if (selectedUsers.length > 0) {
+                const nameStr = selectedUsers.map(u => u.name).join(', ');
+                let html = `<div class="flex -space-x-2 overflow-hidden ml-2 flex-shrink-0" title="${nameStr}">`;
+                selectedUsers.slice(0, 3).forEach(u => {
+                    const initial = u.name.charAt(0).toUpperCase();
+                    html += `<div class="w-6 h-6 rounded-full bg-teal-100 border-2 border-white text-teal-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+                });
+                if (selectedUsers.length > 3) {
+                    html += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${selectedUsers.length - 3}</div>`;
+                }
+                html += `</div>`;
+                header.insertAdjacentHTML('beforeend', html);
+            }
+        }
+    });
     
-    // Immediately hide dropdown in both contexts after an assignee is changed
-    const dropdown = document.getElementById('assignee-dropdown');
-    closeAssigneeDropdownUI(dropdown);
-
-    showLoadingOverlay();
-
     try {
-        // Run network requests and await completion
-        await fetch('api/tasks.php', {
+        // Run network requests and await completion without blocking UI
+        const resAssign = await fetch('api/tasks.php', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ action: 'update_details', task_id: taskId, details: { assignee_ids: window.currentTaskAssigneeIds } })
         });
-        
-        if (window.assigneeDropdownContext === 'list') {
-            if(typeof currentProjectId !== 'undefined') await loadProjectBoard(currentProjectId);
-        } else {
-            const res = await fetch(`api/tasks.php?id=${taskId}`);
-            const task = await res.json();
-            if(!task.error) {
-                document.getElementById('task-modal-assignee-name').innerText = task.assignee_name || 'Unassigned';
-                const stack = document.getElementById('task-modal-assignees-stack');
-                if (stack) {
-                    stack.innerHTML = '';
-                    if (task.assignee_name) {
-                        stack.classList.remove('hidden');
-                        const names = task.assignee_name.split(',');
-                        names.slice(0, 3).forEach(n => {
-                            const initial = n.trim().charAt(0).toUpperCase();
-                            stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-teal-100 border-2 border-white text-teal-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
-                        });
-                        if (names.length > 3) {
-                            stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${names.length - 3}</div>`;
-                        }
-                    } else {
-                        stack.classList.add('hidden');
-                    }
-                }
-            }
-            if(typeof currentProjectId !== 'undefined') await loadProjectBoard(currentProjectId);
-        }
+        const assignData = await resAssign.json();
+        if (window.handleApiError) window.handleApiError(assignData);
     } catch (e) {
         console.error('Error updating assignees:', e);
     } finally {
-        hideLoadingOverlay();
+        hideSavingOverlay();
+    }
+}
+
+// ==========================================
+// Task Collaborator UI
+// ==========================================
+
+window.activeCollaboratorTaskId = null;
+
+window.openListViewCollaboratorDropdown = async function(event, taskId, collaboratorIdsStr) {
+    event.stopPropagation();
+    window.activeCollaboratorTaskId = taskId;
+    window.currentTaskCollaboratorIds = collaboratorIdsStr ? String(collaboratorIdsStr).split(',').map(id => parseInt(id)) : [];
+
+    const dropdown = document.getElementById('collaborator-dropdown');
+    
+    // Move dropdown to body for absolute positioning avoiding table clipping
+    if (dropdown.parentElement !== document.body) {
+        document.body.appendChild(dropdown);
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    dropdown.style.position = 'fixed';
+    dropdown.style.top = (rect.bottom + 4) + 'px';
+    dropdown.style.left = rect.left + 'px';
+    dropdown.style.zIndex = '61';
+    
+    dropdown.classList.remove('hidden');
+    dropdown.classList.add('flex');
+
+    if (!window.allCollaboratorsCache || window.allCollaboratorsCache.length === 0) {
+        await searchCollaborators('');
+    } else {
+        renderCollaboratorList(window.allCollaboratorsCache);
+    }
+
+    setTimeout(() => document.getElementById('collaborator-search').focus(), 50);
+
+    // Open an invisible backdrop to catch clicks and prevent interaction with elements underneath
+    openAssigneeBackdrop(() => {
+        dropdown.classList.add('hidden');
+        dropdown.classList.remove('flex');
+    });
+};
+
+async function toggleCollaboratorDropdown(event) {
+    window.activeCollaboratorTaskId = document.getElementById('task-modal-id').value || null;
+
+    const dropdown = document.getElementById('collaborator-dropdown');
+    
+    // Toggle visibility
+    if (dropdown.classList.contains('hidden')) {
+        if (dropdown.parentElement !== document.body) {
+            document.body.appendChild(dropdown);
+        }
+
+        const rect = event.currentTarget.getBoundingClientRect();
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 4) + 'px';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.zIndex = '61';
+
+        dropdown.classList.remove('hidden');
+        dropdown.classList.add('flex');
+
+        if (!window.allCollaboratorsCache || window.allCollaboratorsCache.length === 0) {
+            await searchCollaborators('');
+        } else {
+            renderCollaboratorList(window.allCollaboratorsCache);
+        }
+
+        setTimeout(() => document.getElementById('collaborator-search').focus(), 50);
+
+        openAssigneeBackdrop(() => {
+            dropdown.classList.add('hidden');
+            dropdown.classList.remove('flex');
+        });
+    } else {
+        dropdown.classList.add('hidden');
+        dropdown.classList.remove('flex');
+        closeAssigneeBackdrop();
+    }
+}
+
+async function searchCollaborators(query) {
+    try {
+        const projectIdParam = (typeof currentProjectId !== 'undefined') ? `&project_id=${currentProjectId}` : '';
+        const res = await fetch(`api/users.php?search=${encodeURIComponent(query)}${projectIdParam}`);
+        const users = await res.json();
+        
+        if (query === '') {
+            window.allCollaboratorsCache = users;
+        }
+        window.lastSearchedCollaborators = users;
+        renderCollaboratorList(users);
+    } catch(e) {
+        console.error('Failed to search collaborators', e);
+    }
+}
+
+function renderCollaboratorList(users) {
+    const ul = document.getElementById('collaborator-dropdown-list');
+    ul.innerHTML = '';
+    
+    if (users.length === 0) {
+        ul.innerHTML = '<li class="p-2 text-slate-400 italic">No users found</li>';
+        return;
+    }
+    
+    users.forEach(user => {
+        const isSelected = window.currentTaskCollaboratorIds.includes(Number(user.id));
+        const checkIcon = isSelected 
+            ? `<svg class="w-4 h-4 text-indigo-500 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>` 
+            : `<div class="w-4 h-4 ml-auto"></div>`;
+            
+        const li = document.createElement('li');
+        li.className = 'p-1.5 hover:bg-slate-100 rounded flex justify-between items-center cursor-pointer transition-colors mt-0.5';
+        li.onclick = (e) => {
+            e.stopPropagation(); // prevent closing
+            toggleCollaboratorAssignment(Number(user.id));
+        };
+        li.innerHTML = `
+            <div class="flex items-center space-x-2">
+                <div class="w-6 h-6 rounded-full bg-slate-200 border-2 border-white text-slate-600 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                    ${user.name.charAt(0).toUpperCase()}
+                </div>
+                <div class="flex flex-col text-left">
+                    <span class="font-medium text-slate-700 leading-tight">${user.name}</span>
+                    <span class="text-[10px] text-slate-400 leading-tight">${user.email}</span>
+                </div>
+            </div>
+            ${checkIcon}
+        `;
+        ul.appendChild(li);
+    });
+}
+
+async function toggleCollaboratorAssignment(userId) {
+    showSavingOverlay();
+    const index = window.currentTaskCollaboratorIds.indexOf(userId);
+    if (index === -1) {
+        window.currentTaskCollaboratorIds.push(userId);
+    } else {
+        window.currentTaskCollaboratorIds.splice(index, 1);
+    }
+    
+    // Re-render the dropdown list with new selection states
+    renderCollaboratorList(document.getElementById('collaborator-search').value ? window.lastSearchedCollaborators : window.allCollaboratorsCache);
+    
+    const taskId = window.activeCollaboratorTaskId || document.getElementById('task-modal-id').value;
+    if (!taskId) return;
+
+    // Immediately update modal UI locally
+    const nameEl = document.getElementById('task-modal-collaborator-name');
+    const stack = document.getElementById('task-modal-collaborators-stack');
+    if (window.currentTaskCollaboratorIds.length === 0) {
+        nameEl.innerText = 'No collaborators';
+        if (stack) {
+            stack.innerHTML = '';
+            stack.classList.add('hidden');
+        }
+    } else {
+        if (stack) {
+            stack.classList.remove('hidden');
+            stack.innerHTML = '';
+        }
+        
+        const allPossibleUsers = [...window.allCollaboratorsCache, ...window.lastSearchedCollaborators];
+        const selectedUsers = [];
+        window.currentTaskCollaboratorIds.forEach(id => {
+            const u = allPossibleUsers.find(user => Number(user.id) === id);
+            if (u && !selectedUsers.find(su => su.id === u.id)) selectedUsers.push(u);
+        });
+        
+        nameEl.innerText = selectedUsers.map(u => u.name).join(', ') || 'No collaborators';
+        
+        if (stack) {
+            selectedUsers.slice(0, 3).forEach(u => {
+                const initial = u.name.charAt(0).toUpperCase();
+                stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white text-indigo-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+            });
+            if (selectedUsers.length > 3) {
+                stack.innerHTML += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${selectedUsers.length - 3}</div>`;
+            }
+        }
+    }
+
+    const collaboratorsString = window.currentTaskCollaboratorIds.join(',');
+    const allPossibleUsersList = [...window.allCollaboratorsCache, ...window.lastSearchedCollaborators];
+    const selectedUsersList = [];
+    window.currentTaskCollaboratorIds.forEach(id => {
+        const u = allPossibleUsersList.find(user => Number(user.id) === id);
+        if (u && !selectedUsersList.find(su => su.id === u.id)) selectedUsersList.push(u);
+    });
+
+    // 2. Soft update List View Row
+    const rows = document.querySelectorAll('.task-row-' + taskId);
+    rows.forEach(row => {
+        row.dataset.collaboratorIds = collaboratorsString;
+        const cells = row.querySelectorAll('td');
+        if (cells.length > 2) {
+            const container = cells[2].querySelector('.inline-flex');
+            if (container) {
+                container.setAttribute('onclick', `if(window.openListViewCollaboratorDropdown) window.openListViewCollaboratorDropdown(event, ${taskId}, '${collaboratorsString}')`);
+                let html = '<span class="text-slate-400 italic">None</span>';
+                if (selectedUsersList.length > 0) {
+                    const nameStr = selectedUsersList.map(u => u.name).join(', ');
+                    html = `<div class="flex -space-x-2 overflow-hidden" title="${nameStr}">`;
+                    selectedUsersList.slice(0, 3).forEach(u => {
+                        const initial = u.name.charAt(0).toUpperCase();
+                        html += `<div class="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white text-indigo-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+                    });
+                    if (selectedUsersList.length > 3) {
+                        html += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${selectedUsersList.length - 3}</div>`;
+                    }
+                    html += `</div>`;
+                }
+                container.innerHTML = html;
+            }
+        }
+    });
+    
+    try {
+        const resAssign = await fetch('api/tasks.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'update_details', task_id: taskId, details: { collaborator_ids: window.currentTaskCollaboratorIds } })
+        });
+        const assignData = await resAssign.json();
+        if (window.handleApiError) window.handleApiError(assignData);
+    } catch (e) {
+        console.error('Error updating collaborators:', e);
+    } finally {
+        hideSavingOverlay();
     }
 }
 
@@ -1578,35 +2661,45 @@ function copyTaskLink() {
     });
 }
 
-function toggleProgress() {
-    const taskId = document.getElementById('task-modal-id').value;
-    if (!taskId) return;
-
-    fetch('api/tasks.php', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ action: 'toggle_time_track', task_id: taskId })
-    }).then(res => res.json())
-      .then(data => {
-          if (data.status === 'success') {
-              // Refresh the modal to sync state from database
-              openTaskModal(taskId);
-          } else {
-              alert('Failed to toggle time track');
-          }
-      });
-}
-
 function stopTimer(reset = false) {
     clearInterval(timerInterval);
     isProgressRunning = false;
-    const btn = document.getElementById('btn-start-progress');
-    if(btn) {
-        btn.classList.replace('bg-amber-500', 'bg-emerald-500');
-        btn.classList.replace('hover:bg-amber-600', 'hover:bg-emerald-600');
-        btn.querySelector('span').innerText = "Start Progress";
+    const display = document.getElementById('timer-display');
+    if(display) {
+        display.classList.remove('text-amber-600', 'bg-amber-100');
+        display.classList.add('text-slate-500', 'bg-slate-100');
     }
     if (reset) timerSeconds = 0;
+}
+
+async function resetTaskTimer() {
+    if (!await showConfirm('Reset Timer', 'Are you sure you want to reset the time tracked for this task? This action cannot be undone.', 'danger')) return;
+    
+    const taskId = document.getElementById('task-modal-id').value;
+    if (!taskId) return;
+
+    showSavingOverlay();
+    try {
+        const res = await fetch('api/tasks.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'reset_timer', task_id: taskId, project_id: typeof currentProjectId !== 'undefined' ? currentProjectId : null })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            stopTimer(true);
+            const display = document.getElementById('timer-display');
+            if (display) display.innerText = '00:00:00';
+            openTaskModal(taskId);
+        } else {
+            showAlert('Error', data.message || 'Failed to reset timer', 'danger');
+        }
+    } catch(e) {
+        console.error(e);
+        showAlert('Error', 'Failed to reset timer', 'danger');
+    } finally {
+        hideSavingOverlay();
+    }
 }
 
 function addSection() {
@@ -1660,13 +2753,14 @@ function uncheckSectionSubtasks(btnElement) {
     const modalCheckboxes = document.querySelectorAll('#subtask-list input[type="checkbox"]');
     modalCheckboxes.forEach(cb => cb.checked = false);
 
-    alert('All subtasks in section unchecked');
+    showAlert('Success', 'All subtasks in section unchecked', 'success');
 }
 
 function promptAddSubtask(parentId) {
     const title = prompt("Enter subtask title:");
     if(!title) return;
     
+    showSavingOverlay();
     fetch('api/tasks.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -1680,102 +2774,108 @@ function promptAddSubtask(parentId) {
             openTaskModal(parentId); // Reload modal
             if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId); // Refresh board view to show new subtask expander
         } else {
-            alert('Failed to create subtask');
+            showAlert('Error', 'Failed to create subtask', 'danger');
         }
+        hideSavingOverlay();
     });
 }
 
-function toggleParentTaskDropdown(e) {
-    if (e) e.stopPropagation();
-    const dropdown = document.getElementById('parent-task-dropdown');
-    if (dropdown.classList.contains('hidden')) {
-        dropdown.classList.remove('hidden');
-        dropdown.classList.add('flex');
-        document.getElementById('parent-task-search').value = '';
-        renderParentTaskList('');
-        document.getElementById('parent-task-search').focus();
-        
-        const outsideClickListener = (evt) => {
-            if (!dropdown.contains(evt.target) && !evt.target.closest('#parent-task-display')) {
-                dropdown.classList.add('hidden');
-                dropdown.classList.remove('flex');
-                document.removeEventListener('click', outsideClickListener);
-            }
-        };
-        setTimeout(() => document.addEventListener('click', outsideClickListener), 10);
-    } else {
-        dropdown.classList.add('hidden');
-        dropdown.classList.remove('flex');
+function toggleProjectLinkDropdown() {
+    const dropdown = document.getElementById('project-link-dropdown');
+    dropdown.classList.toggle('hidden');
+    if (!dropdown.classList.contains('hidden')) {
+        document.getElementById('project-link-search').focus();
+        searchProjectsToLink('');
     }
 }
 
-function searchParentTasks(query) {
-    renderParentTaskList(query);
-}
-
-function renderParentTaskList(query) {
-    const list = document.getElementById('parent-task-list');
-    list.innerHTML = '';
-    const currentTaskIdIdStr = document.getElementById('task-modal-id').value;
-    const currentTaskId = currentTaskIdIdStr ? parseInt(currentTaskIdIdStr, 10) : null;
+async function searchProjectsToLink(query) {
+    const list = document.getElementById('project-link-list');
     
-    // Default None option
-    if (!query) {
-        const li = document.createElement('li');
-        li.className = `p-2 hover:bg-slate-50 cursor-pointer rounded mb-0.5 text-slate-500 italic flex justify-between items-center`;
-        li.innerText = 'None';
-        li.onclick = (e) => {
-            e.stopPropagation();
-            setParentTask('', 'None');
-        };
-        list.appendChild(li);
-    }
-
-    if (!window.allTasksParentCache) return;
-
-    const filtered = window.allTasksParentCache.filter(t => {
-        if (currentTaskId && t.id === currentTaskId) return false; // Prevent self
-        if (currentTaskId && t.parent_task_id === currentTaskId) return false; // Prevent choosing a subtask as parent
+    try {
+        const res = await fetch('api/projects.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'search', query: query })
+        });
+        const clone = res.clone();
+        let data;
+        try {
+            data = await res.json();
+        } catch (jsonErr) {
+            const rawText = await clone.text();
+            console.error("searchProjectsToLink JSON parse failed. Raw response:", rawText);
+            throw jsonErr;
+        }
+        if(window.handleApiError) window.handleApiError(data);
         
-        return t.title.toLowerCase().includes(query.toLowerCase());
-    });
-    
-    if (filtered.length === 0) {
-        list.innerHTML += `<li class="p-2 text-slate-400 italic text-xs">No tasks found</li>`;
-        return;
-    }
-    
-    filtered.forEach(t => {
-        const li = document.createElement('li');
-        li.className = `p-2 hover:bg-slate-50 cursor-pointer rounded mb-0.5 flex justify-between items-center group`;
-        const countStr = t.subtask_count > 0 ? ` <span class="text-slate-400 text-xs ml-1">(${t.subtask_count})</span>` : '';
-        const projStr = t.project_names ? ` <span class="text-teal-600 bg-teal-50 px-1 rounded text-[10px] ml-1">#${t.project_names}</span>` : '';
+        if(data.status !== 'success') return;
         
-        li.innerHTML = `
-            <div class="flex items-center truncate">
-                <span class="truncate font-medium">${t.title}</span>
-                ${projStr}
-                ${countStr}
-            </div>
-        `;
-        li.onclick = (e) => {
-            e.stopPropagation();
-            const displayName = `${t.title}${t.project_names ? ` [${t.project_names}]` : ''}${t.subtask_count > 0 ? ` (${t.subtask_count})` : ''}`;
-            setParentTask(t.id, displayName);
-        };
-        list.appendChild(li);
-    });
+        list.innerHTML = '';
+        if(data.projects.length === 0) {
+            list.innerHTML = '<li class="p-2 text-slate-400 italic text-xs">No projects found.</li>';
+            return;
+        }
+        
+        data.projects.forEach(p => {
+            const li = document.createElement('li');
+            li.className = 'p-2 hover:bg-slate-50 cursor-pointer text-slate-700 truncate';
+            li.textContent = p.name;
+            li.onclick = () => addProjectToTask(p.id);
+            list.appendChild(li);
+        });
+    } catch (e) {
+        console.error(e);
+        list.innerHTML = '<li class="p-2 text-red-500 text-xs">Search failed.</li>';
+    }
 }
 
-function setParentTask(id, name) {
-    document.getElementById('task-modal-parent-id').value = id;
-    document.getElementById('parent-task-name').innerText = name || 'None';
-    const dropdown = document.getElementById('parent-task-dropdown');
-    dropdown.classList.add('hidden');
-    dropdown.classList.remove('flex');
-    updateTaskDetails(); // trigger save
+async function addProjectToTask(projectId) {
+    const taskId = document.getElementById('task-modal-id').value;
+    showSavingOverlay();
+    try {
+        const res = await fetch('api/tasks.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'add_to_project', task_id: taskId, project_id: projectId })
+        });
+        const data = await res.json();
+        if(window.handleApiError) window.handleApiError(data);
+        
+        document.getElementById('project-link-dropdown').classList.add('hidden');
+        if(data.status === 'success') {
+            openTaskModal(taskId); // Reload
+        }
+    } catch (e) {
+        console.error(e);
+    } finally {
+        hideSavingOverlay();
+    }
 }
 
+async function changeTaskProjectSection(projectId, selectElem) {
+    const taskId = document.getElementById('task-modal-id').value;
+    const sectionId = selectElem.value;
+    showSavingOverlay();
+    try {
+        const res = await fetch('api/tasks.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'change_project_section', task_id: taskId, project_id: projectId, section_id: sectionId })
+        });
+        const data = await res.json();
+        if(window.handleApiError) window.handleApiError(data);
+        if (data.status === 'success' && projectId == currentProjectId) {
+            loadProjectBoard(currentProjectId); // Refresh board if it affects current view
+        }
+    } catch (e) {
+        console.error(e);
+    } finally {
+        hideSavingOverlay();
+    }
+}
+
+// Subtasks linking (removed from UI but kept in API/logic)
 function toggleLinkSubtaskDropdown() {
     const dropdown = document.getElementById('link-subtask-dropdown');
     if (dropdown.classList.contains('hidden')) {
@@ -1846,6 +2946,7 @@ async function searchTasksToLink(query) {
 }
 
 function submitLinkSubtask(parentId, subtaskId) {
+    showSavingOverlay();
     fetch('api/tasks.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -1859,14 +2960,16 @@ function submitLinkSubtask(parentId, subtaskId) {
             toggleLinkSubtaskDropdown();
             openTaskModal(parentId); // Reload parent to show new subtask
         } else {
-            alert('Failed to link subtask.');
+            showAlert('Error', 'Failed to link subtask.', 'danger');
         }
+        hideSavingOverlay();
     });
 }
 
 function unlinkSubtask(parentId, subtaskId) {
     if (!confirm('Are you sure you want to unlink this subtask?')) return;
     
+    showSavingOverlay();
     fetch('api/tasks.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -1880,11 +2983,13 @@ function unlinkSubtask(parentId, subtaskId) {
             openTaskModal(parentId); // Reload parent to reflect changes
             if(typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
         } else {
-            alert('Failed to unlink subtask: ' + data.message);
+            showAlert('Error', 'Failed to unlink subtask: ' + data.message, 'danger');
         }
+        hideSavingOverlay();
     }).catch(e => {
         console.error('Error unlinking subtask', e);
-        alert('An error occurred while unlinking.');
+        showAlert('Error', 'An error occurred while unlinking.', 'danger');
+        hideSavingOverlay();
     });
 }
 

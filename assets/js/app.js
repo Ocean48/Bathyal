@@ -1,5 +1,76 @@
 // /assets/js/app.js
 
+window.handleTaskReorder = function(evt) {
+    let newSectionId = null;
+    let newParentTaskId = null;
+    let taskIds = [];
+    
+    // Try to determine newSectionId
+    if (evt.to.dataset.sectionId) {
+        newSectionId = evt.to.dataset.sectionId;
+    } else {
+        const column = evt.to.closest('.kanban-col');
+        if (column) newSectionId = column.dataset.sectionId;
+    }
+    
+    // Get dragged task ID
+    let draggedTaskId = evt.item.dataset.taskId;
+    if (!draggedTaskId) {
+        const draggedTaskMatch = evt.item.className.match(/task-row-(\d+)/);
+        draggedTaskId = draggedTaskMatch ? draggedTaskMatch[1] : null;
+    }
+
+    // Is it dropped in the modal subtasks list?
+    if (evt.to.id === 'task-modal-subtasks') {
+        newParentTaskId = document.getElementById('task-modal-id').value;
+        newSectionId = null; // Explicitly null since it belongs to the modal task
+        taskIds = Array.from(evt.to.children)
+            .map(c => c.dataset.taskId || (c.className.match && c.className.match(/task-row-(\d+)/) ? c.className.match(/task-row-(\d+)/)[1] : null))
+            .filter(id => id != null);
+    } else {
+        // Was it dragged from the modal?
+        const isFromModal = evt.from.id === 'task-modal-subtasks';
+        const isKanbanSubtask = evt.to.classList.contains('kanban-subtasks');
+        
+        if (isKanbanSubtask) {
+            newParentTaskId = evt.to.dataset.parentTaskId;
+        } else if (isFromModal) {
+            newParentTaskId = null; // Become a root task
+        } else {
+            newParentTaskId = evt.item.dataset.parentId || null;
+        }
+        
+        // Exclude section header from task IDs in list view
+        taskIds = Array.from(evt.to.children)
+            .filter(c => !c.classList.contains('section-header'))
+            .map(c => c.dataset.taskId || (c.className.match && c.className.match(/task-row-(\d+)/) ? c.className.match(/task-row-(\d+)/)[1] : null))
+            .filter(id => id != null);
+    }
+    
+    fetch('api/tasks.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ 
+            action: 'reorder', 
+            section_id: newSectionId, 
+            task_ids: taskIds,
+            dragged_task_id: draggedTaskId,
+            parent_task_id: newParentTaskId 
+        })
+    }).then(() => {
+        if (typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
+        if (document.getElementById('task-modal').classList.contains('hidden') === false) {
+            // refresh modal if open
+            if (typeof openTaskModal === 'function' && document.getElementById('task-modal-id').value) {
+                openTaskModal(document.getElementById('task-modal-id').value);
+            }
+        }
+    }).catch(err => {
+        console.error(err);
+        if (typeof currentProjectId !== 'undefined') loadProjectBoard(currentProjectId);
+    });
+};
+
 let currentProjectId = 1; // Global context
 
 // Global Modal Functions (Alert / Confirm)
@@ -20,6 +91,15 @@ window.showAlert = function(title, message, type = 'info') {
 window.showConfirm = function(title, message, type = 'warning') {
     return _showGlobalModal(title, message, type, true);
 };
+
+window.handleApiError = function(result) {
+    if (result.status === 'error') {
+        showAlert('Error', result.message, 'danger');
+    }
+    if (result.email_error) {
+        showAlert('Notification Delivery Failed', 'The operation was successful, but the email notification could not be sent. Detailed error: ' + result.email_error, 'warning');
+    }
+}
 
 function _showGlobalModal(title, message, type, isConfirm) {
     return new Promise((resolve) => {
@@ -244,7 +324,7 @@ async function loadProjectBoard(projectId) {
                 secTr.className = 'bg-slate-50/80 border-b border-slate-200/60 cursor-pointer hover:bg-slate-100 transition-colors section-header';
                 secTr.onclick = (e) => toggleListSection(tbody, secTr);
                 secTr.innerHTML = `
-                    <td colspan="4" class="p-0">
+                    <td colspan="5" class="p-0">
                         <div class="sticky top-0 z-10 bg-slate-50/80 px-4 py-2 font-semibold text-slate-700 text-sm flex items-center justify-between group">
                             <div class="flex items-center">
                                 <svg class="w-4 h-4 mr-2 text-slate-400 transform transition-transform section-toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -299,41 +379,31 @@ async function loadProjectBoard(projectId) {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ action: 'reorder', section_ids: sectionIds })
-                        }).then(() => loadProjectBoard(currentProjectId)).catch(console.error);
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (window.handleApiError) window.handleApiError(data);
+                            loadProjectBoard(currentProjectId);
+                        })
+                        .catch(console.error);
                     }
                 });
 
                 // Board Tasks and Nested Subtasks Dropzones
                 const sortableOptions = {
-                    group: 'shared-board',
+                    group: { name: 'shared-board', put: ['shared-board', 'modal-subtasks', 'main-board-list'], pull: ['shared-board', 'modal-subtasks', 'main-board-list'] },
                     animation: 150,
                     handle: '.cursor-grab',
                     fallbackOnBody: true,
                     swapThreshold: 0.65,
-                    onEnd: function (evt) {
-                        const isSubtaskZone = evt.to.classList.contains('kanban-subtasks');
-                        let newSectionId = null;
-                        let parentTaskId = null;
-
-                        if (isSubtaskZone) {
-                            parentTaskId = evt.to.dataset.parentTaskId;
-                            const column = evt.to.closest('.kanban-col');
-                            newSectionId = column ? column.dataset.sectionId : null;
-                        } else {
-                            newSectionId = evt.to.dataset.sectionId;
-                        }
-
-                        const taskIds = Array.from(evt.to.children)
-                            .map(c => c.closest('.task-card')?.dataset.taskId)
-                            .filter(id => id != null);
-                        
-                        // For dropping directly into tasks, ensure evt.to.children are properly mapped to their task ID 
-                        fetch('api/tasks.php', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({ action: 'reorder', section_id: newSectionId, task_ids: taskIds, parent_task_id: parentTaskId })
-                        }).then(() => loadProjectBoard(currentProjectId)).catch(console.error);
-                    }
+onMove: function(evt) {
+                            // Prevent dropping a shared task into a subtask zone
+                            if (evt.dragged.classList.contains('shared-task') && evt.to.classList.contains('kanban-subtasks')) {
+                                return false;
+                            }
+                            return true;
+                        },
+                        onEnd: window.handleTaskReorder
                 };
 
                 board.querySelectorAll('.kanban-col, .kanban-subtasks').forEach(area => {
@@ -362,7 +432,7 @@ async function loadProjectBoard(projectId) {
                 // List Tasks
                 listTable.querySelectorAll('tbody.sortable-section').forEach(tbody => {
                     new Sortable(tbody, {
-                        group: 'shared-list',
+                        group: { name: 'main-board-list', put: ['main-board-list', 'modal-subtasks', 'shared-board'], pull: ['main-board-list', 'modal-subtasks', 'shared-board'] },
                         animation: 150,
                         handle: '.cursor-grab-list',
                         filter: '.section-header',
@@ -372,91 +442,30 @@ async function loadProjectBoard(projectId) {
                                 return false;
                             }
                             
-                            const depth = parseInt(evt.dragged.dataset.depth || '0', 10);
-                            // Enforce rule: sub-subtask level and below ONLY allow the drag to reorder.
-                            // They cannot change their sub level or parent.
-                            if (depth >= 2) {
-                                if (evt.to !== evt.from) return false;
-                                if (evt.related) {
-                                    if (evt.related.dataset.parentId !== evt.dragged.dataset.parentId) {
-                                        return false;
-                                    }
+                            // Prevent dropping a shared task into a subtask list (modal context)
+                            if (evt.dragged.classList.contains('shared-task') && evt.to.id === 'task-modal-subtasks') {
+                                return false;
+                            }
+                            
+                            // ENFORCE RULE: Only allow reordering among siblings of the SAME parent level!
+                            if (evt.to === evt.from && evt.related) {
+                                const draggedParent = evt.dragged.dataset.parentId || '';
+                                const relatedParent = evt.related.dataset.parentId || '';
+                                
+                                // Dragging past our own parent task row (e.g. dragging child UP past parent)
+                                if (evt.related.dataset.taskId === draggedParent) {
+                                    return false;
+                                }
+                                
+                                // Dragging into someone else's children, or dragging a child past its siblings into another group
+                                if (draggedParent !== relatedParent) {
+                                    return false;
                                 }
                             }
+                            
                             return true;
                         },
-                        onEnd: function(evt) {
-                            const newSectionId = evt.to.dataset.sectionId;
-                            
-                            // Get dragged task ID
-                            const draggedTaskMatch = evt.item.className.match(/task-row-(\d+)/);
-                            const draggedTaskId = draggedTaskMatch ? draggedTaskMatch[1] : null;
-                            const depth = parseInt(evt.item.dataset.depth || '0', 10);
-
-                            // Detect hierarchy based on previous element
-                            let newParentTaskId = null;
-                            let newDepth = 0;
-                            
-                            if (depth >= 2) {
-                                // Sub-subtasks and below retain exactly their same parent and depth.
-                                newParentTaskId = evt.item.dataset.parentId || null;
-                                newDepth = depth;
-                            } else {
-                                const prev = evt.item.previousElementSibling;
-                                
-                                if (prev && prev.classList.contains('task-row')) {
-                                    const childMatch = prev.className.match(/child-of-(\d+)/);
-                                    if (childMatch) {
-                                        newParentTaskId = childMatch[1];
-                                        newDepth = parseInt(prev.dataset.depth || '0', 10); // Inherit depth of sibling
-                                    } else {
-                                        const next = evt.item.nextElementSibling;
-                                        if (next && next.classList.contains('task-row')) {
-                                            const nextChildMatch = next.className.match(/child-of-(\d+)/);
-                                            if (nextChildMatch && nextChildMatch[1] === prev.dataset.taskId) {
-                                                newParentTaskId = prev.dataset.taskId;
-                                                newDepth = parseInt(prev.dataset.depth || '0', 10) + 1; // Inherit depth + 1 from visual parent
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Visually update the dragged task's classes and styling
-                            if (draggedTaskId) {
-                                evt.item.className = evt.item.className.replace(/child-of-\d+/g, '').replace(/\s+/g, ' ');
-                                if (newParentTaskId) {
-                                    evt.item.classList.add(`child-of-${newParentTaskId}`);
-                                }
-                                if (newDepth === 0 && newParentTaskId) {
-                                    newDepth = 1; // Fallback if calculation failed
-                                }
-                                evt.item.dataset.depth = newDepth; // Update the dataset depth!
-                                evt.item.dataset.parentId = newParentTaskId || '';
-                                const paddingVal = newDepth * 24 + 16;
-                                const firstTd = evt.item.querySelector('td:first-child');
-                                if (firstTd) firstTd.style.paddingLeft = paddingVal + 'px';
-                            }
-                            
-                            const taskIds = Array.from(evt.to.querySelectorAll('tr.task-row:not(.section-header)'))
-                                .map(c => {
-                                    const match = c.className.match(/task-row-(\d+)/);
-                                    return match ? match[1] : null;
-                                })
-                                .filter(id => id != null);
-                            
-                            fetch('api/tasks.php', {
-                                method: 'POST',
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({ 
-                                    action: 'reorder', 
-                                    section_id: newSectionId, 
-                                    task_ids: taskIds,
-                                    dragged_task_id: draggedTaskId,
-                                    parent_task_id: newParentTaskId 
-                                })
-                            }).then(() => loadProjectBoard(currentProjectId)).catch(console.error);
-                        }
+                        onEnd: window.handleTaskReorder
                     });
                 });
             }
@@ -494,7 +503,9 @@ function renderTaskCard(task) {
         assigneesHtml += `</div>`;
     }
 
-const totalSubtasks = parseInt(task.subtask_count || 0, 10);
+    const totalSubtasks = parseInt(task.subtask_count || 0, 10);
+    const isShared = parseInt(task.project_count || 1, 10) > 1;
+    const sharedClass = isShared ? 'shared-task' : '';
     const subtaskBadge = totalSubtasks > 0
         ? `<div class="text-[10px] text-slate-500 flex items-center"><svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>${totalSubtasks} subtasks</div>`
         : '';
@@ -502,12 +513,26 @@ const totalSubtasks = parseInt(task.subtask_count || 0, 10);
     // Add subtask count to the end of the title if it exists
     const titleWithCount = totalSubtasks > 0 ? `${task.title} <span class="text-xs text-slate-400 ml-1">(${totalSubtasks})</span>` : task.title;
     
+    // Create label badges
+    let labelsHtml = '';
+    if (task.label_names) {
+        const names = task.label_names.split(',');
+        const colors = task.label_colors ? task.label_colors.split(',') : [];
+        labelsHtml = '<div class="flex flex-wrap gap-1 mb-2 mt-1">';
+        for(let i=0; i<names.length; i++) {
+            const lColor = colors[i] ? colors[i].trim() : '#38b2ac';
+            labelsHtml += `<div class="w-2.5 h-2.5 rounded-full shadow-sm" style="background-color: ${lColor}" title="${names[i].trim()}"></div>`;
+        }
+        labelsHtml += '</div>';
+    }
+
     return `
-        <div class="bg-white p-3.5 rounded-lg shadow-sm border border-slate-200 task-card hover:border-teal-400 hover:shadow transition-all cursor-grab active:cursor-grabbing" data-task-id="${task.id}" onclick="openTaskModal(${task.id})">
-            <div class="flex justify-between items-start mb-2">
+        <div class="bg-white p-3.5 rounded-lg shadow-sm border border-slate-200 task-card hover:border-teal-400 hover:shadow transition-all cursor-grab active:cursor-grabbing ${sharedClass}" data-task-id="${task.id}" onclick="openTaskModal(${task.id})">
+            <div class="flex justify-between items-start mb-1">
                 <h4 class="text-sm text-slate-800 font-medium leading-snug">${titleWithCount}</h4>
                 ${assigneesHtml}
             </div>
+            ${labelsHtml}
             ${task.description ? `<p class="text-xs text-slate-500 line-clamp-2 mb-3 mt-1">${task.description}</p>` : ''}
             
             <div class="flex justify-between items-center text-xs mt-3 pt-3 border-t border-slate-50 relative pointer-events-none">
@@ -524,10 +549,13 @@ const totalSubtasks = parseInt(task.subtask_count || 0, 10);
 
 function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
     const tr = document.createElement('tr');
-    tr.className = `hover:bg-slate-50 cursor-pointer border-b border-slate-100 task-row ${parentId ? 'child-of-' + parentId : ''} task-row-${task.id}`;
+    const isShared = parseInt(task.project_count || 1, 10) > 1;
+    const sharedClass = isShared ? 'shared-task' : '';
+    tr.className = `hover:bg-slate-50 cursor-pointer border-b border-slate-100 task-row ${parentId ? 'child-of-' + parentId : ''} task-row-${task.id} ${sharedClass}`;
     tr.dataset.taskId = task.id;
     tr.dataset.status = task.status || '';
     tr.dataset.assigneeIds = task.assignee_ids || '';
+    tr.dataset.collaboratorIds = task.collaborator_ids || '';
     tr.dataset.title = task.title || '';
     tr.dataset.parentId = parentId || '';
     tr.dataset.depth = depth;
@@ -569,11 +597,39 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
         assigneesHtml += `</div>`;
     }
 
+    // Multiple Collaborators Visual Stack
+    let collaboratorsHtml = '<span class="text-slate-400 italic">None</span>';
+    if (task.collaborator_name) {
+        const names = task.collaborator_name.split(',');
+        collaboratorsHtml = `<div class="flex -space-x-2 overflow-hidden" title="${task.collaborator_name}">`;
+        names.slice(0, 3).forEach(n => {
+            const initial = n.trim().charAt(0).toUpperCase();
+            collaboratorsHtml += `<div class="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white text-indigo-700 text-[10px] font-bold flex items-center justify-center">${initial}</div>`;
+        });
+        if (names.length > 3) {
+            collaboratorsHtml += `<div class="w-6 h-6 rounded-full bg-slate-100 border-2 border-white text-slate-500 text-[9px] font-bold flex items-center justify-center">+${names.length - 3}</div>`;
+        }
+        collaboratorsHtml += `</div>`;
+    }
+
+    // Labels Visual Stack
+    let labelsListHtml = '<span class="text-slate-400 italic text-xs">No Labels</span>';
+    if (task.label_names) {
+        const names = task.label_names.split(',');
+        const colors = task.label_colors ? task.label_colors.split(',') : [];
+        labelsListHtml = '<div class="flex flex-wrap gap-1" title="' + task.label_names + '">';
+        for(let i=0; i<names.length; i++) {
+            const lColor = colors[i] ? colors[i].trim() : '#38b2ac';
+            labelsListHtml += `<div class="w-2 h-2 rounded-full shadow-sm" style="background-color: ${lColor}"></div>`;
+        }
+        labelsListHtml += '</div>';
+    }
+
     // Add subtask count to the end of the title if it exists
     const titleWithCount = totalSubtasks > 0 ? `${task.title} <span class="text-xs text-slate-400 ml-1">(${totalSubtasks})</span>` : task.title;
 
     tr.innerHTML = `
-        <td class="py-3 font-medium text-slate-800 flex items-center" style="padding-left: ${paddingVal}px">
+        <td class="py-3 font-medium text-slate-800 flex items-center ${sharedClass}" style="padding-left: ${paddingVal}px">
             <div class="cursor-grab-list text-slate-300 hover:text-slate-500 mr-2 flex items-center justify-center cursor-move" title="Drag to reorder">
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z"></path></svg>
             </div>
@@ -581,11 +637,21 @@ function renderTaskListRow(task, tbody, depth = 0, parentId = null) {
             <span class="truncate block max-w-sm">${titleWithCount}</span>
         </td>
         <td class="px-4 py-3">
-            <div class="cursor-pointer inline-flex items-center p-1 hover:bg-slate-100 rounded transition-colors -ml-1" onclick="if(window.openListViewAssigneeDropdown) window.openListViewAssigneeDropdown(event, ${task.id}, '${task.assignee_ids || ''}')">
+            <div class="cursor-pointer inline-flex items-center p-1 hover:bg-slate-100 rounded transition-colors -ml-1 list-assignees-container" onclick="if(window.openListViewAssigneeDropdown) window.openListViewAssigneeDropdown(event, ${task.id}, '${task.assignee_ids || ''}')">
                 ${assigneesHtml}
             </div>
         </td>
-        <td class="px-4 py-3 text-slate-500 text-sm whitespace-nowrap">${task.due_date ? task.due_date.split(' ')[0] : '-'}</td>
+        <td class="px-4 py-3">
+            <div class="cursor-pointer inline-flex items-center p-1 hover:bg-slate-100 rounded transition-colors -ml-1 list-collaborators-container" onclick="if(window.openListViewCollaboratorDropdown) window.openListViewCollaboratorDropdown(event, ${task.id}, '${task.collaborator_ids || ''}')">
+                ${collaboratorsHtml}
+            </div>
+        </td>
+        <td class="px-4 py-3">
+            <div class="cursor-pointer inline-flex items-center p-1 hover:bg-slate-100 rounded transition-colors -ml-1 list-labels-container" onclick="if(window.openListViewLabelsDropdown) window.openListViewLabelsDropdown(event, ${task.id}, '${task.label_ids || ''}')">
+                ${labelsListHtml}
+            </div>
+        </td>
+        <td class="px-4 py-3 text-slate-500 text-sm whitespace-nowrap">${task.completed_date ? task.completed_date.split(' ')[0] : '-'}</td>
         <td class="px-4 py-3 whitespace-nowrap">
             <select onchange="window.quickUpdateTaskStatus(${task.id}, this.value)" onclick="event.stopPropagation()" class="px-2 py-0.5 pr-6 rounded text-[10px] font-bold tracking-wider uppercase border border-slate-200/60 focus:outline-none focus:ring-1 focus:ring-teal-500 appearance-none cursor-pointer transition-colors ${window.getStatusBadgeClass ? window.getStatusBadgeClass(task.status) : 'bg-slate-100 text-slate-600'}">
                 <option value="todo" ${task.status === 'todo' ? 'selected' : ''}>TO DO</option>
@@ -775,37 +841,50 @@ async function handleCreateSubmit(e) {
     submitBtnText.innerText = 'Saving...';
     
     try {
+        let res;
         if (actionType === 'section') {
-            await fetch(`api/sections.php`, {
+            res = await fetch(`api/sections.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'create', project_id: currentProjectId, name: title })
             });
         } else if (actionType === 'edit_section') {
-            await fetch(`api/sections.php`, {
+            res = await fetch(`api/sections.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'update', section_id: targetId, name: title })
             });
         } else if (actionType === 'task') {
-            await fetch(`api/tasks.php`, {
+            res = await fetch(`api/tasks.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ project_id: currentProjectId, section_id: targetId, title: title })
             });
         } else if (actionType === 'subtask') {
-            await fetch(`api/tasks.php`, {
+            res = await fetch(`api/tasks.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ parent_task_id: targetId, title: title })
             });
         }
         
+        if (res && res.ok) {
+            const clone = res.clone();
+            try {
+                const data = await res.json();
+                if (window.handleApiError) window.handleApiError(data);
+            } catch (jsonErr) {
+                const rawText = await clone.text();
+                console.error("JSON parse failed. Raw response:", rawText);
+                throw jsonErr;
+            }
+        }
+        
         closeCreateModal();
         loadProjectBoard(currentProjectId);
     } catch (err) {
         console.error('Error saving:', err);
-        alert('An error occurred. Please try again.');
+        showAlert('Error', 'An error occurred. Please try again.', 'danger');
     } finally {
         submitBtnText.innerText = oldText;
     }
@@ -966,12 +1045,18 @@ function renderTimeline() {
     let ganttTasks = [];
     p.sections.forEach(s => {
         s.tasks.forEach(t => {
-            if (t.due_date) {
-                let endDate = new Date(t.due_date.split(' ')[0]);
+            if (t.expected_due_date) {
+                // Parse "YYYY-MM-DD" as local time instead of UTC to prevent date shifting
+                let endDateParts = t.expected_due_date.split(' ')[0].split('-');
+                let endDate = new Date(endDateParts[0], endDateParts[1] - 1, endDateParts[2]);
                 let startDate = new Date(endDate);
                 
-                if(t.start_date) {
-                    startDate = new Date(t.start_date.split(' ')[0]);
+                if(t.expected_start_date) {
+                    let sdParts = t.expected_start_date.split(' ')[0].split('-');
+                    startDate = new Date(sdParts[0], sdParts[1] - 1, sdParts[2]);
+                } else if(t.start_date) {
+                    let sdParts = t.start_date.split(' ')[0].split('-');
+                    startDate = new Date(sdParts[0], sdParts[1] - 1, sdParts[2]);
                 } else {
                     startDate.setDate(endDate.getDate() - 3); // mock duration if missing start date
                 }
@@ -988,7 +1073,7 @@ function renderTimeline() {
                     progress: progress,
                     // Pass the real DB start date (if any) and status
                     start_val: t.start_date ? t.start_date.split(' ')[0] : null,
-                    due_val: t.due_date.split(' ')[0], 
+                    due_val: t.expected_due_date.split(' ')[0], 
                     status: t.status,
                     description: t.description,
                     parent_task_id: t.parent_task_id,
@@ -1052,18 +1137,21 @@ function renderTimeline() {
                                     title: task.name, 
                                     status: task.status || 'todo', 
                                     start_date: newStart, 
-                                    due_date: newEnd, 
+                                    expected_start_date: newStart, 
+                                    expected_due_date: newEnd, 
                                     description: task.description || '', 
                                     parent_task_id: task.parent_task_id || null 
                                 }
                             })
                         });
                         const data = await response.json();
-                        if(data.success && typeof currentProjectId !== 'undefined') {
+                        if (window.handleApiError) window.handleApiError(data);
+                        if(data.status === 'success' && typeof currentProjectId !== 'undefined') {
                             loadProjectBoard(currentProjectId); // Optional, might cause flash of UI
                         }
                     } catch(e) {
                         console.error('Failed to update dates from timeline', e);
+                        showAlert('Error', 'Failed to update dates from timeline', 'danger');
                     }
                 },
                 custom_popup_html: function(task) {

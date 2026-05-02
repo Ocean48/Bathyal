@@ -13,20 +13,34 @@ class EmailService {
         $this->mail = new PHPMailer(true);
 
         try {
-            $appConfig = file_exists(__DIR__ . '/../config.php') ? require __DIR__ . '/../config.php' : ['app_name' => 'Bathyal'];
+            $appConfig = file_exists(__DIR__ . '/../config.php') ? require __DIR__ . '/../config.php' : [];
             $appName = $appConfig['app_name'] ?? 'Bathyal';
 
-            // Server settings
-            $this->mail->isSMTP();
-            $this->mail->Host = 'smtp.gmail.com'; 
-            $this->mail->SMTPAuth = true;
-            $this->mail->Username = 'YOUR_EMAIL@gmail.com'; 
-            $this->mail->Password = 'YOUR_APP_PASSWORD'; 
-            $this->mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            $this->mail->Port = 587;
+            // Fetch from Environment Variables
+            $smtpUser = getenv('SMTP_USER') ?: '';
+            $smtpPass = getenv('SMTP_PASS') ?: '';
+            $smtpHost = getenv('SMTP_HOST') ?: 'smtp.gmail.com';
+            $smtpPort = getenv('SMTP_PORT') ?: 587;
+            $smtpSecure = getenv('SMTP_SECURE') ?: 'tls';
+            $smtpFromEmail = getenv('SMTP_FROM_EMAIL') ?: $smtpUser;
+            $smtpFromName = getenv('SMTP_FROM_NAME') ?: ($appName . ' System');
 
-            // Sender
-            $this->mail->setFrom('YOUR_EMAIL@gmail.com', $appName . ' System');
+            // Server settings
+            if (!empty($smtpUser) && $smtpUser !== 'YOUR_EMAIL@gmail.com') {
+                $this->mail->isSMTP();
+                $this->mail->Host = $smtpHost;
+                $this->mail->SMTPAuth = true;
+                $this->mail->Username = $smtpUser;
+                $this->mail->Password = $smtpPass;
+                $this->mail->SMTPSecure = ($smtpSecure === 'ssl') ? PHPMailer::ENCRYPTION_SMTPS : PHPMailer::ENCRYPTION_STARTTLS;
+                $this->mail->Port = $smtpPort;
+                $this->mail->setFrom($smtpFromEmail, $smtpFromName);
+            } else {
+                // Fallback to local mail() if SMTP is not configured
+                $this->mail->isMail();
+                $this->mail->setFrom('no-reply@' . strtolower(str_replace(' ', '', $appName)) . '.local', $appName . ' System');
+            }
+
             $this->mail->isHTML(true);
         } catch (Exception $e) {
             error_log("Email configuration error: {$this->mail->ErrorInfo}");
@@ -41,7 +55,7 @@ class EmailService {
      * @param string $subject Email subject
      * @param string $body Email content (HTML by default)
      * @param bool $isHtml Whether the body is HTML
-     * @return bool True if sent, False if failed
+     * @return array Array with 'success' and optional 'error' keys
      */
     public function sendEmail($toEmail, $toName, $subject, $body, $isHtml = true) {
         try {
@@ -56,11 +70,10 @@ class EmailService {
             $this->mail->AltBody = strip_tags($body); // Fallback plain text version
 
             $this->mail->send();
-            return true;
+            return ['success' => true];
         } catch (Exception $e) {
-            error_log("Message could not be sent. Mailer Error: {$this->mail->ErrorInfo}");
-            return false;
+            error_log("Email send error: {$this->mail->ErrorInfo}");
+            return ['success' => false, 'error' => $this->mail->ErrorInfo];
         }
     }
 }
-?>

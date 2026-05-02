@@ -19,6 +19,101 @@ A lightweight, self-hosted project management web application built with PHP and
 
 ## Tech Stack
 
+- **Backend:** PHP 8.3 (via PHP-FPM)
+- **Frontend:** Vanilla JS (`app.js`), Tailwind CSS
+- **Database:** MySQL 8.0
+- **Web Server:** Nginx (via Docker)
+- **Dependency Management:** Composer
+
+## Getting Started (Docker)
+
+The recommended way to run Bathyal locally or in production is using Docker.
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yourusername/bathyal.git
+   cd bathyal
+   ```
+
+2. **Setup Environment Variables:**
+   Copy the example environment file and fill in your database passwords.
+   ```bash
+   cp .env.example .env
+   ```
+
+3. **Start the containers:**
+   ```bash
+   docker-compose up -d --build
+   ```
+
+   *Note 1: On the very first run, MySQL will automatically execute `database.sql` to seed the initial database schema.*
+
+   *Note 2: The PHP container will automatically run `composer install` upon starting to install the required dependencies (like PHPMailer).*
+
+4. **Access the application:**
+   - Web App: `http://localhost:8000`
+   - phpMyAdmin: `http://localhost:8080` (Use credentials from your `.env` file)
+
+### Common Docker Commands
+
+- **Start the app:**
+  ```bash
+  docker-compose up -d
+  ```
+- **Stop the app:**
+  ```bash
+  docker-compose down
+  ```
+- **Rebuild the app** (e.g., after changing Docker configs. It is best to stop the app first before rebuild):
+  ```bash
+  docker-compose up -d --build
+  ```
+
+### Database Setup Best Practices
+
+For a secure and stable installation, keep these best practices in mind when setting up your `.env` variables:
+1. **Change Default Passwords:** Always change `DB_PASS` and `DB_ROOT_PASS` from their defaults before starting the containers for the first time.
+2. **Fresh Installation Hook:** MySQL only runs the `database.sql` initialization script if the `.docker/mysql-data` directory is **completely empty**. If you start the container, make a mistake, and want to start over, you must delete that folder.
+3. **Database Client:** You can manage the database visually by navigating to `http://localhost:8080`. Log in using `DB_USER` and `DB_PASS`.
+
+### Email / SMTP Setup
+
+Bathyal uses PHPMailer to send system emails (like notifications and password resets). Out of the box, if SMTP is not configured, it will attempt to use the local PHP `mail()` function as a fallback.
+
+To properly configure SMTP for reliable email delivery:
+
+1. Open your `.env` file.
+2. Update the SMTP variables with your mail server credentials. For example, using Gmail:
+   ```env
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_SECURE=tls
+   SMTP_USER=your.email@gmail.com
+   SMTP_PASS=your_app_password
+   SMTP_FROM_EMAIL=your.email@gmail.com
+   SMTP_FROM_NAME=Pat System
+   ```
+   *(Note: If using Gmail, you must generate an "App Password" from your Google Account settings, rather than using your main account password.)*
+3. Restart your docker containers if they are currently running: `docker-compose restart app`
+
+### Data Persistence (Important!)
+By default, there are two areas where data is safely persisted to your local machine:
+1. **Database:** Saved to `.docker/mysql-data/`.
+2. **File Uploads:** Saved to `assets/uploads/`.
+
+**This ensures your database and user uploads are safe and persist** even if you stop, rebuild, or completely remove the Docker containers.
+
+If you ever need to completely wipe the database and start fresh (re-running `database.sql`), you must manually delete the database folder and the docker volumes:
+```bash
+docker-compose down -v
+rm -rf .docker/mysql-data/
+```
+
+If you also want to completely wipe all user-uploaded files, you can delete the contents of the uploads folder:
+```bash
+rm -rf assets/uploads/*
+```
+
 | Layer      | Technology          |
 |------------|---------------------|
 | Backend    | PHP (front-controller pattern) |
@@ -55,75 +150,6 @@ bathyal/
     └── uploads/
 ```
 
-
-## Getting Started
-
-### Prerequisites
-
-- **PHP 8.x** (with `pdo_mysql`, `curl`, and `mbstring` extensions enabled)
-- **MySQL 8.0+** or **MariaDB**
-- **Composer** (for managing dependencies like PHPMailer)
-- **Web Server:** WAMP (Windows/Apache) for local development, or Linux/Nginx for production.
-
-### Installation
-
-#### 1. Local Development (WAMP)
-
-1. **Clone the repository** into your WAMP `www` directory:
-   ```bash
-   cd c:\wamp64\www
-   git clone <repository-url> bathyal
-   cd bathyal
-   ```
-
-2. **Install dependencies** using Composer:
-   ```bash
-   composer install
-   ```
-   *Note: This will read `composer.json` and `composer.lock` to download the exact package versions into a `vendor/` folder. Do not commit the `vendor/` folder.*
-
-3. **Database Setup:**
-   - Open phpMyAdmin (usually `http://localhost/phpmyadmin`).
-   - Create a new database named `bathyal`.
-   - Import the `database.sql` file located in the root of the project to create the necessary tables.
-
-4. **Configuration:**
-   - Update `core/database.php` with your local database credentials (usually `root` for username and an empty password in WAMP).
-
-5. **Run the App:**
-   - Open your browser and navigate to `http://localhost/bathyal`.
-
-#### 2. Production Deployment (Linux / Nginx)
-
-1. **Clone the repository** to your web root (e.g., `/var/www/bathyal`):
-   ```bash
-   git clone <repository-url> /var/www/bathyal
-   cd /var/www/bathyal
-   ```
-
-2. **Install production dependencies:**
-   This command installs exact versions from `composer.lock`, skips development tools, and optimizes classes for faster loading:
-   ```bash
-   composer install --no-dev --optimize-autoloader
-   ```
-
-3. **Database Setup:**
-   - Create a production database and dedicated database user.
-   - Import the database schema via the command line:
-     ```bash
-     mysql -u your_user -p bathyal < database.sql
-     ```
-   - Update `core/database.php` with your secure production database credentials.
-
-4. **Permissions:**
-   - Ensure your web server has write permissions to any required directories (like an uploads folder, if applicable):
-     ```bash
-     chown -R www-data:www-data /var/www/bathyal
-     ```
-
-5. **Nginx Configuration:**
-   - Point your Nginx virtual host `root` to `/var/www/bathyal`.
-   - Ensure it is configured to pass `.php` files to PHP-FPM.
 
 ## API Endpoints
 

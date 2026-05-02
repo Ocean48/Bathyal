@@ -1,3 +1,10 @@
 .htaccess
 vendor/*
 config.php
+assets/images/pa_favicon.png
+database copy.sql
+assets/uploads/*
+
+# Docker
+.docker/mysql-data/
+.env

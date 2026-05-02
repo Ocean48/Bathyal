@@ -3,7 +3,7 @@
 session_start();
 
 if (isset($_SESSION['user_id'])) {
-    header("Location: /bathyal/index.php");
+    header("Location: /index.php");
     exit;
 }
 
@@ -16,7 +16,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-    $teamName = trim($_POST['team_name'] ?? ''); // Optional: generate new team for them
 
     if ($name && $email && $password) {
         $db = new DBQueries($pdo);
@@ -29,29 +28,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'name' => $name,
                 'email' => $email,
                 'password_hash' => password_hash($password, PASSWORD_DEFAULT),
-                'team_id' => null,
-                'role' => $teamName ? 'admin' : 'member'
+                'role' => 'member'
             ]);
 
             if ($userId) {
-                // Team logic
-                $teamId = null;
-                if ($teamName) {
-                    $teamId = $db->createTeam($teamName, $userId);
-                } else {
-                    // Pre-existing team
-                    $teamId = 1;
-                    $db->addTeamMember($teamId, $userId, 'member');
-                }
-                
-                // Update primary team_id for backward compatibility
-                $stmt = $pdo->prepare("UPDATE users SET team_id = :tid WHERE id = :uid");
-                $stmt->execute(['tid' => $teamId, 'uid' => $userId]);
-
                 $_SESSION['user_id'] = $userId;
-                $_SESSION['team_id'] = $teamId;
-                $_SESSION['role'] = $teamName ? 'admin' : 'member';
-                header("Location: /bathyal/index.php");
+                $_SESSION['role'] = 'member';
+                header("Location: /index.php");
                 exit;
             } else {
                 $error = 'Failed to register. Please try again.';
@@ -64,12 +47,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $appConfig = file_exists(__DIR__ . '/../../config.php') ? require __DIR__ . '/../../config.php' : ['app_name' => 'Bathyal'];
 $appName = $appConfig['app_name'] ?? 'Bathyal';
+$favicon = $appConfig['favicon'] ?? 'assets/images/favicon.png';
+$basePath = rtrim($appConfig['base_path'] ?? '', '/');
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Create Account - <?= htmlspecialchars($appName) ?></title>
+    <link rel="icon" href="<?= htmlspecialchars($basePath) ?>/<?= htmlspecialchars($favicon) ?>">
     <script src="https://cdn.tailwindcss.com"></script>
     <?php require_once __DIR__ . '/../layouts/tailwind_config.php'; ?>
 </head>
@@ -87,7 +73,7 @@ $appName = $appConfig['app_name'] ?? 'Bathyal';
             </div>
         <?php endif; ?>
 
-        <form method="POST" action="/bathyal/register" class="space-y-4">
+        <form method="POST" action="<?= htmlspecialchars($basePath) ?>/register" class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-slate-600 mb-1" for="name">Full Name</label>
                 <input type="text" id="name" name="name" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:bg-white transition-colors">
@@ -100,15 +86,11 @@ $appName = $appConfig['app_name'] ?? 'Bathyal';
                 <label class="block text-sm font-medium text-slate-600 mb-1" for="password">Password</label>
                 <input type="password" id="password" name="password" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:bg-white transition-colors">
             </div>
-            <div class="pt-2 border-t border-slate-100">
-                <label class="block text-sm font-medium text-slate-600 mb-1" for="team_name">Team Name <span class="text-slate-400 font-normal">(Optional)</span></label>
-                <input type="text" id="team_name" name="team_name" placeholder="Leave blank to join existing instance" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:bg-white transition-colors text-sm">
-            </div>
             <button type="submit" class="w-full py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium shadow-sm transition-colors mt-4">Sign Up</button>
         </form>
         
         <p class="text-center text-sm text-slate-500 mt-6">
-            Already have an account? <a href="/bathyal/login" class="text-cyan-700 font-medium hover:underline">Sign in</a>
+            Already have an account? <a href="<?= htmlspecialchars($basePath) ?>/login" class="text-cyan-700 font-medium hover:underline">Sign in</a>
         </p>
     </div>
 </body>

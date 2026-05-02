@@ -15,6 +15,12 @@ if ($method === 'GET') {
     $projectId = isset($_GET['id']) ? (int)$_GET['id'] : 1;
 
     try {
+        if (!isset($currentUser['id']) || !$db->isProjectMember($projectId, $currentUser['id'])) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden']);
+            exit;
+        }
+
         // Fetch Project details
         $project = $db->getProjectById($projectId);
 
@@ -65,6 +71,12 @@ if ($method === 'GET') {
 
     $projectId = isset($_GET['id']) ? (int)$_GET['id'] : (isset($data['project_id']) ? (int)$data['project_id'] : 1);
 
+    if (!isset($currentUser['id']) || !$db->isProjectMember($projectId, $currentUser['id'])) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Forbidden']);
+        exit;
+    }
+
     if ($data['action'] === 'add_section') {
         try {
             $name = $data['name'];
@@ -105,6 +117,16 @@ if ($method === 'GET') {
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
+    } elseif ($data['action'] === 'search') {
+        try {
+            $query = isset($data['query']) ? $data['query'] : '';
+            $userId = isset($currentUser['id']) ? $currentUser['id'] : 1;
+            $projects = $db->searchProjects($query, $userId, 10);
+            echo json_encode(['status' => 'success', 'projects' => $projects]);
+        } catch (\PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
     } else {
         http_response_code(400);
         echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
@@ -113,4 +135,3 @@ if ($method === 'GET') {
     http_response_code(405);
     echo json_encode(['status' => 'error', 'message' => 'Method not allowed']);
 }
-?>

@@ -1,15 +1,21 @@
 <?php
 // /index.php (Front Controller / Router)
 
+// Enable error reporting
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // Determine the requested URI path
 $request_uri = $_SERVER['REQUEST_URI'];
 // Strip out query parameters e.g., ?id=1
 $path = parse_url($request_uri, PHP_URL_PATH);
 
-// Base directory path depending on Apache Alias/DocumentRoot setups.
-// Change this if the app is hosted directly at the domain root (e.g. replacing it with '')
-$base_path = '/bathyal'; 
-// Remove the base path (case-insensitive to support /bathyal symlink) to figure out the internal app route
+// Load the config file
+$config = require_once __DIR__ . '/config.php';
+$base_path = $config['base_path'] ?? '';
+
+// Remove the base path (case-insensitive to support symlinks) to figure out the internal app route
 $route = str_ireplace($base_path, '', $path);
 $route = trim($route, '/');
 $route = strtolower($route); // Force lowercase for case-insensitive routing
@@ -67,6 +73,11 @@ switch ($route) {
     case 'reports.php':
     case 'reports':
         require 'views/pages/reports.php';
+        break;
+        
+    case 'labels.php':
+    case 'labels':
+        require 'views/pages/labels.php';
         break;
         
     default:

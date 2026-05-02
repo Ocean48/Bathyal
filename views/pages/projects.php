@@ -38,13 +38,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 if (!empty($description)) {
                     $body .= "<p><strong>Description:</strong> " . nl2br(htmlspecialchars($description)) . "</p>";
                 }
-                $body .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/bathyal/project?id=" . $newProjectId . "'>Click here to view your new project</a></p>";
+                $body .= "<p><a href='http://" . $_SERVER['HTTP_HOST'] . "/project?id=" . $newProjectId . "'>Click here to view your new project</a></p>";
                 
                 $emailService->sendEmail($creator['email'], $creator['name'], $subject, $body);
             }
 
             $pdo->commit();
-            header("Location: /bathyal/projects");
+            header("Location: /projects");
             exit;
         } catch (\PDOException $e) {
             $pdo->rollBack();
@@ -56,10 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 require_once 'views/layouts/header.php';
+require_once 'core/db_query.php';
 
-// Fetch all projects
-$stmt = $pdo->query("SELECT * FROM projects ORDER BY created_at DESC");
-$allProjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Fetch projects for the current user
+$userId = $currentUser['id'] ?? 1; // Assume $currentUser is populated by auth_check.php
+$dbQueries = new DBQueries($pdo);
+$allProjects = $dbQueries->getProjectsForUser($userId);
 
 function getInitials($string) {
     if (empty($string)) return "P";
@@ -103,7 +105,7 @@ $colors = [
         <?php foreach ($allProjects as $index => $project): 
             $c = $colors[$index % count($colors)];
         ?>
-        <div class="group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col <?= $c['border'] ?> hover:shadow-md cursor-pointer transition-all" onclick="window.location.href='/bathyal/project?id=<?= $project['id'] ?>'">
+        <div class="group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col <?= $c['border'] ?> hover:shadow-md cursor-pointer transition-all" onclick="window.location.href='/project?id=<?= $project['id'] ?>'">
             <div class="p-5 flex items-start justify-between">
                 <div class="w-12 h-12 rounded-xl <?= $c['bg'] ?> flex items-center justify-center <?= $c['text'] ?> font-bold text-lg mr-4 shrink-0">
                     <?= getInitials($project['name']) ?>
@@ -145,7 +147,7 @@ $colors = [
     
     <!-- Modal Content -->
     <div class="relative bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
-        <form action="/bathyal/projects" method="POST">
+        <form action="/projects" method="POST">
             <input type="hidden" name="action" value="create_project">
             <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
                 <h3 class="text-lg font-semibold text-slate-800">Create New Project</h3>

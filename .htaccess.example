@@ -1,4 +1,4 @@
-# /var/www/html/bathyal/.htaccess
+# /var/www/html/.htaccess
 
 # Security to prevent directory listing
 Options -Indexes
@@ -13,11 +13,16 @@ SetEnv DB_CHARSET utf8mb4
 # Set Environment Variables for SMTP Email Configuration
 SetEnv SMTP_USER Youremaril@gmail.com
 SetEnv SMTP_PASS YOURAPPPASSWORD
+SetEnv SMTP_HOST smtp.gmail.com
+SetEnv SMTP_PORT 587
+SetEnv SMTP_SECURE tls
+SetEnv SMTP_FROM_EMAIL your-email@gmail.com
+SetEnv SMTP_FROM_NAME "YourAppName System"
 
 # Basic routing (if you want all traffic through index.php later)
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /bathyal/
+    RewriteBase /
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^(.*)$ index.php [QSA,L]

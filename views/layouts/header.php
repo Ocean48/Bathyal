@@ -4,11 +4,14 @@
     <?php
     $appConfig = file_exists(__DIR__ . '/../../config.php') ? require __DIR__ . '/../../config.php' : ['app_name' => 'Bathyal'];
     $appName = $appConfig['app_name'] ?? 'Bathyal';
+    $favicon = $appConfig['favicon'] ?? 'assets/images/favicon.png';
+    $basePath = rtrim($appConfig['base_path'] ?? '', '/');
     ?>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($appName) ?> Project Management</title>
-    <link rel="stylesheet" href="/bathyal/assets/css/style.css">
+    <link rel="icon" href="<?= htmlspecialchars($basePath) ?>/<?= htmlspecialchars($favicon) ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars($basePath) ?>/assets/css/style.css">
     <!-- Optional: Add Tailwind CSS via CDN for rapid UI development -->
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <?php require_once __DIR__ . '/tailwind_config.php'; ?>
@@ -26,7 +29,7 @@
         <nav class="flex-1 overflow-y-auto py-4">
             <?php
             $currentUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-            $baseRoute = rtrim($appConfig['base_path'] ?? '/bathyal', '/');
+            $baseRoute = rtrim($appConfig['base_path'] ?? '', '/');
             $route = strtolower(trim(str_replace($baseRoute, '', $currentUri), '/'));
             if ($route === 'index.php') $route = '';
 
@@ -79,6 +82,14 @@
                         Projects
                     </a>
                 </li>
+                <?php if (isset($currentUser['role']) && in_array($currentUser['role'], ['admin', 'member'])): ?>
+                <li>
+                    <a href="<?= $baseRoute ?>/labels" class="flex items-center px-6 py-2 transition-all <?= $route === 'labels' ? $activeClass : $inactiveClass ?>">
+                        <svg class="w-5 h-5 mr-3 <?= $route === 'labels' ? $activeIcon : $inactiveIcon ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
+                        Labels
+                    </a>
+                </li>
+                <?php endif; ?>
             </ul>
 
             <div class="px-6 mt-8 mb-2">
@@ -204,7 +215,7 @@
                                     <p class="text-sm <?= !$rn['is_read'] ? 'text-slate-800 font-medium' : 'text-slate-600' ?> leading-snug break-words">
                                         <?= htmlspecialchars($rn['message']) ?>
                                     </p>
-                                    <p class="text-[10px] text-slate-400 mt-1"><?= date('M j, g:i A', strtotime($rn['created_at'])) ?></p>
+                                    <p class="text-[10px] text-slate-400 mt-1"><?= convertUtcToToronto($rn['created_at'], 'M j, g:i A') ?></p>
                                 </div>
                             </a>
                             <?php endforeach; endif; ?>
@@ -216,6 +227,24 @@
                 </div>
 
                 <script>
+                    function showSavingOverlay() {
+                        const overlay = document.getElementById('saving-overlay');
+                        if(overlay) {
+                            overlay.classList.remove('hidden');
+                            overlay.classList.add('pointer-events-auto');
+                            setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+                        }
+                    }
+
+                    function hideSavingOverlay() {
+                        const overlay = document.getElementById('saving-overlay');
+                        if(overlay) {
+                            overlay.classList.add('opacity-0');
+                            overlay.classList.remove('pointer-events-auto');
+                            setTimeout(() => overlay.classList.add('hidden'), 200); 
+                        }
+                    }
+                    
                     document.getElementById('header-bell-btn').addEventListener('click', function(e) {
                         e.stopPropagation();
                         document.getElementById('global-notifications-dropdown').classList.toggle('hidden');
@@ -251,3 +280,14 @@
 
         <!-- Main scrolling area -->
         <main class="flex-1 overflow-x-hidden overflow-y-auto">
+        
+            <!-- Saving Overlay -->
+            <div id="saving-overlay" class="fixed inset-0 bg-slate-900/20 hidden z-[9999] flex items-center justify-center backdrop-blur-sm transition-opacity opacity-0 pointer-events-none">
+                <div class="bg-white px-5 py-3 rounded-lg shadow-xl flex items-center space-x-3 border border-slate-200">
+                    <svg class="animate-spin h-5 w-5 text-teal-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-slate-700 font-medium text-sm">Saving...</span>
+                </div>
+            </div>

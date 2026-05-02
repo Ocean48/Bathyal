@@ -5,15 +5,15 @@ require_once 'core/database.php';
 require_once 'core/auth_check.php';
 
 require_once 'views/layouts/header.php';
+require_once 'core/db_query.php';
 
 // Prepare data for the reporting dashboard
 $userId = $currentUser['id'] ?? 1;
+$dbQueries = new DBQueries($pdo);
 
 try {
-    // 1. Task Status Breakdown (Overall)
-    $stmtStatus = $pdo->prepare("SELECT status, COUNT(*) as count FROM tasks GROUP BY status");
-    $stmtStatus->execute();
-    $statusDataRaw = $stmtStatus->fetchAll(PDO::FETCH_ASSOC);
+    // 1. Task Status Breakdown (Overall for user's projects)
+    $statusDataRaw = $dbQueries->getReportTaskStatus($userId);
     $statusData = ['todo' => 0, 'in_progress' => 0, 'paused' => 0, 'completed' => 0];
     foreach ($statusDataRaw as $row) {
         $statusKey = strtolower($row['status']);
@@ -24,17 +24,8 @@ try {
         }
     }
 
-        // 2. Tasks by Project
-    $stmtProject = $pdo->prepare("
-        SELECT p.name, COUNT(tp.task_id) as task_count 
-        FROM projects p 
-        LEFT JOIN task_projects tp ON p.id = tp.project_id 
-        GROUP BY p.id 
-        ORDER BY task_count DESC 
-        LIMIT 5
-    ");
-    $stmtProject->execute();
-    $projectsData = $stmtProject->fetchAll(PDO::FETCH_ASSOC);
+    // 2. Tasks by Project
+    $projectsData = $dbQueries->getReportTasksByProject($userId);
     $projectNames = [];
     $projectTaskCounts = [];
     foreach ($projectsData as $p) {
@@ -42,19 +33,8 @@ try {
         $projectTaskCounts[] = $p['task_count'];
     }
 
-    // 3. User Workload (Tasks Assignee Breakdown)
-    $stmtWorkload = $pdo->prepare("
-        SELECT u.name as assignee_name, COUNT(ta.task_id) as count 
-        FROM users u 
-        JOIN task_assignees ta ON u.id = ta.user_id 
-        JOIN tasks t ON ta.task_id = t.id
-        WHERE t.status != 'completed'
-        GROUP BY u.id 
-        ORDER BY count DESC 
-        LIMIT 5
-    ");
-    $stmtWorkload->execute();
-    $workloadData = $stmtWorkload->fetchAll(PDO::FETCH_ASSOC);
+    // 3. User Workload (Tasks Assignee Breakdown within user's projects)
+    $workloadData = $dbQueries->getReportUserWorkload($userId);
     $workloadLabels = [];
     $workloadCounts = [];
     foreach ($workloadData as $w) {
@@ -62,15 +42,8 @@ try {
         $workloadCounts[] = $w['count'];
     }
 
-    // 4. Overdue Tasks
-    $stmtOverdue = $pdo->prepare("
-        SELECT COUNT(*) as count 
-        FROM tasks 
-        WHERE due_date < NOW() 
-        AND status != 'completed'
-    ");
-    $stmtOverdue->execute();
-    $overdueCount = $stmtOverdue->fetchColumn();
+    // 4. Overdue Tasks within user's projects
+    $overdueCount = $dbQueries->getReportOverdueTasksCount($userId);
 
 } catch (\PDOException $e) {
     // If table doesn't exist or query fails, ignore and use empty arrays
@@ -259,7 +232,7 @@ function exportToJSON() {
     const tempElement = document.createElement("a");
     const url = URL.createObjectURL(blob);
     tempElement.href = url;
-    tempElement.download = "<?= strtolower($appName ?? 'bathyal') ?>-project-report.json";
+    tempElement.download = "<?= strtolower($appName ?? 'app') ?>-project-report.json";
     
     document.body.appendChild(tempElement);
     tempElement.click();

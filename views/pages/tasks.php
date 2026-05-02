@@ -73,7 +73,7 @@ $tasks = $db->getTasksByAssigneeId($userId);
                             <div class="flex items-center text-xs font-medium text-slate-400 uppercase tracking-wider px-4 py-2 border-b border-slate-100">
                                 <div class="flex-1 min-w-[200px]">Task Name</div>
                                 <div class="w-48 shrink-0 hidden md:block">Project</div>
-                                <div class="w-32 shrink-0">Due Date</div>
+                                <div class="w-32 shrink-0">Expected End Date</div>
                                 <div class="w-32 shrink-0 hidden sm:block">Status</div>
                             </div>
 
@@ -96,9 +96,9 @@ $tasks = $db->getTasksByAssigneeId($userId);
                                     // Determine if late
                                     $isLate = false;
                                     $dueDateText = '--';
-                                    if ($task['due_date']) {
-                                        $dueDateText = date('M j', strtotime($task['due_date']));
-                                        if (strtotime($task['due_date']) < time() && $task['status'] !== 'done' && $task['status'] !== 'completed') {
+                                    if ($task['expected_due_date']) {
+                                        $dueDateText = convertUtcToToronto($task['expected_due_date'], 'M j');
+                                        if (strtotime($task['expected_due_date']) < time() && $task['status'] !== 'done' && $task['status'] !== 'completed') {
                                             $isLate = true;
                                         }
                                     }
@@ -108,7 +108,7 @@ $tasks = $db->getTasksByAssigneeId($userId);
                                 ?>
 
                                 <!-- Single Task Row -->
-                                <div class="task-item flex items-center px-4 py-3 hover:bg-slate-50/80 group transition-colors cursor-pointer border-l-2 border-transparent hover:border-teal-400" style="<?= $isCompleted ? 'display: none;' : '' ?>" data-status="<?= htmlspecialchars($task['status']) ?>" <?= $task['project_id'] ? 'onclick="window.location.href=\'/bathyal/project?id='.$task['project_id'].'&task_id='.$task['id'].'\'"' : '' ?>>
+                                <div class="task-item flex items-center px-4 py-3 hover:bg-slate-50/80 group transition-colors cursor-pointer border-l-2 border-transparent hover:border-teal-400" style="<?= $isCompleted ? 'display: none;' : '' ?>" data-status="<?= htmlspecialchars($task['status']) ?>" <?= $task['project_id'] ? 'onclick="window.location.href=\'/project?id='.$task['project_id'].'&task_id='.$task['id'].'\'"' : '' ?>>
                                     
                                     <!-- Task Name -->
                                     <div class="flex-1 min-w-[200px] flex items-center">
@@ -120,7 +120,7 @@ $tasks = $db->getTasksByAssigneeId($userId);
                                     <!-- Project -->
                                     <div class="w-48 shrink-0 hidden md:flex items-center text-xs text-slate-500">
                                          <?php if($task['project_id']): ?>
-                                            <a href="/bathyal/project?id=<?= $task['project_id'] ?>" class="hover:text-teal-600 hover:underline truncate mr-2 max-w-full" onclick="event.stopPropagation()">
+                                            <a href="/project?id=<?= $task['project_id'] ?>" class="hover:text-teal-600 hover:underline truncate mr-2 max-w-full" onclick="event.stopPropagation()">
                                                 <?= htmlspecialchars($task['project_name'] ?? 'Unknown Project') ?>
                                             </a>
                                          <?php else: ?>
@@ -128,7 +128,7 @@ $tasks = $db->getTasksByAssigneeId($userId);
                                          <?php endif; ?>
                                     </div>
 
-                                    <!-- Due Date -->
+                                    <!-- Expected End Date -->
                                     <div class="w-32 shrink-0 flex items-center">
                                         <span class="text-xs font-medium <?= $isLate ? 'text-rose-500' : ($task['status'] === 'done' ? 'text-slate-400' : 'text-slate-600') ?>">
                                             <?= $dueDateText ?>
