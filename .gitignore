@@ -13,6 +13,13 @@ Thumbs.db
 *.sln
 *.sw?
 
+# Uploaded documents and assets
+public/uploads/*/*
+!public/uploads/*/.gitkeep
+public/uploads/*
+!public/uploads/tasks/
+!public/uploads/documents/
+
 # Database data (if mounted locally)
 docker/mysql/data/
 

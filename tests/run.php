@@ -27,6 +27,7 @@ $testFiles = [
     __DIR__ . '/Unit/CustomFieldEngineTest.php',
     __DIR__ . '/Unit/RecurrenceEngineTest.php',
     __DIR__ . '/Integration/ApiIntegrationTest.php',
+    __DIR__ . '/Integration/DocumentTaskAttachmentTest.php',
     __DIR__ . '/Integration/SystemResetTest.php',
 ];
 

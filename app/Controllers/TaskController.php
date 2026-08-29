@@ -16,10 +16,14 @@ class TaskController extends BaseController
         $view = $request->getString('view', 'all');
         $statusId = $request->getInt('status_id');
         $priority = $request->getString('priority');
+        $parentIdParam = $request->get('parent_id');
+        $allLevels = $request->getBool('all_levels', false) || $request->getBool('include_subtasks', false);
 
         $sql = "SELECT t.*, s.name AS status_name, s.color_hex AS status_color, s.type AS status_type,
                        p.name AS project_name, p.color_hex AS project_color,
-                       u.full_name AS creator_name
+                       u.full_name AS creator_name,
+                       (SELECT COUNT(*) FROM tasks sub WHERE sub.parent_id = t.id) AS subtask_count,
+                       (SELECT COUNT(*) FROM tasks sub JOIN statuses sub_s ON sub.status_id = sub_s.id WHERE sub.parent_id = t.id AND (sub_s.type = 'completed' OR sub.status_id = 3)) AS completed_subtask_count
                 FROM tasks t
                 JOIN statuses s ON t.status_id = s.id
                 JOIN users u ON t.created_by = u.id
@@ -27,6 +31,19 @@ class TaskController extends BaseController
                 WHERE 1=1";
 
         $params = [];
+
+        // Parent / Subtask Hierarchy Filtering
+        if ($parentIdParam !== null && $parentIdParam !== '') {
+            if ($parentIdParam === 'null' || $parentIdParam === '0') {
+                $sql .= " AND t.parent_id IS NULL";
+            } else {
+                $sql .= " AND t.parent_id = :parent_id";
+                $params['parent_id'] = (int)$parentIdParam;
+            }
+        } elseif (!$allLevels) {
+            // By default, list views and boards only show top-level (root) tasks
+            $sql .= " AND t.parent_id IS NULL";
+        }
 
         if ($workspaceId > 0) {
             $sql .= " AND t.workspace_id = :workspace_id";
@@ -111,8 +128,24 @@ class TaskController extends BaseController
         $title = $parsed['title'];
         $priority = $payload['priority'] ?? $parsed['priority'];
         $dueDate = $payload['due_date'] ?? $parsed['due_date'];
+        $parentId = !empty($payload['parent_id']) ? (int)$payload['parent_id'] : null;
 
         $workspaceId = !empty($payload['workspace_id']) ? (int)$payload['workspace_id'] : null;
+        $projectId = !empty($payload['project_id']) ? (int)$payload['project_id'] : null;
+
+        // If creating a subtask, inherit workspace and project from parent if not specified
+        if ($parentId) {
+            $parentTask = Database::fetchOne("SELECT workspace_id, project_id FROM tasks WHERE id = :p_id", ['p_id' => $parentId]);
+            if ($parentTask) {
+                if (!$workspaceId) {
+                    $workspaceId = (int)$parentTask['workspace_id'];
+                }
+                if ($projectId === null && !empty($parentTask['project_id'])) {
+                    $projectId = (int)$parentTask['project_id'];
+                }
+            }
+        }
+
         if (!$workspaceId) {
             // Find or use user's personal workspace
             $personalWs = Database::fetchOne(
@@ -125,7 +158,6 @@ class TaskController extends BaseController
             $workspaceId = $personalWs ? (int)$personalWs['id'] : 1;
         }
 
-        $projectId = !empty($payload['project_id']) ? (int)$payload['project_id'] : null;
         $statusId = !empty($payload['status_id']) ? (int)$payload['status_id'] : 1; // Default: To Do
         $description = $payload['description'] ?? null;
         $estimatedHours = !empty($payload['estimated_hours']) ? (float)$payload['estimated_hours'] : null;
@@ -140,10 +172,11 @@ class TaskController extends BaseController
 
         $taskId = Database::insertGetId(
             "INSERT INTO tasks (workspace_id, project_id, parent_id, status_id, title, description, priority, start_date, due_date, estimated_hours, position, created_by, created_at)
-             VALUES (:ws_id, :proj_id, NULL, :status_id, :title, :desc, :prio, :start_date, :due_date, :est, :pos, :created_by, NOW())",
+             VALUES (:ws_id, :proj_id, :parent_id, :status_id, :title, :desc, :prio, :start_date, :due_date, :est, :pos, :created_by, NOW())",
             [
                 'ws_id' => $workspaceId,
                 'proj_id' => $projectId,
+                'parent_id' => $parentId,
                 'status_id' => $statusId,
                 'title' => $title,
                 'desc' => $description,
@@ -191,11 +224,20 @@ class TaskController extends BaseController
         $fields = [];
         $params = ['id' => $id];
 
-        $updatable = ['title', 'description', 'status_id', 'priority', 'start_date', 'due_date', 'estimated_hours', 'position', 'project_id'];
+        $updatable = ['title', 'description', 'status_id', 'priority', 'start_date', 'due_date', 'estimated_hours', 'position', 'project_id', 'parent_id'];
         foreach ($updatable as $field) {
             if (array_key_exists($field, $payload)) {
-                $fields[] = "`{$field}` = :{$field}";
-                $params[$field] = $payload[$field];
+                if ($field === 'parent_id') {
+                    $pid = !empty($payload['parent_id']) ? (int)$payload['parent_id'] : null;
+                    if ($pid === $id) {
+                        continue; // Prevent self-parenting
+                    }
+                    $fields[] = "`parent_id` = :parent_id";
+                    $params['parent_id'] = $pid;
+                } else {
+                    $fields[] = "`{$field}` = :{$field}";
+                    $params[$field] = $payload[$field];
+                }
             }
         }
 
@@ -309,6 +351,18 @@ class TaskController extends BaseController
              WHERE tga.task_id = :id",
             ['id' => $id]
         );
+
+        $task['subtasks'] = Database::fetchAll(
+            "SELECT t.*, s.name AS status_name, s.color_hex AS status_color, s.type AS status_type
+             FROM tasks t
+             JOIN statuses s ON t.status_id = s.id
+             WHERE t.parent_id = :id
+             ORDER BY t.position ASC, t.id ASC",
+            ['id' => $id]
+        );
+
+        $task['subtask_count'] = count($task['subtasks']);
+        $task['completed_subtask_count'] = count(array_filter($task['subtasks'], fn($s) => ($s['status_type'] === 'completed' || $s['status_id'] == 3)));
 
         return $task;
     }

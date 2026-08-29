@@ -85,6 +85,49 @@ class ApiClient {
     delete(endpoint) {
         return this.request(endpoint, { method: 'DELETE' });
     }
+
+    async upload(endpoint, formData) {
+        const url = this.baseUrl + endpoint;
+        const headers = {
+            'Accept': 'application/json',
+        };
+
+        const token = this.getToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const config = {
+            method: 'POST',
+            body: formData,
+            headers,
+            credentials: 'same-origin',
+        };
+
+        try {
+            const response = await fetch(url, config);
+            let data = null;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                data = { message: await response.text() };
+            }
+
+            if (!response.ok) {
+                const errorMessage = (data && data.message) ? data.message : `HTTP Error ${response.status}`;
+                const error = new Error(errorMessage);
+                error.status = response.status;
+                error.data = data;
+                throw error;
+            }
+
+            return data;
+        } catch (err) {
+            console.error(`API Upload Error on [POST ${endpoint}]:`, err);
+            throw err;
+        }
+    }
 }
 
 export const api = new ApiClient();

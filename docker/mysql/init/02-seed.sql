@@ -84,10 +84,13 @@ INSERT IGNORE INTO `custom_field_values` (`task_id`, `custom_field_id`, `value_t
 (8, 1, 'Engineering', NULL, NULL, NULL),
 (8, 3, NULL, 5.0, NULL, NULL);
 
--- 12. Documents
-INSERT IGNORE INTO `documents` (`id`, `workspace_id`, `project_id`, `title`, `content`, `created_by`, `created_at`) VALUES
-(1, 2, 1, 'Mobile App Architecture Spec', '{"blocks":[{"type":"heading","level":1,"text":"Mobile App Architecture"},{"type":"paragraph","text":"Defines component structure, state management, and offline cache protocols."}]}', 1, NOW()),
-(2, 2, 2, 'API Security & Rate Limiting Guidelines', '{"blocks":[{"type":"heading","level":1,"text":"API Security Guidelines"},{"type":"paragraph","text":"Mandatory token inspection, CSRF validation, and strict prepared SQL statements."}]}', 1, NOW());
+-- 12. Documents & Task Attachments
+INSERT IGNORE INTO `documents` (`id`, `workspace_id`, `project_id`, `task_id`, `title`, `content`, `doc_type`, `file_path`, `file_name`, `original_name`, `file_size`, `mime_type`, `file_extension`, `created_by`, `created_at`) VALUES
+(1, 2, 1, 5, 'Mobile App Architecture Spec', '{"blocks":[{"type":"heading","level":1,"text":"Mobile App Architecture"},{"type":"paragraph","text":"Defines component structure, state management, and offline cache protocols."}]}', 'rich_text', NULL, NULL, NULL, NULL, NULL, NULL, 1, NOW()),
+(2, 2, 2, 7, 'API Security & Rate Limiting Guidelines', '{"blocks":[{"type":"heading","level":1,"text":"API Security Guidelines"},{"type":"paragraph","text":"Mandatory token inspection, CSRF validation, and strict prepared SQL statements."}]}', 'rich_text', NULL, NULL, NULL, NULL, NULL, NULL, 1, NOW()),
+(3, 2, 1, 5, 'Design System UI Wireframes.png', NULL, 'file', '/uploads/tasks/5/seed_design_wireframes.png', 'seed_design_wireframes.png', 'Design System UI Wireframes.png', 2458120, 'image/png', 'png', 1, NOW()),
+(4, 2, 1, 6, 'Sprint Backlog & User Flow.pdf', NULL, 'file', '/uploads/tasks/6/seed_sprint_backlog.pdf', 'seed_sprint_backlog.pdf', 'Sprint Backlog & User Flow.pdf', 1048576, 'application/pdf', 'pdf', 1, NOW()),
+(5, 2, 2, 7, 'Database Migration Architecture.pptx', NULL, 'file', '/uploads/tasks/7/seed_db_migration.pptx', 'seed_db_migration.pptx', 'Database Migration Architecture.pptx', 4194304, 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'pptx', 1, NOW());
 
 -- 13. Activity Logs
 INSERT IGNORE INTO `activity_logs` (`id`, `workspace_id`, `task_id`, `user_id`, `action`, `details`, `created_at`) VALUES

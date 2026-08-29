@@ -120,6 +120,9 @@ $router->group(['prefix' => '/api/v1', 'middleware' => [AuthMiddleware::class]],
     $r->delete('/tasks/{id:\d+}', [TaskController::class, 'destroy']);
     $r->post('/tasks/reorder', [TaskController::class, 'reorder']);
     $r->post('/tasks/batch', [TaskController::class, 'batch']);
+    $r->get('/tasks/{id:\d+}/documents', [DocumentController::class, 'taskDocuments']);
+    $r->post('/tasks/{id:\d+}/documents', [DocumentController::class, 'attachToTask']);
+    $r->delete('/tasks/{id:\d+}/documents/{docId:\d+}', [DocumentController::class, 'detachFromTask']);
 
     $r->get('/dependencies', [DependencyController::class, 'index']);
     $r->post('/dependencies', [DependencyController::class, 'store']);
@@ -131,12 +134,15 @@ $router->group(['prefix' => '/api/v1', 'middleware' => [AuthMiddleware::class]],
     $r->put('/tasks/{id:\d+}/custom-fields', [CustomFieldController::class, 'updateTaskValue']);
     $r->delete('/custom-fields/{id:\d+}', [CustomFieldController::class, 'destroy']);
 
-    // 6. Documents
+    // 6. Documents & File Attachments
     $r->get('/documents', [DocumentController::class, 'index']);
     $r->post('/documents', [DocumentController::class, 'store']);
+    $r->post('/documents/upload', [DocumentController::class, 'upload']);
     $r->get('/documents/{id:\d+}', [DocumentController::class, 'show']);
     $r->patch('/documents/{id:\d+}', [DocumentController::class, 'update']);
     $r->delete('/documents/{id:\d+}', [DocumentController::class, 'destroy']);
+    $r->get('/documents/{id:\d+}/download', [DocumentController::class, 'download']);
+    $r->get('/documents/{id:\d+}/preview', [DocumentController::class, 'preview']);
 
     // 7. Time Logs & Activity Logs
     $r->get('/time-logs', [TimeLogController::class, 'index']);

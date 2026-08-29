@@ -9,6 +9,7 @@ class Request
     private string $path;
     private array $queryParams;
     private array $bodyParams;
+    private array $files;
     private array $headers;
     private array $routeParams = [];
     private ?array $user = null;
@@ -21,6 +22,7 @@ class Request
         $this->queryParams = $_GET;
         $this->headers = $this->parseHeaders();
         $this->bodyParams = $this->parseBody();
+        $this->files = $this->parseFiles();
     }
 
     public static function createFromGlobals(): self
@@ -61,6 +63,47 @@ class Request
         return [];
     }
 
+    private function parseFiles(): array
+    {
+        $normalized = [];
+        if (empty($_FILES)) {
+            return $normalized;
+        }
+
+        foreach ($_FILES as $key => $fileInfo) {
+            if (is_array($fileInfo['name'])) {
+                $count = count($fileInfo['name']);
+                for ($i = 0; $i < $count; $i++) {
+                    if (empty($fileInfo['name'][$i]) || $fileInfo['error'][$i] === UPLOAD_ERR_NO_FILE) {
+                        continue;
+                    }
+                    $normalized[$key][] = [
+                        'name' => $fileInfo['name'][$i],
+                        'type' => $fileInfo['type'][$i] ?? 'application/octet-stream',
+                        'tmp_name' => $fileInfo['tmp_name'][$i],
+                        'error' => $fileInfo['error'][$i],
+                        'size' => $fileInfo['size'][$i],
+                        'extension' => strtolower(pathinfo($fileInfo['name'][$i], PATHINFO_EXTENSION)),
+                    ];
+                }
+            } else {
+                if (empty($fileInfo['name']) || $fileInfo['error'] === UPLOAD_ERR_NO_FILE) {
+                    continue;
+                }
+                $normalized[$key] = [
+                    'name' => $fileInfo['name'],
+                    'type' => $fileInfo['type'] ?? 'application/octet-stream',
+                    'tmp_name' => $fileInfo['tmp_name'],
+                    'error' => $fileInfo['error'],
+                    'size' => $fileInfo['size'],
+                    'extension' => strtolower(pathinfo($fileInfo['name'], PATHINFO_EXTENSION)),
+                ];
+            }
+        }
+
+        return $normalized;
+    }
+
     public function getMethod(): string
     {
         return $this->method;
@@ -87,6 +130,10 @@ class Request
         $auth = $this->header('authorization');
         if ($auth && preg_match('/Bearer\s+(\S+)/i', $auth, $matches)) {
             return $matches[1];
+        }
+        $queryToken = $this->get('token') ?: $this->get('auth_token');
+        if (!empty($queryToken) && is_scalar($queryToken)) {
+            return trim((string)$queryToken);
         }
         return null;
     }
@@ -150,6 +197,46 @@ class Request
     public function getJson(): array
     {
         return $this->bodyParams;
+    }
+
+    public function hasFile(string $key): bool
+    {
+        return !empty($this->files[$key]);
+    }
+
+    public function file(string $key): ?array
+    {
+        if (!isset($this->files[$key])) {
+            return null;
+        }
+        $f = $this->files[$key];
+        if (is_array($f) && isset($f[0]) && is_array($f[0])) {
+            return $f[0];
+        }
+        return is_array($f) && isset($f['name']) ? $f : null;
+    }
+
+    public function files(?string $key = null): array
+    {
+        if ($key === null) {
+            return $this->files;
+        }
+        if (!isset($this->files[$key])) {
+            return [];
+        }
+        $f = $this->files[$key];
+        if (is_array($f) && isset($f[0]) && is_array($f[0])) {
+            return $f;
+        }
+        if (is_array($f) && isset($f['name'])) {
+            return [$f];
+        }
+        return [];
+    }
+
+    public function setFiles(array $files): void
+    {
+        $this->files = $files;
     }
 
     public function setUser(?array $user): void

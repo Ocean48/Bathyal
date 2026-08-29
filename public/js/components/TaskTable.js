@@ -14,6 +14,8 @@ export class TaskTable {
         this.unsubscribe = null;
         this.tasks = [];
         this.customFields = [];
+        this.expandedTasks = new Set();
+        this.subtasksCache = new Map();
     }
 
     mount() {
@@ -35,6 +37,7 @@ export class TaskTable {
 
             this.tasks = tasksRes.data || [];
             this.customFields = fieldsRes.data || [];
+            await this.loadExpandedSubtasks();
             this.render();
         } catch (err) {
             this.container.innerHTML = `
@@ -43,6 +46,20 @@ export class TaskTable {
                     <div class="empty-state-desc">${this.escapeHtml(err.message || 'Please check connection')}</div>
                 </div>
             `;
+        }
+    }
+
+    async loadExpandedSubtasks() {
+        const promises = [];
+        for (const taskId of this.expandedTasks) {
+            promises.push(
+                api.get('/api/v1/tasks', { parent_id: taskId })
+                    .then(res => this.subtasksCache.set(taskId, res.data || []))
+                    .catch(() => this.subtasksCache.set(taskId, []))
+            );
+        }
+        if (promises.length > 0) {
+            await Promise.all(promises);
         }
     }
 
@@ -65,7 +82,9 @@ export class TaskTable {
 
         const rowsHtml = this.tasks.map(task => {
             const isCompleted = task.status_type === 'completed' || task.status_id == 3;
-            const prioClass = task.priority && task.priority !== 'none' ? `prio-${task.priority}` : 'prio-none';
+            const hasSubtasks = (task.subtask_count || 0) > 0;
+            const isExpanded = this.expandedTasks.has(task.id);
+            const cachedSubtasks = this.subtasksCache.get(task.id) || [];
 
             let startText = '';
             if (task.start_date) {
@@ -91,13 +110,19 @@ export class TaskTable {
                 `;
             }).join('');
 
-            return `
+            const parentRow = `
                 <tr class="table-tr ${isCompleted ? 'row-completed' : ''}" data-id="${task.id}">
                     <td class="table-td" style="width: 40px; text-align: center;">
                         <input type="checkbox" class="table-row-chk" data-id="${task.id}" ${isCompleted ? 'checked' : ''} />
                     </td>
-                    <td class="table-td cell-title" data-id="${task.id}" style="font-weight: 500; cursor: pointer;">
-                        ${this.escapeHtml(task.title)}
+                    <td class="table-td cell-title" data-id="${task.id}" style="font-weight: 500;">
+                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                            <button class="btn-tree-toggle ${hasSubtasks ? 'has-subtasks' : ''} ${isExpanded ? 'expanded' : ''}" data-id="${task.id}" title="${hasSubtasks ? 'Toggle subtasks' : 'Add subtask'}">
+                                ${hasSubtasks ? '❯' : '·'}
+                            </button>
+                            <span class="table-title-text">${this.escapeHtml(task.title)}</span>
+                            ${hasSubtasks ? `<span class="badge-subtasks-count">${task.completed_subtask_count || 0}/${task.subtask_count}</span>` : ''}
+                        </div>
                     </td>
                     <td class="table-td">
                         <select class="field-inline-select table-status-select" data-id="${task.id}">
@@ -130,6 +155,58 @@ export class TaskTable {
                     </td>
                 </tr>
             `;
+
+            const subRows = isExpanded ? cachedSubtasks.map(sub => {
+                const subCompleted = sub.status_type === 'completed' || sub.status_id == 3;
+                let subDueText = '';
+                if (sub.due_date) {
+                    const d = new Date(sub.due_date);
+                    subDueText = d.toISOString().split('T')[0];
+                }
+
+                return `
+                    <tr class="table-tr subtask-table-row ${subCompleted ? 'row-completed' : ''}" data-id="${sub.id}" data-parent-id="${task.id}">
+                        <td class="table-td" style="width: 40px; text-align: center;">
+                            <input type="checkbox" class="table-row-chk" data-id="${sub.id}" ${subCompleted ? 'checked' : ''} />
+                        </td>
+                        <td class="table-td cell-title subtask-table-cell" data-id="${sub.id}">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; padding-left: 1.5rem;">
+                                <span style="color: var(--text-subtle); font-size: 0.75rem;">└─</span>
+                                <span>${this.escapeHtml(sub.title)}</span>
+                            </div>
+                        </td>
+                        <td class="table-td">
+                            <select class="field-inline-select table-status-select" data-id="${sub.id}">
+                                <option value="1" ${sub.status_id == 1 ? 'selected' : ''}>To Do</option>
+                                <option value="2" ${sub.status_id == 2 ? 'selected' : ''}>In Progress</option>
+                                <option value="3" ${sub.status_id == 3 ? 'selected' : ''}>Completed</option>
+                            </select>
+                        </td>
+                        <td class="table-td">
+                            <select class="field-inline-select table-prio-select" data-id="${sub.id}">
+                                <option value="none" ${sub.priority === 'none' ? 'selected' : ''}>None</option>
+                                <option value="low" ${sub.priority === 'low' ? 'selected' : ''}>Low</option>
+                                <option value="medium" ${sub.priority === 'medium' ? 'selected' : ''}>Medium</option>
+                                <option value="high" ${sub.priority === 'high' ? 'selected' : ''}>High</option>
+                                <option value="urgent" ${sub.priority === 'urgent' ? 'selected' : ''}>Urgent</option>
+                            </select>
+                        </td>
+                        <td class="table-td"></td>
+                        <td class="table-td">
+                            <input type="date" class="field-inline-input table-date-input" data-id="${sub.id}" value="${subDueText}" title="Due Date" />
+                        </td>
+                        <td class="table-td">
+                            <input type="number" step="0.5" class="field-inline-input table-hours-input" data-id="${sub.id}" value="${sub.estimated_hours || ''}" placeholder="-" style="width: 70px;" />
+                        </td>
+                        ${this.customFields.map(() => '<td class="table-td"></td>').join('')}
+                        <td class="table-td" style="width: 50px; text-align: right;">
+                            <button class="btn-icon btn-ghost btn-sm table-del-btn" data-id="${sub.id}" title="Delete subtask">✕</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('') : '';
+
+            return parentRow + subRows;
         }).join('');
 
         this.container.innerHTML = `
@@ -153,7 +230,7 @@ export class TaskTable {
                     </tbody>
                     <tfoot>
                         <tr class="table-tfoot-row">
-                            <td colspan="2" class="table-td" style="font-weight: 600;">Total: ${this.tasks.length} tasks</td>
+                            <td colspan="2" class="table-td" style="font-weight: 600;">Total: ${this.tasks.length} parent tasks</td>
                             <td class="table-td"></td>
                             <td class="table-td"></td>
                             <td class="table-td"></td>
@@ -171,11 +248,44 @@ export class TaskTable {
     }
 
     bindEvents() {
+        // Toggle Tree Expand/Collapse
+        this.container.querySelectorAll('.btn-tree-toggle').forEach(btn => {
+            btn.onclick = async (e) => {
+                e.stopPropagation();
+                const taskId = parseInt(btn.dataset.id, 10);
+                if (this.expandedTasks.has(taskId)) {
+                    this.expandedTasks.delete(taskId);
+                } else {
+                    this.expandedTasks.add(taskId);
+                    try {
+                        const res = await api.get('/api/v1/tasks', { parent_id: taskId });
+                        this.subtasksCache.set(taskId, res.data || []);
+                    } catch (err) {
+                        this.subtasksCache.set(taskId, []);
+                    }
+                }
+                this.render();
+            };
+        });
+
         // Row Title Click to Open Drawer
-        this.container.querySelectorAll('.cell-title').forEach(cell => {
+        this.container.querySelectorAll('.table-title-text').forEach(span => {
+            span.onclick = () => {
+                const tr = span.closest('.table-tr');
+                if (tr) {
+                    const taskId = tr.dataset.id;
+                    const task = this.tasks.find(t => t.id == taskId);
+                    if (task) eventBus.emit('task:open-drawer', task);
+                }
+            };
+        });
+
+        this.container.querySelectorAll('.subtask-table-cell').forEach(cell => {
             cell.onclick = () => {
-                const task = this.tasks.find(t => t.id == cell.dataset.id);
-                if (task) eventBus.emit('task:open-drawer', task);
+                const subId = cell.dataset.id;
+                api.get(`/api/v1/tasks/${subId}`).then(res => {
+                    if (res.data) eventBus.emit('task:open-drawer', res.data);
+                });
             };
         });
 
@@ -188,6 +298,7 @@ export class TaskTable {
                     await api.patch(`/api/v1/tasks/${taskId}`, { status_id: newStatus });
                     toast.success('Task status updated');
                     this.loadData();
+                    eventBus.emit('task:created');
                 } catch (err) {
                     toast.error('Failed to update status');
                 }
@@ -202,6 +313,7 @@ export class TaskTable {
                     await api.patch(`/api/v1/tasks/${taskId}`, { status_id: parseInt(sel.value, 10) });
                     toast.success('Status updated');
                     this.loadData();
+                    eventBus.emit('task:created');
                 } catch (err) {
                     toast.error('Failed to update status');
                 }
@@ -230,6 +342,7 @@ export class TaskTable {
                         start_date: input.value ? `${input.value} 00:00:00` : null
                     });
                     toast.success('Start date updated');
+                    eventBus.emit('task:created');
                 } catch (err) {
                     toast.error('Failed to update start date');
                 }
@@ -245,6 +358,7 @@ export class TaskTable {
                         due_date: input.value ? `${input.value} 23:59:59` : null
                     });
                     toast.success('Due date updated');
+                    eventBus.emit('task:created');
                 } catch (err) {
                     toast.error('Failed to update date');
                 }
@@ -260,6 +374,7 @@ export class TaskTable {
                         estimated_hours: input.value ? parseFloat(input.value) : null
                     });
                     toast.success('Hours updated');
+                    eventBus.emit('task:created');
                 } catch (err) {
                     toast.error('Failed to update hours');
                 }
@@ -275,6 +390,7 @@ export class TaskTable {
                     await api.delete(`/api/v1/tasks/${taskId}`);
                     toast.info('Task deleted');
                     this.loadData();
+                    eventBus.emit('task:created');
                 } catch (err) {
                     toast.error('Failed to delete task');
                 }

@@ -63,10 +63,24 @@ export class KanbanBoard {
                     dueText = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
                 }
 
+                const hasSubtasks = (task.subtask_count || 0) > 0;
+                const subPct = hasSubtasks ? Math.round(((task.completed_subtask_count || 0) / task.subtask_count) * 100) : 0;
+
                 return `
                     <div class="kanban-card enterprise-card" draggable="true" data-id="${task.id}">
                         <div class="kanban-card-title">${this.escapeHtml(task.title)}</div>
                         ${task.description ? `<div class="kanban-card-desc">${this.escapeHtml(task.description.substring(0, 80))}${task.description.length > 80 ? '...' : ''}</div>` : ''}
+                        ${hasSubtasks ? `
+                            <div class="kanban-card-subtasks" title="${task.completed_subtask_count || 0} of ${task.subtask_count} subtasks completed">
+                                <div class="kanban-subtask-bar">
+                                    <div class="kanban-subtask-progress" style="width: ${subPct}%;"></div>
+                                </div>
+                                <span class="kanban-subtask-label">
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                    ${task.completed_subtask_count || 0}/${task.subtask_count}
+                                </span>
+                            </div>
+                        ` : ''}
                         <div class="kanban-card-meta">
                             ${task.project_name ? `<span class="badge-tag" style="background-color: ${task.project_color}20; color: ${task.project_color};">${this.escapeHtml(task.project_name)}</span>` : ''}
                             ${renderPriorityBadge(task.priority)}

@@ -25,9 +25,15 @@ class Config
                     [$key, $value] = explode('=', $line, 2);
                     $key = trim($key);
                     $value = trim($value, " \t\n\r\0\x0B\"'");
-                    putenv("{$key}={$value}");
-                    $_ENV[$key] = $value;
-                    $_SERVER[$key] = $value;
+                    if (getenv($key) === false) {
+                        putenv("{$key}={$value}");
+                    }
+                    if (!isset($_ENV[$key])) {
+                        $_ENV[$key] = $value;
+                    }
+                    if (!isset($_SERVER[$key])) {
+                        $_SERVER[$key] = $value;
+                    }
                 }
             }
         }

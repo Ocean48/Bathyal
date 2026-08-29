@@ -14,6 +14,8 @@ export class SimpleTaskList {
         this.container = container;
         this.unsubscribe = null;
         this.tasks = [];
+        this.expandedSubtasks = new Set();
+        this.subtasksCache = new Map();
     }
 
     mount() {
@@ -34,6 +36,7 @@ export class SimpleTaskList {
 
             const res = await api.get('/api/v1/tasks', params);
             this.tasks = res.data || [];
+            await this.loadExpandedSubtasks();
             this.render();
         } catch (err) {
             this.container.innerHTML = `
@@ -45,6 +48,20 @@ export class SimpleTaskList {
             `;
             const retryBtn = this.container.querySelector('#btn-retry-tasks');
             if (retryBtn) retryBtn.onclick = () => this.loadTasks();
+        }
+    }
+
+    async loadExpandedSubtasks() {
+        const promises = [];
+        for (const taskId of this.expandedSubtasks) {
+            promises.push(
+                api.get('/api/v1/tasks', { parent_id: taskId })
+                    .then(res => this.subtasksCache.set(taskId, res.data || []))
+                    .catch(() => this.subtasksCache.set(taskId, []))
+            );
+        }
+        if (promises.length > 0) {
+            await Promise.all(promises);
         }
     }
 
@@ -65,6 +82,9 @@ export class SimpleTaskList {
 
         const itemsHtml = this.tasks.map(task => {
             const isCompleted = task.status_type === 'completed' || task.status_id == 3;
+            const hasSubtasks = (task.subtask_count || 0) > 0;
+            const isExpanded = this.expandedSubtasks.has(task.id);
+            const cachedSubtasks = this.subtasksCache.get(task.id) || [];
 
             let dueText = '';
             if (task.due_date) {
@@ -72,29 +92,56 @@ export class SimpleTaskList {
                 dueText = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
             }
 
+            const subtasksHtml = isExpanded ? `
+                <div class="task-subtasks-wrapper" data-parent-id="${task.id}">
+                    <div class="task-subtasks-list">
+                        ${cachedSubtasks.map(sub => {
+                            const subCompleted = sub.status_type === 'completed' || sub.status_id == 3;
+                            return `
+                                <div class="task-subtask-item ${subCompleted ? 'completed' : ''}" data-id="${sub.id}">
+                                    <input type="checkbox" class="subtask-inline-chk" data-id="${sub.id}" data-parent-id="${task.id}" ${subCompleted ? 'checked' : ''} />
+                                    <span class="subtask-inline-title" data-id="${sub.id}">${this.escapeHtml(sub.title)}</span>
+                                    <button class="btn-icon btn-ghost btn-sm subtask-inline-del" data-id="${sub.id}" data-parent-id="${task.id}">✕</button>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    <div class="task-subtask-add-box">
+                        <input type="text" class="quick-add-input task-subtask-input" data-parent-id="${task.id}" placeholder="+ Add a subtask and press Enter..." />
+                    </div>
+                </div>
+            ` : '';
+
             return `
-                <div class="task-item ${isCompleted ? 'completed' : ''}" data-id="${task.id}">
-                    <div class="task-item-left">
-                        <button class="task-checkbox" data-id="${task.id}" title="${isCompleted ? 'Mark incomplete' : 'Mark complete'}">
-                            ${isCompleted ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
-                        </button>
-                        <div class="task-info">
-                            <span class="task-title" data-id="${task.id}">${this.escapeHtml(task.title)}</span>
-                            <div class="task-meta">
-                                ${task.project_name ? `<span class="badge-tag" style="background-color: ${task.project_color}20; color: ${task.project_color};">${this.escapeHtml(task.project_name)}</span>` : ''}
-                                ${renderPriorityBadge(task.priority)}
-                                ${dueText ? `<span>Due ${dueText}</span>` : ''}
+                <div class="task-group-container" data-id="${task.id}">
+                    <div class="task-item ${isCompleted ? 'completed' : ''}" data-id="${task.id}">
+                        <div class="task-item-left">
+                            <button class="task-checkbox" data-id="${task.id}" title="${isCompleted ? 'Mark incomplete' : 'Mark complete'}">
+                                ${isCompleted ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
+                            </button>
+                            <div class="task-info">
+                                <span class="task-title" data-id="${task.id}">${this.escapeHtml(task.title)}</span>
+                                <div class="task-meta">
+                                    ${task.project_name ? `<span class="badge-tag" style="background-color: ${task.project_color}20; color: ${task.project_color};">${this.escapeHtml(task.project_name)}</span>` : ''}
+                                    ${renderPriorityBadge(task.priority)}
+                                    ${dueText ? `<span>Due ${dueText}</span>` : ''}
+                                    <button class="badge-subtasks-toggle ${hasSubtasks ? 'has-subtasks' : ''} ${isExpanded ? 'active' : ''}" data-id="${task.id}" title="Toggle subtasks">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                        <span>${task.completed_subtask_count || 0}/${task.subtask_count || 0}</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
+                        <div class="task-item-right">
+                            <button class="btn-icon btn-ghost btn-delete-task" data-id="${task.id}" title="Delete task">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
-                    <div class="task-item-right">
-                        <button class="btn-icon btn-ghost btn-delete-task" data-id="${task.id}" title="Delete task">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            </svg>
-                        </button>
-                    </div>
+                    ${subtasksHtml}
                 </div>
             `;
         }).join('');
@@ -120,6 +167,91 @@ export class SimpleTaskList {
                     this.loadTasks();
                 } catch (err) {
                     toast.error(err.message || 'Failed to update status');
+                }
+            };
+        });
+
+        // Toggle Subtask Expansion Badge
+        this.container.querySelectorAll('.badge-subtasks-toggle').forEach(badge => {
+            badge.onclick = async (e) => {
+                e.stopPropagation();
+                const taskId = parseInt(badge.dataset.id, 10);
+                if (this.expandedSubtasks.has(taskId)) {
+                    this.expandedSubtasks.delete(taskId);
+                } else {
+                    this.expandedSubtasks.add(taskId);
+                    try {
+                        const res = await api.get('/api/v1/tasks', { parent_id: taskId });
+                        this.subtasksCache.set(taskId, res.data || []);
+                    } catch (e) {
+                        this.subtasksCache.set(taskId, []);
+                    }
+                }
+                this.render();
+            };
+        });
+
+        // Inline Subtask Add Input
+        this.container.querySelectorAll('.task-subtask-input').forEach(input => {
+            input.onkeydown = async (e) => {
+                if (e.key === 'Enter' && input.value.trim()) {
+                    const text = input.value.trim();
+                    const parentId = parseInt(input.dataset.parentId, 10);
+                    input.value = '';
+                    input.disabled = true;
+
+                    try {
+                        await api.post('/api/v1/tasks', {
+                            title: text,
+                            parent_id: parentId,
+                        });
+                        toast.success('Subtask created');
+                        const res = await api.get('/api/v1/tasks', { parent_id: parentId });
+                        this.subtasksCache.set(parentId, res.data || []);
+                        this.loadTasks();
+                        eventBus.emit('task:created');
+                    } catch (err) {
+                        toast.error(err.message || 'Failed to create subtask');
+                        input.disabled = false;
+                    }
+                }
+            };
+        });
+
+        // Inline Subtask Checkbox
+        this.container.querySelectorAll('.subtask-inline-chk').forEach(chk => {
+            chk.onchange = async () => {
+                const subId = chk.dataset.id;
+                const parentId = parseInt(chk.dataset.parentId, 10);
+                const newStatus = chk.checked ? 3 : 1;
+
+                try {
+                    await api.patch(`/api/v1/tasks/${subId}`, { status_id: newStatus });
+                    const res = await api.get('/api/v1/tasks', { parent_id: parentId });
+                    this.subtasksCache.set(parentId, res.data || []);
+                    this.loadTasks();
+                    eventBus.emit('task:created');
+                } catch (err) {
+                    toast.error('Failed to update subtask');
+                }
+            };
+        });
+
+        // Inline Subtask Delete
+        this.container.querySelectorAll('.subtask-inline-del').forEach(btn => {
+            btn.onclick = async () => {
+                const subId = btn.dataset.id;
+                const parentId = parseInt(btn.dataset.parentId, 10);
+
+                try {
+                    await api.delete(`/api/v1/tasks/${subId}`);
+                    toast.info('Subtask deleted');
+                    const res = await api.get('/api/v1/tasks', { parent_id: parentId });
+                    this.subtasksCache.set(parentId, res.data || []);
+                    this.loadTasks();
+                    eventBus.emit('task:created');
+                } catch (err) {
+                    toast.error('Failed to delete subtask');
                 }
             };
         });
@@ -158,10 +290,11 @@ export class SimpleTaskList {
             };
         });
 
-        // Click task meta or info to open side drawer
+        // Click task meta to open side drawer
         this.container.querySelectorAll('.task-meta').forEach(meta => {
             meta.style.cursor = 'pointer';
             meta.onclick = (e) => {
+                if (e.target.closest('.badge-subtasks-toggle')) return;
                 e.stopPropagation();
                 const item = meta.closest('.task-item');
                 if (item) {

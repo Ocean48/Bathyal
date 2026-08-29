@@ -11,6 +11,8 @@ export class TaskDetailDrawer {
         this.isOpen = false;
         this.task = null;
         this.subtasks = [];
+        this.documents = [];
+        this.availableDocs = [];
         this.customFields = [];
         this.container = null;
         this.backdrop = null;
@@ -40,17 +42,19 @@ export class TaskDetailDrawer {
 
     async loadDetails() {
         try {
-            const [taskRes, customFieldsRes] = await Promise.all([
+            const [taskRes, customFieldsRes, subtasksRes, docsRes, allDocsRes] = await Promise.all([
                 api.get(`/api/v1/tasks/${this.task.id}`),
-                api.get(`/api/v1/custom-fields`, { workspace_id: this.task.workspace_id, project_id: this.task.project_id || '' })
+                api.get(`/api/v1/custom-fields`, { workspace_id: this.task.workspace_id, project_id: this.task.project_id || '' }),
+                api.get('/api/v1/tasks', { workspace_id: this.task.workspace_id, parent_id: this.task.id }),
+                api.get(`/api/v1/tasks/${this.task.id}/documents`),
+                api.get('/api/v1/documents', { workspace_id: this.task.workspace_id })
             ]);
 
             this.task = taskRes.data || this.task;
             this.customFields = customFieldsRes.data || [];
-            
-            // Load subtasks
-            const subtasksRes = await api.get('/api/v1/tasks', { workspace_id: this.task.workspace_id, parent_id: this.task.id });
-            this.subtasks = subtasksRes.data || [];
+            this.subtasks = subtasksRes.data || (this.task.subtasks || []);
+            this.documents = docsRes.data || [];
+            this.availableDocs = (allDocsRes.data || []).filter(d => !d.task_id || d.task_id != this.task.id);
 
             this.renderDrawerContent();
         } catch (err) {
@@ -100,6 +104,45 @@ export class TaskDetailDrawer {
         const totalSub = this.subtasks.length;
         const completedSub = this.subtasks.filter(s => s.status_type === 'completed' || s.status_id == 3).length;
         const progressPct = totalSub > 0 ? Math.round((completedSub / totalSub) * 100) : 0;
+
+        // Render attachments list
+        const docsHtml = this.documents.map(doc => {
+            const isFile = doc.doc_type === 'file';
+            const isImg = isFile && (doc.mime_type?.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(doc.file_extension));
+            const sizeStr = doc.file_size ? this.formatFileSize(doc.file_size) : '';
+            const extBadge = (doc.file_extension || (isFile ? 'file' : 'doc')).toUpperCase();
+
+            let iconOrThumb = '';
+            if (isImg && doc.file_path) {
+                iconOrThumb = `<img src="${doc.file_path}" alt="${this.escapeHtml(doc.title)}" class="attachment-thumb" />`;
+            } else {
+                iconOrThumb = `<div class="attachment-type-badge badge-${extBadge.toLowerCase()}">${extBadge}</div>`;
+            }
+
+            return `
+                <div class="attachment-card" data-id="${doc.id}">
+                    <div class="attachment-card-left">
+                        ${iconOrThumb}
+                        <div class="attachment-info">
+                            <div class="attachment-title" title="${this.escapeHtml(doc.title)}">${this.escapeHtml(doc.title)}</div>
+                            <div class="attachment-meta">
+                                <span>${sizeStr ? sizeStr + ' • ' : ''}${doc.author_name ? this.escapeHtml(doc.author_name) : 'User'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="attachment-actions">
+                        ${isFile ? `<a href="${this.getDownloadUrl(doc.id)}" target="_blank" class="btn btn-icon btn-ghost btn-sm" title="Download Document">↓</a>` : ''}
+                        <button class="btn btn-icon btn-ghost btn-sm drawer-doc-preview-btn" data-id="${doc.id}" title="Preview Document">👁</button>
+                        <button class="btn btn-icon btn-ghost btn-sm drawer-doc-detach-btn" data-id="${doc.id}" title="Detach Document">✕</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Options for linking existing docs
+        const linkDocOptions = this.availableDocs.map(d => `
+            <option value="${d.id}">${this.escapeHtml(d.title)} (${d.doc_type === 'file' ? (d.file_extension || 'file').toUpperCase() : 'Doc'})</option>
+        `).join('');
 
         mount.innerHTML = `
             <!-- Title & Status -->
@@ -152,6 +195,41 @@ export class TaskDetailDrawer {
                 <textarea class="drawer-description-input" id="drawer-description" placeholder="Add detailed notes or requirements...">${this.escapeHtml(this.task.description || '')}</textarea>
             </div>
 
+            <!-- Documents & Attachments Section -->
+            <div class="drawer-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <div class="drawer-section-title" style="margin-bottom: 0;">Documents &amp; Attachments (${this.documents.length})</div>
+                    <label class="btn btn-sm btn-primary" for="drawer-file-picker-input" style="cursor: pointer; margin: 0;">
+                        + Upload
+                    </label>
+                    <input type="file" id="drawer-file-picker-input" multiple style="display: none;" accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.zip" />
+                </div>
+
+                <!-- Drag-and-drop Dropzone -->
+                <div class="attachment-dropzone" id="drawer-upload-dropzone">
+                    <div class="dropzone-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    </div>
+                    <div class="dropzone-text">Drop images, PDFs, Word, PowerPoint, or docs here to attach</div>
+                </div>
+
+                <!-- Attached Documents List -->
+                <div class="attachment-list" id="drawer-attachment-list">
+                    ${docsHtml || '<div style="font-size: 0.8rem; color: var(--text-muted); padding: 0.5rem 0;">No documents attached yet.</div>'}
+                </div>
+
+                <!-- Link Existing Doc Selector -->
+                ${this.availableDocs.length > 0 ? `
+                    <div class="link-doc-row" style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+                        <select class="field-inline-select" id="drawer-link-doc-select" style="flex: 1;">
+                            <option value="">-- Link Existing Workspace Document --</option>
+                            ${linkDocOptions}
+                        </select>
+                        <button class="btn btn-sm btn-secondary" id="drawer-link-doc-btn">Link</button>
+                    </div>
+                ` : ''}
+            </div>
+
             <!-- Subtask Checklist -->
             <div class="drawer-section">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
@@ -198,11 +276,14 @@ export class TaskDetailDrawer {
         const estimateInput = this.backdrop.querySelector('#drawer-estimate-hours');
         const toggleCompleteBtn = this.backdrop.querySelector('#drawer-toggle-complete');
         const newSubtaskInput = this.backdrop.querySelector('#drawer-new-subtask-input');
+        const filePicker = this.backdrop.querySelector('#drawer-file-picker-input');
+        const dropzone = this.backdrop.querySelector('#drawer-upload-dropzone');
+        const linkDocBtn = this.backdrop.querySelector('#drawer-link-doc-btn');
+        const linkDocSelect = this.backdrop.querySelector('#drawer-link-doc-select');
 
         const autoSave = async () => {
             const formatForDb = (val) => {
                 if (!val) return null;
-                // Convert 'YYYY-MM-DDTHH:MM' or 'YYYY-MM-DD' to 'YYYY-MM-DD HH:MM:SS'
                 const clean = val.replace('T', ' ');
                 return clean.length === 16 ? `${clean}:00` : (clean.length === 10 ? `${clean} 00:00:00` : clean);
             };
@@ -245,6 +326,104 @@ export class TaskDetailDrawer {
             };
         }
 
+        // File Upload Handler
+        const handleFiles = async (fileList) => {
+            if (!fileList || fileList.length === 0) return;
+
+            const formData = new FormData();
+            formData.append('task_id', this.task.id);
+            formData.append('workspace_id', this.task.workspace_id);
+            if (this.task.project_id) {
+                formData.append('project_id', this.task.project_id);
+            }
+
+            for (let i = 0; i < fileList.length; i++) {
+                formData.append('files[]', fileList[i]);
+            }
+
+            try {
+                toast.info('Uploading document(s)...');
+                await api.upload('/api/v1/documents/upload', formData);
+                toast.success('Document(s) uploaded and attached');
+                this.loadDetails();
+                eventBus.emit('document:updated');
+            } catch (err) {
+                toast.error(err.message || 'Upload failed');
+            }
+        };
+
+        if (filePicker) {
+            filePicker.onchange = (e) => {
+                handleFiles(e.target.files);
+                filePicker.value = '';
+            };
+        }
+
+        if (dropzone) {
+            dropzone.onclick = () => filePicker?.click();
+            dropzone.ondragover = (e) => {
+                e.preventDefault();
+                dropzone.classList.add('drag-active');
+            };
+            dropzone.ondragleave = () => {
+                dropzone.classList.remove('drag-active');
+            };
+            dropzone.ondrop = (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('drag-active');
+                if (e.dataTransfer?.files?.length) {
+                    handleFiles(e.dataTransfer.files);
+                }
+            };
+        }
+
+        // Link Existing Doc
+        if (linkDocBtn && linkDocSelect) {
+            linkDocBtn.onclick = async () => {
+                const docId = parseInt(linkDocSelect.value, 10);
+                if (!docId) {
+                    toast.error('Please select a document to link');
+                    return;
+                }
+                try {
+                    await api.post(`/api/v1/tasks/${this.task.id}/documents`, { document_id: docId });
+                    toast.success('Document linked to task');
+                    this.loadDetails();
+                    eventBus.emit('document:updated');
+                } catch (err) {
+                    toast.error('Failed to link document');
+                }
+            };
+        }
+
+        // Detach Document
+        this.backdrop.querySelectorAll('.drawer-doc-detach-btn').forEach(btn => {
+            btn.onclick = async (e) => {
+                e.stopPropagation();
+                const docId = btn.dataset.id;
+                try {
+                    await api.delete(`/api/v1/tasks/${this.task.id}/documents/${docId}`);
+                    toast.info('Document detached from task');
+                    this.loadDetails();
+                    eventBus.emit('document:updated');
+                } catch (err) {
+                    toast.error('Failed to detach document');
+                }
+            };
+        });
+
+        // Preview Document Modal
+        this.backdrop.querySelectorAll('.drawer-doc-preview-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const docId = parseInt(btn.dataset.id, 10);
+                const doc = this.documents.find(d => d.id === docId);
+                if (doc) {
+                    this.showDocumentPreviewModal(doc);
+                }
+            };
+        });
+
         // Subtask Create
         if (newSubtaskInput) {
             newSubtaskInput.onkeydown = async (e) => {
@@ -260,6 +439,7 @@ export class TaskDetailDrawer {
                         });
                         toast.success('Subtask added');
                         this.loadDetails();
+                        eventBus.emit('task:created');
                     } catch (err) {
                         toast.error('Failed to add subtask');
                     }
@@ -275,6 +455,7 @@ export class TaskDetailDrawer {
                 try {
                     await api.patch(`/api/v1/tasks/${subId}`, { status_id: newStatus });
                     this.loadDetails();
+                    eventBus.emit('task:created');
                 } catch (err) {
                     toast.error('Failed to update subtask');
                 }
@@ -289,6 +470,7 @@ export class TaskDetailDrawer {
                     await api.delete(`/api/v1/tasks/${subId}`);
                     toast.info('Subtask deleted');
                     this.loadDetails();
+                    eventBus.emit('task:created');
                 } catch (err) {
                     toast.error('Failed to delete subtask');
                 }
@@ -335,6 +517,99 @@ export class TaskDetailDrawer {
                 }
             };
         }
+    }
+
+    showDocumentPreviewModal(doc) {
+        const modalBackdrop = document.createElement('div');
+        modalBackdrop.className = 'modal-backdrop';
+        modalBackdrop.style.zIndex = '99999';
+
+        const isFile = doc.doc_type === 'file';
+        const ext = (doc.file_extension || '').toLowerCase();
+        const isImage = isFile && (doc.mime_type?.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext));
+        const isPdf = isFile && (doc.mime_type === 'application/pdf' || ext === 'pdf');
+
+        let previewBody = '';
+        if (isImage) {
+            previewBody = `
+                <div style="text-align: center; max-height: 70vh; overflow: auto;">
+                    <img src="${doc.file_path}" alt="${this.escapeHtml(doc.title)}" style="max-width: 100%; border-radius: var(--radius-md); box-shadow: var(--shadow-md);" />
+                </div>
+            `;
+        } else if (isPdf) {
+            previewBody = `
+                <div style="height: 70vh;">
+                    <iframe src="${doc.file_path}" style="width: 100%; height: 100%; border: none; border-radius: var(--radius-md);"></iframe>
+                </div>
+            `;
+        } else if (isFile) {
+            previewBody = `
+                <div class="doc-file-showcase" style="padding: 2rem; text-align: center;">
+                    <div class="attachment-type-badge badge-${ext}" style="font-size: 1.5rem; width: 64px; height: 64px; margin: 0 auto 1rem; border-radius: 12px; display: flex; align-items: center; justify-content: center;">${ext.toUpperCase()}</div>
+                    <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem;">${this.escapeHtml(doc.title)}</div>
+                    <div style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">${doc.file_size ? this.formatFileSize(doc.file_size) : ''} • ${doc.mime_type || 'Document file'}</div>
+                    <a href="${this.getDownloadUrl(doc.id)}" target="_blank" class="btn btn-primary">Download ${ext.toUpperCase()} Document</a>
+                </div>
+            `;
+        } else {
+            let contentText = '';
+            try {
+                const parsed = typeof doc.content === 'string' ? JSON.parse(doc.content) : doc.content;
+                if (parsed?.blocks) {
+                    contentText = parsed.blocks.map(b => `<p>${this.escapeHtml(b.text || '')}</p>`).join('');
+                } else {
+                    contentText = this.escapeHtml(String(doc.content || ''));
+                }
+            } catch (e) {
+                contentText = this.escapeHtml(String(doc.content || ''));
+            }
+
+            previewBody = `
+                <div style="max-height: 60vh; overflow-y: auto; padding: 1rem; background: var(--bg-surface); border-radius: var(--radius-md); line-height: 1.6;">
+                    ${contentText}
+                </div>
+            `;
+        }
+
+        modalBackdrop.innerHTML = `
+            <div class="modal-dialog" style="max-width: 800px; width: 90%;">
+                <div class="modal-header">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-weight: 600;">${this.escapeHtml(doc.title)}</span>
+                    </div>
+                    <button class="btn btn-icon btn-ghost" id="preview-modal-close">✕</button>
+                </div>
+                <div class="modal-body">
+                    ${previewBody}
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+                    ${isFile ? `<a href="${this.getDownloadUrl(doc.id)}" target="_blank" class="btn btn-secondary btn-sm">Download</a>` : ''}
+                    <button class="btn btn-primary btn-sm" id="preview-modal-ok">Close</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modalBackdrop);
+
+        const close = () => modalBackdrop.remove();
+        modalBackdrop.querySelector('#preview-modal-close').onclick = close;
+        modalBackdrop.querySelector('#preview-modal-ok').onclick = close;
+        modalBackdrop.onclick = (e) => {
+            if (e.target === modalBackdrop) close();
+        };
+    }
+
+    formatFileSize(bytes) {
+        if (!bytes || bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    getDownloadUrl(docId) {
+        const token = api.getToken();
+        return `/api/v1/documents/${docId}/download${token ? `?token=${encodeURIComponent(token)}` : ''}`;
     }
 
     formatForInput(val) {
