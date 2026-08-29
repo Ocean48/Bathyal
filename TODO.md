@@ -2,7 +2,7 @@
 
 This document outlines the comprehensive, modular implementation roadmap for the Bathyal project management system based on the architectural specifications defined in `PLAN.md`.
 
-To ensure the platform scales effortlessly from a lightweight daily task tracker (Simple Mode) to a massive, extensible enterprise work operating system (Enterprise Mode), the entire architecture follows a **Modular Control and Plugin-Driven Design** across both the backend PHP engine and the frontend vanilla JavaScript component registry.
+To ensure the platform scales effortlessly from a lightweight daily task tracker (Simple Mode) to a massive, extensible enterprise work operating system (Enterprise Mode), the entire architecture follows a **Modular Control and Plugin-Driven Design** across both the backend PHP engine and the frontend hybrid JavaScript component registry.
 
 ---
 
@@ -17,8 +17,8 @@ To ensure the platform scales effortlessly from a lightweight daily task tracker
    - Filter hooks (`applyFilter('task.data', $data)`) for mutating and enriching data payloads.
    - Standardized module interface (`ModuleInterface`) allowing internal components and third-party extensions to hook into core request/response and database lifecycles.
 
-3. **Frontend Component & View Plugin Registry (`public/js/core/`):**
-   - **View Registry (`ViewRegistry.js`)**: Standardized lifecycle interface (`mount`, `render`, `update`, `unmount`, `getActions`) for all views (SimpleList, SimpleKanban, TaskTable, KanbanBoard, GanttChart, DocEditor, Calendar).
+3. **Frontend Component & Widget Registry (`public/js/core/`):**
+   - **Component Registry (`ComponentRegistry.js`)**: Standardized lifecycle interface (`mount`, `render`, `update`, `unmount`) for all rich interactive widgets initialized on server-rendered pages (SimpleList, SimpleKanban, TaskTable, KanbanBoard, GanttChart, DocEditor, Calendar).
    - **Field Widget Registry (`FieldRegistry.js`)**: Pluggable rendering and inline editing controls for each custom field type.
    - **Slash Block Registry (`BlockRegistry.js`)**: Pluggable block types for the document editor.
    - **Command Registry (`CommandRegistry.js`)**: Extensible command items and shortcuts for the Command Palette.
@@ -48,19 +48,23 @@ Goal: Establish bootstrap configuration, database seeding, container health, cor
 - [ ] **1.3 Framework-Free PHP Core Primitives & Base Architecture**
   - [ ] Implement `app/Core/Request.php`: Typed parameter access (`getString()`, `getInt()`, `getFloat()`, `getBool()`, `getArray()`, `getJson()`), sanitization, headers parsing, and bearer token extraction.
   - [ ] Implement `app/Core/Response.php`: Standardized JSON envelopes (`json($data, $statusCode, $meta)`, `error($message, $code, $details)`), HTTP status constants, and security headers.
+  - [ ] Implement `app/Core/View.php`: Simple templating engine to render PHP/HTML views with layout support and data extraction.
   - [ ] Implement `app/Controllers/BaseController.php`: Common controller functionality (payload validation, current user context extraction, permission verification, standard response dispatching).
-  - [ ] Implement `app/Core/SessionManager.php`: JWT and native session handling, timing-safe signature verification, token revocation, and Argon2id/Bcrypt password hashing.
+  - [ ] Implement `app/Controllers/PageController.php`: Handles rendering main HTML pages (Dashboard, Project, Task).
+  - [ ] Implement `app/Core/SessionManager.php`: Native session handling, timing-safe signature verification, token revocation, and Argon2id/Bcrypt password hashing.
   - [ ] Implement `app/Core/EventDispatcher.php`: In-app hook and event bus (`addListener`, `dispatch`, `addAction`, `applyFilters`) as specified in PLAN.md Layer B.
   - [ ] Implement `app/Core/PluginManager.php`: Modular feature registry, plugin lifecycle manager, and workspace feature-module activation toggles.
+  - [ ] Setup `app/Views/` structure: Create `layout/header.php`, `layout/footer.php`, `layout/sidebar.php`, and initial `pages/dashboard.php`.
 
 - [ ] **1.4 Router and Middleware Pipeline Engine**
   - [ ] Enhance `app/Core/Router.php`:
+    - [ ] Support web routes (returning HTML views) and API routes (returning JSON).
     - [ ] Support middleware stacks for individual routes and route groups (`$router->group(['prefix' => '/api/v1', 'middleware' => [AuthMiddleware::class]], ...)`).
     - [ ] Regex parameter matching with typed parameter extraction (`{id:\d+}`).
   - [ ] Implement `app/Middleware/MiddlewareInterface.php`.
   - [ ] Implement `app/Middleware/CorsMiddleware.php`: Handle preflight `OPTIONS` requests and CORS headers.
   - [ ] Implement `app/Middleware/JsonBodyParserMiddleware.php`: Parse incoming JSON request bodies.
-  - [ ] Implement `app/Middleware/AuthMiddleware.php`: Guard protected endpoints and inject authenticated user into Request context.
+  - [ ] Implement `app/Middleware/AuthMiddleware.php`: Guard protected endpoints and inject authenticated user into Request context (handles both session cookies for web and API tokens if needed).
 
 - [ ] **1.5 Frontend Foundations, Reactive Store, and Base Design System**
   - [ ] Implement `public/js/core/store.js`: Lightweight PubSub state store with subscription channels for `currentUser`, `activeMode` (`simple` vs `enterprise`), `activeWorkspace`, `activeProject`, and `tasks`.
@@ -126,20 +130,19 @@ Goal: Construct modular domain engines, permission checks, and RESTful API contr
 
 ---
 
-## Phase 3: Frontend Modular Architecture, Performance, and QoL Engine
+## Phase 3: Frontend Hybrid Architecture, Performance, and QoL Engine
 
-Goal: Build a high-performance Vanilla JavaScript SPA architecture powered by a plugin/registry system, sub-50ms rendering, keyboard navigation, and optimistic updates.
+Goal: Build a high-performance Hybrid architecture powered by a plugin/registry system for rich client-side components initialized on server-rendered pages.
 
-- [ ] **3.1 Frontend Core Plugin and Registry Engine**
-  - [ ] Implement `public/js/core/store.js`: Lightweight PubSub state store with subscription channels for tasks, active filters, workspace tree, and user preferences.
+- [ ] **3.1 Frontend Core Plugin and Component Engine**
+  - [ ] Implement `public/js/core/store.js`: Lightweight PubSub state store with subscription channels for tasks, active filters, workspace tree, and user preferences (synced with server state where appropriate).
   - [ ] Implement `public/js/core/eventBus.js`: Global decoupled event bus and UI hook system (`on`, `off`, `emit`, `filter`).
-  - [ ] Implement `public/js/core/viewRegistry.js`: Extensible registry managing active views (Table, Kanban, Gantt, SimpleList, SimpleKanban, DocEditor, Calendar) with standard lifecycle methods.
+  - [ ] Implement `public/js/core/componentRegistry.js`: Extensible registry managing active widgets (Table, Kanban, Gantt, SimpleList, SimpleKanban, DocEditor, Calendar) bound to DOM elements.
   - [ ] Implement `public/js/core/fieldRegistry.js`: Extensible custom field widget registry for rendering and inline editing across views.
-  - [ ] Implement `public/js/core/router.js`: HTML5 History API (`pushState`/`popstate`) client router with route-to-view dispatcher.
-  - [ ] Implement `public/js/core/api.js`: Unified Fetch client with bearer token handling, request deduplication, and retry logic.
-  - [ ] Implement `public/js/core/storage.js`: IndexedDB / LocalStorage caching layer for instant initial render and offline-first task cache.
-  - [ ] Implement `public/js/core/optimistic.js`: Optimistic UI mutation manager with automatic rollback on API failure.
-  - [ ] Implement `public/js/core/virtualizer.js`: DOM windowing/virtual scroll engine for fluid 60fps rendering of 10,000+ tasks.
+  - [ ] Implement `public/js/core/api.js`: Unified Fetch client for AJAX requests, with CSRF token handling, request deduplication, and retry logic.
+  - [ ] Implement `public/js/core/storage.js`: IndexedDB / LocalStorage caching layer.
+  - [ ] Implement `public/js/core/optimistic.js`: Optimistic UI mutation manager with automatic rollback on API failure for widget interactions.
+  - [ ] Implement `public/js/core/virtualizer.js`: DOM windowing/virtual scroll engine for fluid 60fps rendering of 10,000+ tasks in table/kanban widgets.
 
 - [ ] **3.2 Global Ergonomics and Quality of Life (QoL)**
   - [ ] Implement `public/js/components/CommandPalette.js` & `commandRegistry.js`:
@@ -180,12 +183,12 @@ Goal: Deliver a clean, zero-friction task management experience tailored for dai
     - [ ] Sticky bottom/top bar accessible anywhere in Simple Mode.
 
 - [ ] **4.3 Simple Task List and Simple Kanban**
-  - [ ] Implement `public/js/components/SimpleTaskList.js` (registered in `viewRegistry.js`):
+  - [ ] Implement `public/js/components/SimpleTaskList.js` (registered in `componentRegistry.js`):
     - [ ] One-click checkbox completion with micro-animation and celebratory completion sound toggle.
     - [ ] Direct inline text editing on click without modal popups.
     - [ ] Lightweight drag handle for custom prioritization and ordering.
     - [ ] Inline subtask checklist expansion.
-  - [ ] Implement `public/js/components/SimpleKanban.js` (registered in `viewRegistry.js`):
+  - [ ] Implement `public/js/components/SimpleKanban.js` (registered in `componentRegistry.js`):
     - [ ] Streamlined 3-column personal board (To Do, In Progress, Done).
     - [ ] Fluid HTML5 drag-and-drop card movement.
 
@@ -212,7 +215,7 @@ Goal: Build an enterprise-grade work management platform supporting nested hiera
     - [ ] Invitation link generation and guest sharing permissions.
 
 - [ ] **5.2 Pluggable Data Views Engine**
-  - [ ] Implement `public/js/components/ViewSwitcher.js`: Tab bar dynamically rendered from registered views in `viewRegistry.js`.
+  - [ ] Implement `public/js/components/ViewSwitcher.js`: Tab bar dynamically rendered from registered widgets in `componentRegistry.js` or via server navigation.
   - [ ] Implement `public/js/components/FilterBar.js`:
     - [ ] Multi-condition filtering (Status is/is not, Assignee contains, Due Date before/after/within, Priority, Custom Field values).
     - [ ] Multi-level sorting (by Priority, Due Date, Title, Created Date, Custom Field).
@@ -220,7 +223,7 @@ Goal: Build an enterprise-grade work management platform supporting nested hiera
     - [ ] Saved View presets (e.g., "My High Priority Tasks", "Overdue Milestones").
 
 - [ ] **5.3 Enterprise Table / Spreadsheet Grid Plugin**
-  - [ ] Implement `public/js/components/TaskTable.js` (registered in `viewRegistry.js`):
+  - [ ] Implement `public/js/components/TaskTable.js` (registered in `componentRegistry.js`):
     - [ ] Virtualized table supporting 5,000+ rows with pinned column headers.
     - [ ] Inline cell editors consuming `fieldRegistry.js` widget plugins.
     - [ ] Column resizing, reordering, and visibility toggling dropdown.
@@ -228,14 +231,14 @@ Goal: Build an enterprise-grade work management platform supporting nested hiera
     - [ ] Bottom summary bar showing task counts, sum/average of estimated hours, and custom field totals.
 
 - [ ] **5.4 Enterprise Kanban Board Plugin**
-  - [ ] Implement `public/js/components/KanbanBoard.js` (registered in `viewRegistry.js`):
+  - [ ] Implement `public/js/components/KanbanBoard.js` (registered in `componentRegistry.js`):
     - [ ] Dynamic status columns with customizable WIP (Work In Progress) limits.
     - [ ] Horizontal Swimlanes (group by Assignee, Priority, or Folder).
     - [ ] Card customization settings (show/hide assignees, subtask progress bar, tags, custom fields, cover colors).
     - [ ] Drag-and-drop cards between columns and swimlanes with drop placeholder indicator.
 
 - [ ] **5.5 Interactive Gantt Chart and Timeline Plugin**
-  - [ ] Implement `public/js/components/GanttChart.js` (registered in `viewRegistry.js`):
+  - [ ] Implement `public/js/components/GanttChart.js` (registered in `componentRegistry.js`):
     - [ ] High-performance SVG + HTML canvas timeline rendering.
     - [ ] Drag-to-resize duration handles and drag-to-shift date bars.
     - [ ] Interactive dependency drawing: drag link line from task connector circle to another task.
@@ -266,7 +269,7 @@ Goal: Build an enterprise-grade work management platform supporting nested hiera
     - [ ] Comments thread with rich markdown and @mention support.
 
 - [ ] **5.9 Slash-Command Block Document Editor Plugin**
-  - [ ] Implement `public/js/components/DocEditor.js` & `blockRegistry.js` (registered in `viewRegistry.js`):
+  - [ ] Implement `public/js/components/DocEditor.js` & `blockRegistry.js` (registered in `componentRegistry.js`):
     - [ ] Block-based contenteditable document workspace for project specs and wikis.
     - [ ] Pluggable slash menu (`/`) blocks: Heading 1/2/3, Bullet List, Numbered List, Checklist, Code Block, Callout Note, Quote, Table, Divider.
     - [ ] Embeddable live task card block directly linking to project tasks.

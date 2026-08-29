@@ -39,47 +39,50 @@ To accommodate simple daily task tracking without cluttering the UI, while still
 
 ---
 
-## 2. Rich Component Structure (Vanilla Stack Architecture)
+## 2. Rich Component Structure (Hybrid Architecture)
 
 ### Layer A: Nginx Routing & Reverse Proxy Layer
-* **Static File Dispatcher:** Directly serves vanilla JavaScript modules, CSS stylesheets, images, and HTML templates bypassing PHP.
-* **PHP-FPM Load Router:** Routes `/api/v1/*` dynamic application requests to PHP.
+* **Static File Dispatcher:** Directly serves JavaScript modules, CSS stylesheets, and images.
+* **PHP-FPM Router:** Routes all main application requests (both HTML page requests and AJAX endpoints) to PHP.
 * **Python AI Microservice Gateway:** Proxies requests directed to `/api/v1/ai/*` directly to the FastAPI Python container.
 
-### Layer B: PHP Core Application Architecture (No Framework Dependencies)
+### Layer B: PHP Core Application Architecture (Server-Side Rendering + API)
 
 
 ```
 
 /app
 ├── Core/
-│   ├── Router.php               # Regex RESTful Router (GET, POST, PUT, DELETE)
+│   ├── Router.php               # Handles web routes (HTML) and API routes (JSON)
 │   ├── Database.php             # PDO Wrapper with Prepared Statement Caching
-│   ├── SessionManager.php       # Native Auth & API Key/JWT Verification
-│   └── EventDispatcher.php      # In-app hook engine for logs & triggers
+│   ├── SessionManager.php       # Native PHP Sessions & Auth
+│   └── View.php                 # Simple templating engine to render HTML views
 ├── Controllers/
+│   ├── PageController.php       # Renders main HTML pages (Dashboard, Project, Task)
 │   ├── WorkspaceController.php  # Hierarchy & RBAC management
-│   ├── TaskController.php       # Simple/Complex Task CRUD & Batch operations
+│   ├── TaskController.php       # Task CRUD operations & Batch operations
 │   ├── CustomFieldController.php# Dynamic field definitions & value updates
-│   ├── DependencyController.php # Dependency graph logic & auto-scheduling
 │   └── AIController.php         # Proxy to Python LLM microservice
+├── Views/                       # HTML templates (e.g., dashboard.php, kanban.php)
+│   ├── layout/                  # Headers, footers, sidebars
+│   └── pages/                   # Specific page content
 ├── Services/
 │   ├── AutoScheduler.php        # Recalculates Gantt dates on dependency shift
-│   ├── CustomFieldEngine.php    # Pivots EAV data for fast JSON output
 │   └── PermEngine.php           # Checks user privileges across scopes
 
 ```
 
-### Layer C: Vanilla JavaScript Single Page App Engine (Frontend)
+### Layer C: Rich JavaScript UI (Progressive Enhancement)
 
-* **Core State Store (`store.js`):** Lightweight PubSub state model storing current active user, workspace layout, tasks, and view options.
-* **Component Registry (`/components`):**
+Instead of a strict SPA, the initial page load and layout are handled by PHP (the traditional way). Rich JavaScript components then take over specific UI regions to provide a seamless, app-like experience without sacrificing ease of use.
+
+* **AJAX & DOM Management:** Vanilla JavaScript fetching data from PHP endpoints and updating the DOM dynamically where needed.
+* **Interactive Components (`/public/js/components`):**
   * `TaskTable.js`: High-performance inline-editable HTML table grid.
   * `KanbanBoard.js`: Drag-and-drop board powered by HTML5 Drag & Drop API.
   * `GanttChart.js`: Custom SVG/Canvas timeline view with interactive dependency lines.
   * `QuickAddBar.js`: Minimalist modal/bar for fast simple-task creation.
   * `DocEditor.js`: Slash-command (`/`) block editor built on contenteditable API.
-* **Router & View Engine (`router.js`):** Intercepts client navigation via `pushState`, rendering layout fragments without full page reloads.
 
 ---
 
