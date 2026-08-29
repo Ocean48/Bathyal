@@ -2,45 +2,105 @@
 
 namespace App\Core;
 
+use App\Middleware\MiddlewareInterface;
+use Closure;
+
 class Router
 {
     private array $routes = [];
+    private array $groupStack = [];
+    private array $globalMiddleware = [];
 
-    public function get(string $path, callable $handler): void
+    public function use(string|MiddlewareInterface $middleware): self
     {
-        $this->addRoute('GET', $path, $handler);
+        $this->globalMiddleware[] = $middleware;
+        return $this;
     }
 
-    public function post(string $path, callable $handler): void
+    public function group(array $attributes, callable $callback): void
     {
-        $this->addRoute('POST', $path, $handler);
+        $this->groupStack[] = $attributes;
+        $callback($this);
+        array_pop($this->groupStack);
     }
 
-    public function put(string $path, callable $handler): void
+    public function get(string $path, mixed $handler, array $middleware = []): self
     {
-        $this->addRoute('PUT', $path, $handler);
+        return $this->addRoute('GET', $path, $handler, $middleware);
     }
 
-    public function delete(string $path, callable $handler): void
+    public function post(string $path, mixed $handler, array $middleware = []): self
     {
-        $this->addRoute('DELETE', $path, $handler);
+        return $this->addRoute('POST', $path, $handler, $middleware);
     }
 
-    private function addRoute(string $method, string $path, callable $handler): void
+    public function put(string $path, mixed $handler, array $middleware = []): self
     {
-        $pattern = preg_replace('/\{([a-zA-Z0-9_]+)\}/', '(?P<$1>[^/]+)', $path);
+        return $this->addRoute('PUT', $path, $handler, $middleware);
+    }
+
+    public function patch(string $path, mixed $handler, array $middleware = []): self
+    {
+        return $this->addRoute('PATCH', $path, $handler, $middleware);
+    }
+
+    public function delete(string $path, mixed $handler, array $middleware = []): self
+    {
+        return $this->addRoute('DELETE', $path, $handler, $middleware);
+    }
+
+    public function options(string $path, mixed $handler, array $middleware = []): self
+    {
+        return $this->addRoute('OPTIONS', $path, $handler, $middleware);
+    }
+
+    private function addRoute(string $method, string $path, mixed $handler, array $middleware = []): self
+    {
+        $prefix = '';
+        $groupMiddleware = [];
+
+        foreach ($this->groupStack as $group) {
+            if (!empty($group['prefix'])) {
+                $prefix .= '/' . trim($group['prefix'], '/');
+            }
+            if (!empty($group['middleware'])) {
+                $m = is_array($group['middleware']) ? $group['middleware'] : [$group['middleware']];
+                $groupMiddleware = array_merge($groupMiddleware, $m);
+            }
+        }
+
+        $fullPath = rtrim($prefix . '/' . ltrim($path, '/'), '/');
+        if (empty($fullPath)) {
+            $fullPath = '/';
+        }
+
+        // Convert {param:\d+} or {param} into regex
+        $pattern = preg_replace_callback('/\{([a-zA-Z0-9_]+)(?::([^}]+))?\}/', function ($matches) {
+            $name = $matches[1];
+            $regex = $matches[2] ?? '[^/]+';
+            return "(?P<{$name}>{$regex})";
+        }, $fullPath);
+
         $pattern = "#^" . $pattern . "$#";
+
+        $allMiddleware = array_merge($groupMiddleware, $middleware);
+
         $this->routes[] = [
-            'method' => $method,
+            'method' => strtoupper($method),
+            'path' => $fullPath,
             'pattern' => $pattern,
-            'handler' => $handler
+            'handler' => $handler,
+            'middleware' => $allMiddleware,
         ];
+
+        return $this;
     }
 
-    public function dispatch(string $method, string $uri): void
+    public function dispatch(?Request $request = null): void
     {
-        $path = parse_url($uri, PHP_URL_PATH);
-        $path = rtrim($path, '/');
+        $req = $request ?? Request::createFromGlobals();
+        $method = $req->getMethod();
+        $path = rtrim($req->getPath(), '/');
         if (empty($path)) {
             $path = '/';
         }
@@ -48,18 +108,54 @@ class Router
         foreach ($this->routes as $route) {
             if ($route['method'] === $method && preg_match($route['pattern'], $path, $matches)) {
                 $params = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
-                call_user_func($route['handler'], $params);
+                $req->setRouteParams($params);
+
+                $pipeline = array_merge($this->globalMiddleware, $route['middleware']);
+                $handler = $this->resolveHandler($route['handler'], $req, $params);
+
+                $runner = array_reduce(
+                    array_reverse($pipeline),
+                    function ($next, $middleware) {
+                        return function (Request $request) use ($next, $middleware) {
+                            $instance = is_string($middleware) ? new $middleware() : $middleware;
+                            return $instance->handle($request, $next);
+                        };
+                    },
+                    $handler
+                );
+
+                $runner($req);
                 return;
             }
         }
 
-        http_response_code(404);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'Endpoint not found',
+        Response::error('Endpoint not found', Response::HTTP_NOT_FOUND, [
             'path' => $path,
-            'method' => $method
+            'method' => $method,
         ]);
     }
+
+    private function resolveHandler(mixed $handler, Request $request, array $params): Closure
+    {
+        return function (Request $req) use ($handler, $params) {
+            if ($handler instanceof Closure) {
+                return $handler($req, $params);
+            }
+
+            if (is_array($handler) && count($handler) === 2) {
+                [$class, $method] = $handler;
+                $instance = is_string($class) ? new $class() : $class;
+                return $instance->$method($req, $params);
+            }
+
+            if (is_string($handler) && str_contains($handler, '@')) {
+                [$class, $method] = explode('@', $handler, 2);
+                $instance = new $class();
+                return $instance->$method($req, $params);
+            }
+
+            throw new \RuntimeException("Invalid route handler provided");
+        };
+    }
 }
+

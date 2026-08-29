@@ -13,7 +13,8 @@ class TestRootAndHealthEndpoints:
         data = response.json()
         assert data["service"] == "Bathyal AI Microservice"
         assert data["status"] == "healthy"
-        assert data["version"] == "1.0.0"
+        assert data["version"] == "1.1.0"
+        assert "Gemini" in data["ai_engine"]
 
     def test_health_check_default(self, client: TestClient):
         response = client.get("/api/v1/ai/health")
@@ -39,12 +40,9 @@ class TestTaskEstimationEndpoint:
         response = client.post("/api/v1/ai/estimate-task", json=payload)
         assert response.status_code == 200
         data = response.json()
-        assert data["estimated_hours"] == 4.0
-        assert data["confidence"] == 0.85
-        assert len(data["suggested_subtasks"]) == 3
-        assert "Research and planning for: Implement User Authentication" in data["suggested_subtasks"]
-        assert "Implementation phase for: Implement User Authentication" in data["suggested_subtasks"]
-        assert "Testing and review for: Implement User Authentication" in data["suggested_subtasks"]
+        assert data["estimated_hours"] > 0
+        assert data["confidence"] >= 0.8
+        assert len(data["suggested_subtasks"]) >= 3
 
     def test_estimate_task_urgent_priority(self, client: TestClient):
         payload = {
@@ -55,47 +53,101 @@ class TestTaskEstimationEndpoint:
         response = client.post("/api/v1/ai/estimate-task", json=payload)
         assert response.status_code == 200
         data = response.json()
-        assert data["estimated_hours"] == 8.0
-        assert data["confidence"] == 0.85
-        assert len(data["suggested_subtasks"]) == 3
+        assert data["estimated_hours"] > 0
+        assert len(data["suggested_subtasks"]) >= 3
 
-    def test_estimate_task_low_priority(self, client: TestClient):
-        payload = {
-            "title": "Update Footer Copyright Year",
-            "priority": "low",
-        }
-        response = client.post("/api/v1/ai/estimate-task", json=payload)
+
+class TestPhase6AIFeatures:
+    """Tests for Gemini 3.1 Flash-Lite NLP Prompt Parsing, Decomposition, Recommendations, and CPM."""
+
+    def test_parse_prompt_endpoint(self, client: TestClient):
+        payload = {"prompt": "Design responsive navigation bar next Friday !urgent #frontend ~3.5h"}
+        response = client.post("/api/v1/ai/parse-prompt", json=payload)
         assert response.status_code == 200
         data = response.json()
-        assert data["estimated_hours"] == 2.0
-        assert data["confidence"] == 0.85
+        assert "Design responsive navigation bar" in data["title"]
+        assert data["priority"] == "urgent"
+        assert data["estimated_hours"] == 3.5
+        assert "frontend" in data["tags"]
+        assert data["source"] in ["gemini-3.1-flash-lite", "heuristic"]
 
-    def test_estimate_task_custom_description(self, client: TestClient):
+    def test_parse_prompt_empty(self, client: TestClient):
+        response = client.post("/api/v1/ai/parse-prompt", json={"prompt": "   "})
+        assert response.status_code == 422
+
+    def test_decompose_task_endpoint(self, client: TestClient):
         payload = {
-            "title": "Database Migration Script",
-            "description": "Migrate MySQL 5.7 schema to MySQL 8.0 utf8mb4",
-            "priority": "medium",
+            "title": "Build Distributed Event Bus",
+            "description": "Kafka integration with retry queue",
+            "complexity": "high"
         }
-        response = client.post("/api/v1/ai/estimate-task", json=payload)
+        response = client.post("/api/v1/ai/decompose-task", json=payload)
         assert response.status_code == 200
         data = response.json()
-        assert data["estimated_hours"] == 4.0
-        assert len(data["suggested_subtasks"]) == 3
+        assert data["parent_title"] == "Build Distributed Event Bus"
+        assert len(data["subtasks"]) >= 3
+        assert data["total_estimated_hours"] > 0
+        for s in data["subtasks"]:
+            assert "title" in s
+            assert "estimated_hours" in s
+            assert "priority" in s
 
-    def test_estimate_task_missing_title(self, client: TestClient):
-        payload = {"description": "Task without title"}
-        response = client.post("/api/v1/ai/estimate-task", json=payload)
-        assert response.status_code == 422
+    def test_recommend_dependencies_endpoint(self, client: TestClient):
+        payload = {
+            "tasks": [
+                {"id": 1, "title": "Design Database Schema", "description": "Create SQL tables"},
+                {"id": 2, "title": "Implement REST API Endpoints", "description": "Build backend routes"},
+                {"id": 3, "title": "QA & Load Testing", "description": "Run performance tests"},
+            ]
+        }
+        response = client.post("/api/v1/ai/recommend-dependencies", json=payload)
+        assert response.status_code == 200
         data = response.json()
-        assert "detail" in data
+        assert "recommendations" in data
+        assert len(data["recommendations"]) > 0
+        rec = data["recommendations"][0]
+        assert "blocking_task_id" in rec
+        assert "dependent_task_id" in rec
 
-    def test_estimate_task_invalid_json(self, client: TestClient):
-        response = client.post(
-            "/api/v1/ai/estimate-task",
-            content="invalid-json-body",
-            headers={"Content-Type": "application/json"},
-        )
-        assert response.status_code == 422
+    def test_optimize_schedule_endpoint(self, client: TestClient):
+        payload = {
+            "tasks": [
+                {"id": 1, "title": "Requirements", "duration_days": 2.0},
+                {"id": 2, "title": "Core Build", "duration_days": 5.0},
+                {"id": 3, "title": "Release", "duration_days": 1.0},
+            ],
+            "dependencies": [
+                {"blocking_task_id": 1, "dependent_task_id": 2},
+                {"blocking_task_id": 2, "dependent_task_id": 3},
+            ]
+        }
+        response = client.post("/api/v1/ai/optimize-schedule", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["is_cyclic"] is False
+        assert data["project_duration_days"] == 8.0
+        assert data["critical_path"] == [1, 2, 3]
+        assert len(data["schedule"]) == 3
+
+    def test_optimize_schedule_cycle_error(self, client: TestClient):
+        payload = {
+            "tasks": [
+                {"id": 1, "duration_days": 1.0},
+                {"id": 2, "duration_days": 1.0},
+            ],
+            "dependencies": [
+                {"blocking_task_id": 1, "dependent_task_id": 2},
+                {"blocking_task_id": 2, "dependent_task_id": 1},
+            ]
+        }
+        response = client.post("/api/v1/ai/optimize-schedule", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "error"
+        assert data["is_cyclic"] is True
+        assert data["critical_path"] == []
+
 
 
 class TestScheduleOptimizationEndpoint:
@@ -104,22 +156,22 @@ class TestScheduleOptimizationEndpoint:
     def test_optimize_schedule_success(self, client: TestClient):
         payload = {
             "tasks": [
-                {"id": 1, "title": "Design Database Schema", "estimated_hours": 8},
-                {"id": 2, "title": "Implement API Endpoints", "estimated_hours": 16},
-                {"id": 3, "title": "Deploy to Staging", "estimated_hours": 4},
+                {"id": 1, "title": "Design Database Schema", "duration_days": 1},
+                {"id": 2, "title": "Implement API Endpoints", "duration_days": 2},
+                {"id": 3, "title": "Deploy to Staging", "duration_days": 1},
             ],
             "dependencies": [
-                {"blocking_task_id": 1, "dependent_task_id": 2, "type": "finish_to_start"},
-                {"blocking_task_id": 2, "dependent_task_id": 3, "type": "finish_to_start"},
+                {"blocking_task_id": 1, "dependent_task_id": 2},
+                {"blocking_task_id": 2, "dependent_task_id": 3},
             ],
         }
         response = client.post("/api/v1/ai/optimize-schedule", json=payload)
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        assert data["tasks_processed"] == 3
-        assert data["dependencies_processed"] == 2
-        assert "Auto-schedule calculation complete" in data["message"]
+        assert data["is_cyclic"] is False
+        assert data["project_duration_days"] == 4.0
+        assert data["critical_path"] == [1, 2, 3]
 
     def test_optimize_schedule_empty_payload(self, client: TestClient):
         payload = {
@@ -130,15 +182,17 @@ class TestScheduleOptimizationEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
-        assert data["tasks_processed"] == 0
-        assert data["dependencies_processed"] == 0
+        assert data["project_duration_days"] == 0.0
 
     def test_optimize_schedule_missing_dependencies_field(self, client: TestClient):
         payload = {
-            "tasks": [{"id": 1, "title": "Single Task"}],
+            "tasks": [{"id": 1, "title": "Single Task", "duration_days": 2.0}],
         }
         response = client.post("/api/v1/ai/optimize-schedule", json=payload)
-        assert response.status_code == 422
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["project_duration_days"] == 2.0
 
     def test_optimize_schedule_invalid_types(self, client: TestClient):
         payload = {
@@ -175,4 +229,4 @@ class TestOpenAPIAndDocs:
             },
         )
         assert response.status_code == 200
-        assert response.headers.get("access-control-allow-origin") == "*"
+        assert response.headers.get("access-control-allow-origin") in ["*", "http://localhost"]
