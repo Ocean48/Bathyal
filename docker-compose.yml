@@ -1,0 +1,113 @@
+services:
+  # --------------------------------------------------------
+  # Layer A: Nginx Reverse Proxy & Static Assets Dispatcher
+  # --------------------------------------------------------
+  web:
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile
+    container_name: bathyal-web
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./public:/var/www/public:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - php
+      - ai
+    networks:
+      - bathyal-network
+    restart: unless-stopped
+
+  # --------------------------------------------------------
+  # Layer B: PHP Core Application (PHP 8.3 FPM)
+  # --------------------------------------------------------
+  php:
+    build:
+      context: ./docker/php
+      dockerfile: Dockerfile
+    container_name: bathyal-php
+    volumes:
+      - ./:/var/www
+      - ./docker/php/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+    environment:
+      APP_NAME: "${APP_NAME:-Bathyal}"
+      APP_ENV: "${APP_ENV:-development}"
+      APP_DEBUG: "${APP_DEBUG:-true}"
+      DB_HOST: "${DB_HOST:-db}"
+      DB_PORT: "${DB_PORT:-3306}"
+      DB_DATABASE: "${DB_DATABASE:-bathyal_db}"
+      DB_USERNAME: "${DB_USERNAME:-bathyal_user}"
+      DB_PASSWORD: "${DB_PASSWORD:-bathyal_secret}"
+      AI_HOST: "${AI_HOST:-bathyal_ai}"
+      AI_PORT: "${AI_PORT:-8000}"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - bathyal-network
+    restart: unless-stopped
+
+  # --------------------------------------------------------
+  # Layer C: Python AI Microservice (FastAPI)
+  # --------------------------------------------------------
+  ai:
+    build:
+      context: .
+      dockerfile: ./docker/ai/Dockerfile
+    container_name: bathyal_ai
+    ports:
+      - "${AI_HOST_PORT:-8000}:8000"
+    volumes:
+      - ./ai_services:/app
+    environment:
+      APP_ENV: "${APP_ENV:-development}"
+      DB_HOST: "${DB_HOST:-db}"
+      DB_PORT: "${DB_PORT:-3306}"
+      DB_DATABASE: "${DB_DATABASE:-bathyal_db}"
+      DB_USERNAME: "${DB_USERNAME:-bathyal_user}"
+      DB_PASSWORD: "${DB_PASSWORD:-bathyal_secret}"
+    networks:
+      bathyal-network:
+        aliases:
+          - bathyal_ai
+    restart: unless-stopped
+
+  # --------------------------------------------------------
+  # Layer D: MySQL 8.0 Relational Data Core
+  # --------------------------------------------------------
+  db:
+    image: mysql:8.0
+    container_name: bathyal-db
+    ports:
+      - "${DB_HOST_PORT:-3306}:3306"
+    environment:
+      MYSQL_DATABASE: "${DB_DATABASE:-bathyal_db}"
+      MYSQL_USER: "${DB_USERNAME:-bathyal_user}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:-bathyal_secret}"
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:-root_secret}"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_0900_ai_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-root_secret}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - bathyal-network
+    restart: unless-stopped
+
+volumes:
+  db_data:
+    driver: local
+
+networks:
+  bathyal-network:
+    driver: bridge
