@@ -45,7 +45,7 @@ export class AuthModal {
                 <div class="auth-modal-header">
                     <div style="display: flex; align-items: center; gap: 0.6rem; justify-content: center; margin-bottom: 0.5rem;">
                         <div class="logo-icon" style="width: 32px; height: 32px;">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 12c3-3 6-3 9 0s6 3 9 0 3-3 4-3"/></svg>
+                            <img src="/logo.png" alt="Bathyal logo" class="brand-logo-img">
                         </div>
                         <span class="brand-title" style="font-size: 1.3rem;">Bathyal</span>
                     </div>
