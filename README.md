@@ -28,6 +28,10 @@ Bathyal operates on a four-tier containerized architecture orchestrated via Dock
    - MySQL 8.0 database with utf8mb4 collation.
    - Automatically initializes schema from `docker/mysql/init/01-schema.sql`.
 
+5. **Layer E: Database Management Interface (`phpmyadmin`)**
+   - Web-based administration tool for MySQL database operations.
+   - Accessible on port 8080 by default.
+
 ---
 
 ## Directory Structure
@@ -99,6 +103,7 @@ docker compose ps
 ### 3. Accessing the Application
 
 - **Web Application:** [http://localhost](http://localhost) (or configured `HTTP_PORT`)
+- **Database Management (phpMyAdmin):** [http://localhost:8080](http://localhost:8080) (or configured `PMA_PORT`)
 - **AI Microservice Direct API:** [http://localhost:8000](http://localhost:8000) (or configured `AI_HOST_PORT`)
 - **Interactive OpenAPI Documentation:** [http://localhost/api/v1/ai/docs](http://localhost/api/v1/ai/docs)
 - **OpenAPI JSON Schema:** [http://localhost/api/v1/ai/openapi.json](http://localhost/api/v1/ai/openapi.json)
