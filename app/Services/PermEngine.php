@@ -80,7 +80,15 @@ class PermEngine
     }
 
     /**
-     * Check access to a project
+     * Check if user can manage user groups in a workspace
+     */
+    public static function canManageGroups(int $userId, int $workspaceId): bool
+    {
+        return self::hasMinRole($userId, $workspaceId, self::ROLE_ADMIN);
+    }
+
+    /**
+     * Check access to a project (evaluating workspace role and group-level permissions)
      */
     public static function canViewProject(int $userId, int $projectId): bool
     {
@@ -88,7 +96,27 @@ class PermEngine
         if (!$project) {
             return false;
         }
-        return self::canViewWorkspace($userId, (int)$project['workspace_id']);
+
+        $wsId = (int)$project['workspace_id'];
+        if (self::canViewWorkspace($userId, $wsId)) {
+            return true;
+        }
+
+        // Check group permissions
+        $userGroupIds = GroupEngine::getUserGroupIds($userId, $wsId);
+        if (!empty($userGroupIds)) {
+            $placeholders = implode(',', array_fill(0, count($userGroupIds), '?'));
+            $params = array_merge([$projectId], $userGroupIds);
+            $hasGroupPerm = Database::fetchOne(
+                "SELECT role FROM project_group_permissions WHERE project_id = ? AND group_id IN ({$placeholders})",
+                $params
+            );
+            if ($hasGroupPerm) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function canEditProject(int $userId, int $projectId): bool
@@ -97,7 +125,27 @@ class PermEngine
         if (!$project) {
             return false;
         }
-        return self::canEditWorkspace($userId, (int)$project['workspace_id']);
+
+        $wsId = (int)$project['workspace_id'];
+        if (self::canEditWorkspace($userId, $wsId)) {
+            return true;
+        }
+
+        // Check group-level edit permission
+        $userGroupIds = GroupEngine::getUserGroupIds($userId, $wsId);
+        if (!empty($userGroupIds)) {
+            $placeholders = implode(',', array_fill(0, count($userGroupIds), '?'));
+            $params = array_merge([$projectId], $userGroupIds);
+            $groupPerm = Database::fetchOne(
+                "SELECT role FROM project_group_permissions WHERE project_id = ? AND group_id IN ({$placeholders}) AND role IN ('admin', 'member')",
+                $params
+            );
+            if ($groupPerm) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function canDeleteProject(int $userId, int $projectId): bool
@@ -110,7 +158,7 @@ class PermEngine
     }
 
     /**
-     * Check access to a task
+     * Check access to a task (individual or group assignee)
      */
     public static function canViewTask(int $userId, int $taskId): bool
     {

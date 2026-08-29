@@ -67,6 +67,12 @@ export class TaskTable {
             const isCompleted = task.status_type === 'completed' || task.status_id == 3;
             const prioClass = task.priority && task.priority !== 'none' ? `prio-${task.priority}` : 'prio-none';
 
+            let startText = '';
+            if (task.start_date) {
+                const s = new Date(task.start_date);
+                startText = s.toISOString().split('T')[0];
+            }
+
             let dueText = '';
             if (task.due_date) {
                 const d = new Date(task.due_date);
@@ -110,7 +116,10 @@ export class TaskTable {
                         </select>
                     </td>
                     <td class="table-td">
-                        <input type="date" class="field-inline-input table-date-input" data-id="${task.id}" value="${dueText}" />
+                        <input type="date" class="field-inline-input table-start-date-input" data-id="${task.id}" value="${startText}" title="Start Date" />
+                    </td>
+                    <td class="table-td">
+                        <input type="date" class="field-inline-input table-date-input" data-id="${task.id}" value="${dueText}" title="Due Date" />
                     </td>
                     <td class="table-td">
                         <input type="number" step="0.5" class="field-inline-input table-hours-input" data-id="${task.id}" value="${task.estimated_hours || ''}" placeholder="-" style="width: 70px;" />
@@ -132,6 +141,7 @@ export class TaskTable {
                             <th class="table-th">Task Title</th>
                             <th class="table-th">Status</th>
                             <th class="table-th">Priority</th>
+                            <th class="table-th">Start Date</th>
                             <th class="table-th">Due Date</th>
                             <th class="table-th">Est. Hours</th>
                             ${customHeaders}
@@ -144,6 +154,7 @@ export class TaskTable {
                     <tfoot>
                         <tr class="table-tfoot-row">
                             <td colspan="2" class="table-td" style="font-weight: 600;">Total: ${this.tasks.length} tasks</td>
+                            <td class="table-td"></td>
                             <td class="table-td"></td>
                             <td class="table-td"></td>
                             <td class="table-td"></td>
@@ -210,7 +221,22 @@ export class TaskTable {
             };
         });
 
-        // Date Change
+        // Start Date Change
+        this.container.querySelectorAll('.table-start-date-input').forEach(input => {
+            input.onchange = async () => {
+                const taskId = input.dataset.id;
+                try {
+                    await api.patch(`/api/v1/tasks/${taskId}`, {
+                        start_date: input.value ? `${input.value} 00:00:00` : null
+                    });
+                    toast.success('Start date updated');
+                } catch (err) {
+                    toast.error('Failed to update start date');
+                }
+            };
+        });
+
+        // Due Date Change
         this.container.querySelectorAll('.table-date-input').forEach(input => {
             input.onchange = async () => {
                 const taskId = input.dataset.id;

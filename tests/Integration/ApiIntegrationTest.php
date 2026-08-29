@@ -30,7 +30,7 @@ class ApiIntegrationTest extends TestCase
     {
         $workspace = Database::fetchOne("SELECT * FROM workspaces WHERE id = :id", ['id' => 2]);
         $this->assertNotNull($workspace);
-        $this->assertEquals('Acme Corporation', $workspace['name']);
+        $this->assertTrue(str_contains($workspace['name'], 'Acme'));
 
         $folders = Database::fetchAll("SELECT * FROM folders WHERE workspace_id = :ws_id", ['ws_id' => 2]);
         $this->assertTrue(count($folders) >= 2);

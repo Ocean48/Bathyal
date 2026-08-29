@@ -7,6 +7,7 @@ import { store } from '../core/store.js';
 import { toast } from './Toast.js';
 import { eventBus } from '../core/eventBus.js';
 import { optimistic } from '../core/optimistic.js';
+import { renderPriorityBadge } from '../core/priorities.js';
 
 export class KanbanBoard {
     constructor(container) {
@@ -56,7 +57,6 @@ export class KanbanBoard {
             const colTasks = this.tasks.filter(t => t.status_id == status.id);
 
             const cardsHtml = colTasks.map(task => {
-                const prioClass = task.priority && task.priority !== 'none' ? `prio-${task.priority}` : 'prio-none';
                 let dueText = '';
                 if (task.due_date) {
                     const d = new Date(task.due_date);
@@ -69,7 +69,7 @@ export class KanbanBoard {
                         ${task.description ? `<div class="kanban-card-desc">${this.escapeHtml(task.description.substring(0, 80))}${task.description.length > 80 ? '...' : ''}</div>` : ''}
                         <div class="kanban-card-meta">
                             ${task.project_name ? `<span class="badge-tag" style="background-color: ${task.project_color}20; color: ${task.project_color};">${this.escapeHtml(task.project_name)}</span>` : ''}
-                            ${prioClass !== 'prio-none' ? `<span class="badge-prio ${prioClass}">${task.priority}</span>` : ''}
+                            ${renderPriorityBadge(task.priority)}
                             ${dueText ? `<span class="kanban-card-due">Due ${dueText}</span>` : ''}
                         </div>
                     </div>

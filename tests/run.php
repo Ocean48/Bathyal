@@ -22,10 +22,12 @@ echo "========================================\n\n";
 
 $testFiles = [
     __DIR__ . '/Unit/PermEngineTest.php',
+    __DIR__ . '/Unit/GroupEngineTest.php',
     __DIR__ . '/Unit/AutoSchedulerTest.php',
     __DIR__ . '/Unit/CustomFieldEngineTest.php',
     __DIR__ . '/Unit/RecurrenceEngineTest.php',
     __DIR__ . '/Integration/ApiIntegrationTest.php',
+    __DIR__ . '/Integration/SystemResetTest.php',
 ];
 
 $passCount = 0;

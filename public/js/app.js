@@ -19,6 +19,7 @@ import { upgradePrompt } from './components/UpgradePrompt.js';
 import { workspaceModal } from './components/WorkspaceModal.js';
 import { dataImportExport } from './components/DataImportExport.js';
 import { bulkActionToolbar } from './components/BulkActionToolbar.js';
+import { authModal } from './components/AuthModal.js';
 import { toast } from './components/Toast.js';
 import { themeManager } from './components/ThemeManager.js';
 import { commandPalette } from './components/CommandPalette.js';
@@ -39,13 +40,99 @@ let currentViewType = 'list'; // 'list', 'kanban', 'table', 'gantt', 'docs'
 
 document.addEventListener('DOMContentLoaded', async () => {
     initThemeControls();
-    await initAuth();
+    const authenticated = await initAuth();
     initSystemHealth();
     initModeSwitcher();
     initNavigation();
     initHeaderActions();
-    mountComponents();
+    initUserMenu();
+
+    if (authenticated) {
+        mountComponents();
+    } else {
+        authModal.open('login');
+    }
 });
+
+function initUserMenu() {
+    const userMenuBtn = document.getElementById('user-menu-btn');
+    const userDropdown = document.getElementById('user-dropdown-menu');
+    const switchModeBtn = document.getElementById('btn-menu-switch-mode');
+    const resetDbBtn = document.getElementById('btn-menu-reset-db');
+    const logoutBtn = document.getElementById('btn-menu-logout');
+
+    if (userMenuBtn && userDropdown) {
+        userMenuBtn.onclick = (e) => {
+            e.stopPropagation();
+            const isHidden = userDropdown.style.display === 'none';
+            userDropdown.style.display = isHidden ? 'flex' : 'none';
+        };
+
+        document.addEventListener('click', (e) => {
+            if (userDropdown && !userDropdown.contains(e.target) && e.target !== userMenuBtn) {
+                userDropdown.style.display = 'none';
+            }
+        });
+    }
+
+    if (switchModeBtn) {
+        switchModeBtn.onclick = () => {
+            const current = store.getState().activeMode;
+            const next = current === 'simple' ? 'enterprise' : 'simple';
+            store.setMode(next);
+            eventBus.emit('mode:changed', next);
+            if (userDropdown) userDropdown.style.display = 'none';
+        };
+    }
+
+    if (resetDbBtn) {
+        resetDbBtn.onclick = async () => {
+            if (userDropdown) userDropdown.style.display = 'none';
+            if (!confirm('Rebuild database schema and restore default seed data? All custom data will be reset.')) return;
+
+            try {
+                toast.info('Rebuilding database schema...');
+                const res = await api.post('/api/v1/system/reset-db');
+                toast.success(res.message || 'Database reset successfully!');
+                setTimeout(() => window.location.reload(), 800);
+            } catch (err) {
+                toast.error(err.message || 'Database reset failed');
+            }
+        };
+    }
+
+    if (logoutBtn) {
+        logoutBtn.onclick = async () => {
+            if (userDropdown) userDropdown.style.display = 'none';
+            try {
+                await api.post('/api/v1/auth/logout');
+            } catch (e) {}
+            api.setToken('');
+            store.setState({ currentUser: null, tasks: [], workspaces: [] });
+            toast.info('Signed out');
+            authModal.open('login');
+        };
+    }
+
+    updateUserMenuUI();
+    store.subscribe('currentUser', () => updateUserMenuUI());
+}
+
+function updateUserMenuUI() {
+    const user = store.getState().currentUser;
+    const nameEl = document.getElementById('user-display-name');
+    const initialsEl = document.getElementById('user-avatar-initials');
+    const emailEl = document.getElementById('user-dropdown-email');
+
+    if (user) {
+        if (nameEl) nameEl.textContent = user.full_name || 'User';
+        if (emailEl) emailEl.textContent = user.email || '';
+        if (initialsEl) {
+            const initials = (user.full_name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+            initialsEl.textContent = initials;
+        }
+    }
+}
 
 function initThemeControls() {
     const themeBtn = document.getElementById('theme-toggle-btn');
@@ -92,6 +179,12 @@ function initHeaderActions() {
     // Prompt Upgrade to Enterprise
     eventBus.on('prompt:upgrade', () => {
         upgradePrompt.open();
+    });
+
+    // Auth success from modal
+    eventBus.on('auth:success', () => {
+        mountComponents();
+        initSystemHealth();
     });
 
     // Prompt Import / Export
@@ -158,38 +251,25 @@ async function initAuth() {
     let token = api.getToken();
 
     if (!token) {
-        try {
-            const loginRes = await api.post('/api/v1/auth/login', {
-                email: 'demo@bathyal.local',
-                password: 'password123',
-            });
-
-            if (loginRes.data && loginRes.data.token) {
-                api.setToken(loginRes.data.token);
-                store.setState({
-                    currentUser: loginRes.data.user,
-                    workspaces: loginRes.data.workspaces || [],
-                    activeWorkspaceId: loginRes.data.workspaces?.[0]?.id || 1,
-                });
-            }
-        } catch (err) {
-            console.warn('Auto-login error:', err);
-        }
-    } else {
-        try {
-            const meRes = await api.get('/api/v1/auth/me');
-            if (meRes.data && meRes.data.user) {
-                store.setState({
-                    currentUser: meRes.data.user,
-                    workspaces: meRes.data.workspaces || [],
-                    activeWorkspaceId: meRes.data.workspaces?.[0]?.id || 1,
-                });
-            }
-        } catch (err) {
-            api.setToken('');
-            await initAuth();
-        }
+        return false;
     }
+
+    try {
+        const meRes = await api.get('/api/v1/auth/me');
+        if (meRes.data && meRes.data.user) {
+            store.setState({
+                currentUser: meRes.data.user,
+                workspaces: meRes.data.workspaces || [],
+                activeWorkspaceId: meRes.data.workspaces?.[0]?.id || 1,
+                activeMode: meRes.data.user.default_mode || 'simple',
+            });
+            return true;
+        }
+    } catch (err) {
+        api.setToken('');
+    }
+
+    return false;
 }
 
 async function initSystemHealth() {

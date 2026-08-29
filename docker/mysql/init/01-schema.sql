@@ -35,6 +35,27 @@ CREATE TABLE IF NOT EXISTS `workspace_members` (
     CONSTRAINT `fk_wm_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE IF NOT EXISTS `user_groups` (
+    `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `workspace_id` BIGINT UNSIGNED NOT NULL,
+    `name` VARCHAR(100) NOT NULL,
+    `slug` VARCHAR(100) NOT NULL,
+    `description` TEXT NULL,
+    `color_hex` VARCHAR(7) DEFAULT '#6366F1',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uq_group_slug` (`workspace_id`, `slug`),
+    CONSTRAINT `fk_ug_workspace` FOREIGN KEY (`workspace_id`) REFERENCES `workspaces` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `user_group_members` (
+    `group_id` BIGINT UNSIGNED NOT NULL,
+    `user_id` BIGINT UNSIGNED NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`group_id`, `user_id`),
+    CONSTRAINT `fk_ugm_group` FOREIGN KEY (`group_id`) REFERENCES `user_groups` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_ugm_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS `folders` (
     `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `workspace_id` BIGINT UNSIGNED NOT NULL,
@@ -107,6 +128,23 @@ CREATE TABLE IF NOT EXISTS `task_assignees` (
     PRIMARY KEY (`task_id`, `user_id`),
     CONSTRAINT `fk_ta_task` FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_ta_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `task_group_assignees` (
+    `task_id` BIGINT UNSIGNED NOT NULL,
+    `group_id` BIGINT UNSIGNED NOT NULL,
+    PRIMARY KEY (`task_id`, `group_id`),
+    CONSTRAINT `fk_tga_task` FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_tga_group` FOREIGN KEY (`group_id`) REFERENCES `user_groups` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `project_group_permissions` (
+    `project_id` BIGINT UNSIGNED NOT NULL,
+    `group_id` BIGINT UNSIGNED NOT NULL,
+    `role` ENUM('admin', 'member', 'guest') DEFAULT 'member',
+    PRIMARY KEY (`project_id`, `group_id`),
+    CONSTRAINT `fk_pgp_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_pgp_group` FOREIGN KEY (`group_id`) REFERENCES `user_groups` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS `task_dependencies` (

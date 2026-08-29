@@ -7,6 +7,7 @@ import { api } from '../core/api.js';
 import { store } from '../core/store.js';
 import { toast } from './Toast.js';
 import { eventBus } from '../core/eventBus.js';
+import { getPriorityBarColor } from '../core/priorities.js';
 
 export class GanttChart {
     constructor(container) {
@@ -133,11 +134,12 @@ export class GanttChart {
 
         const barsHtml = this.tasks.map((t, idx) => {
             const barPos = this.calculateBarPosition(t);
-            const prioColor = t.priority === 'urgent' ? '#EF4444' : (t.priority === 'high' ? '#F59E0B' : (t.project_color || '#6366F1'));
+            const prioColor = getPriorityBarColor(t.priority);
             const isCompleted = t.status_type === 'completed' || t.status_id == 3;
+            const bgStyle = prioColor ? `background-color: ${prioColor};` : '';
 
             return `
-                <div class="gantt-bar-item ${isCompleted ? 'completed' : ''}" 
+                <div class="gantt-bar-item ${isCompleted ? 'completed' : ''} ${!prioColor ? 'no-prio' : ''}" 
                      data-id="${t.id}"
                      data-idx="${idx}"
                      style="
@@ -145,7 +147,7 @@ export class GanttChart {
                         left: ${barPos.left}px;
                         width: ${barPos.width}px;
                         height: 28px;
-                        background-color: ${prioColor};
+                        ${bgStyle}
                      ">
                     <span class="gantt-resize-handle handle-left" data-id="${t.id}" data-action="resize-left"></span>
                     <div class="gantt-bar-content">
@@ -219,26 +221,32 @@ export class GanttChart {
     }
 
     calculateBarPosition(task) {
+        const baseMidnight = new Date(this.minDate.getFullYear(), this.minDate.getMonth(), this.minDate.getDate()).getTime();
+        const oneDayMs = 86400000;
+
         let startTs = task.start_date ? new Date(task.start_date).getTime() : null;
         let dueTs = task.due_date ? new Date(task.due_date).getTime() : null;
 
-        const baseTs = this.minDate.getTime();
-        const oneDayMs = 1000 * 60 * 60 * 24;
-
         if (!startTs && !dueTs) {
             startTs = Date.now();
-            dueTs = startTs + oneDayMs * 2;
+            dueTs = startTs + oneDayMs;
         } else if (!startTs) {
-            startTs = dueTs - oneDayMs * 2;
+            startTs = dueTs - oneDayMs;
         } else if (!dueTs) {
-            dueTs = startTs + oneDayMs * 2;
+            dueTs = startTs + oneDayMs;
         }
 
-        const startDayOffset = Math.max(0, (startTs - baseTs) / oneDayMs);
-        const durationDays = Math.max(1, (dueTs - startTs) / oneDayMs);
+        const sDate = new Date(startTs);
+        const dDate = new Date(dueTs);
 
-        const left = Math.round(startDayOffset * this.cellWidth);
-        const width = Math.max(36, Math.round(durationDays * this.cellWidth));
+        const sMidnight = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate()).getTime();
+        const dMidnight = new Date(dDate.getFullYear(), dDate.getMonth(), dDate.getDate()).getTime();
+
+        const startDayOffset = Math.max(0, Math.round((sMidnight - baseMidnight) / oneDayMs));
+        const durationDays = Math.max(1, Math.round((dMidnight - sMidnight) / oneDayMs) + 1);
+
+        const left = startDayOffset * this.cellWidth;
+        const width = durationDays * this.cellWidth;
 
         return { left, width, startTs, dueTs };
     }
@@ -256,7 +264,6 @@ export class GanttChart {
             const bPos = this.calculateBarPosition(blockingTask);
             const dPos = this.calculateBarPosition(dependentTask);
 
-            // Coordinates for Bezier line
             const x1 = bPos.left + bPos.width;
             const y1 = blockingIdx * this.rowHeight + 22;
 
@@ -264,7 +271,6 @@ export class GanttChart {
             const y2 = dependentIdx * this.rowHeight + 22;
 
             const midX = x1 + Math.max(20, (x2 - x1) / 2);
-
             const pathD = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2 - 4} ${y2}`;
 
             return `
@@ -274,9 +280,42 @@ export class GanttChart {
                       stroke-width="2" 
                       marker-end="url(#gantt-arrow)" 
                       class="gantt-dependency-line" 
-                      data-dep-id="${dep.id}" />
+                      data-dep-id="${dep.id}" 
+                      data-blocking-id="${dep.blocking_task_id}"
+                      data-dependent-id="${dep.dependent_task_id}" />
             `;
         }).join('');
+    }
+
+    updateLiveDependencyCurves() {
+        const svg = this.container.querySelector('.gantt-svg-overlay');
+        if (!svg) return;
+
+        svg.querySelectorAll('.gantt-dependency-line').forEach(line => {
+            const blockingId = parseInt(line.dataset.blockingId, 10);
+            const dependentId = parseInt(line.dataset.dependentId, 10);
+
+            const blockingIdx = this.tasks.findIndex(t => t.id == blockingId);
+            const dependentIdx = this.tasks.findIndex(t => t.id == dependentId);
+            if (blockingIdx === -1 || dependentIdx === -1) return;
+
+            const bEl = this.container.querySelector(`.gantt-bar-item[data-id="${blockingId}"]`);
+            const dEl = this.container.querySelector(`.gantt-bar-item[data-id="${dependentId}"]`);
+            if (!bEl || !dEl) return;
+
+            const bLeft = parseFloat(bEl.style.left);
+            const bWidth = parseFloat(bEl.style.width);
+            const dLeft = parseFloat(dEl.style.left);
+
+            const x1 = bLeft + bWidth;
+            const y1 = blockingIdx * this.rowHeight + 22;
+
+            const x2 = dLeft;
+            const y2 = dependentIdx * this.rowHeight + 22;
+
+            const midX = x1 + Math.max(20, (x2 - x1) / 2);
+            line.setAttribute('d', `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2 - 4} ${y2}`);
+        });
     }
 
     bindEvents() {
@@ -333,6 +372,7 @@ export class GanttChart {
 
         // Connector Dots (Draw Dependency)
         this.container.querySelectorAll('.gantt-connector-dot').forEach(dot => {
+            dot.onmousedown = (e) => e.stopPropagation();
             dot.onclick = (e) => {
                 e.stopPropagation();
                 const taskId = parseInt(dot.dataset.id, 10);
@@ -351,17 +391,151 @@ export class GanttChart {
             };
         });
 
-        // Click task bar to open drawer
+        // Click / Delete Dependency Lines
+        this.container.querySelectorAll('.gantt-dependency-line').forEach(line => {
+            line.onclick = async (e) => {
+                e.stopPropagation();
+                const depId = line.dataset.depId;
+                if (!depId) return;
+
+                const dep = this.dependencies.find(d => d.id == depId);
+                const bTitle = dep ? (dep.blocking_title || `Task #${dep.blocking_task_id}`) : 'Blocking Task';
+                const dTitle = dep ? (dep.dependent_title || `Task #${dep.dependent_task_id}`) : 'Dependent Task';
+
+                if (!confirm(`Delete dependency link: "${bTitle}" -> "${dTitle}"?`)) return;
+
+                try {
+                    await api.delete(`/api/v1/dependencies/${depId}`);
+                    toast.info('Dependency link removed');
+                    this.loadData();
+                } catch (err) {
+                    toast.error('Failed to remove dependency');
+                }
+            };
+        });
+
+        // Drag-to-shift and resize task bars with real-time day snapping & live tooltip
         this.container.querySelectorAll('.gantt-bar-item').forEach(bar => {
-            bar.onclick = (e) => {
-                if (e.target.classList.contains('gantt-connector-dot') || e.target.classList.contains('gantt-resize-handle')) {
-                    return;
+            bar.onmousedown = (e) => {
+                if (e.target.classList.contains('gantt-connector-dot')) return;
+
+                const taskId = parseInt(bar.dataset.id, 10);
+                const task = this.tasks.find(t => t.id === taskId);
+                if (!task) return;
+
+                const isResizeLeft = e.target.dataset.action === 'resize-left';
+                const isResizeRight = e.target.dataset.action === 'resize-right';
+                const isMove = !isResizeLeft && !isResizeRight;
+
+                const initialClientX = e.clientX;
+                const initialLeft = parseFloat(bar.style.left);
+                const initialWidth = parseFloat(bar.style.width);
+                let hasMoved = false;
+
+                bar.classList.add('dragging-bar');
+
+                // Create or ensure floating live tooltip
+                let tooltip = this.container.querySelector('.gantt-drag-tooltip');
+                if (!tooltip) {
+                    tooltip = document.createElement('div');
+                    tooltip.className = 'gantt-drag-tooltip';
+                    this.container.querySelector('.gantt-timeline-body').appendChild(tooltip);
                 }
-                const taskId = bar.dataset.id;
-                const task = this.tasks.find(t => t.id == taskId);
-                if (task) {
-                    eventBus.emit('task:open-drawer', task);
-                }
+
+                const baseMs = new Date(this.minDate.getFullYear(), this.minDate.getMonth(), this.minDate.getDate()).getTime();
+                const oneDayMs = 86400000;
+
+                const updateTooltip = (left, width) => {
+                    const startDayOffset = Math.max(0, Math.round(left / this.cellWidth));
+                    const durationDays = Math.max(1, Math.round(width / this.cellWidth));
+                    const startTs = baseMs + startDayOffset * oneDayMs;
+                    const dueTs = startTs + (durationDays - 1) * oneDayMs;
+
+                    const sStr = new Date(startTs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                    const dStr = new Date(dueTs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+                    tooltip.textContent = `${sStr} — ${dStr} (${durationDays}d)`;
+                    tooltip.style.left = `${left + width / 2}px`;
+                    tooltip.style.top = `${parseFloat(bar.style.top) - 28}px`;
+                    tooltip.style.display = 'block';
+                };
+
+                updateTooltip(initialLeft, initialWidth);
+
+                const onMouseMove = (moveEvent) => {
+                    const rawDeltaX = moveEvent.clientX - initialClientX;
+                    if (Math.abs(rawDeltaX) > 2) {
+                        hasMoved = true;
+                    }
+
+                    // Snap in real-time to day cell increments
+                    const snappedDeltaX = Math.round(rawDeltaX / this.cellWidth) * this.cellWidth;
+
+                    let currentLeft = initialLeft;
+                    let currentWidth = initialWidth;
+
+                    if (isMove) {
+                        currentLeft = Math.max(0, initialLeft + snappedDeltaX);
+                        bar.style.left = `${currentLeft}px`;
+                    } else if (isResizeRight) {
+                        currentWidth = Math.max(this.cellWidth, initialWidth + snappedDeltaX);
+                        bar.style.width = `${currentWidth}px`;
+                    } else if (isResizeLeft) {
+                        const rawNewLeft = initialLeft + snappedDeltaX;
+                        const maxAllowedLeft = initialLeft + initialWidth - this.cellWidth;
+                        currentLeft = Math.max(0, Math.min(rawNewLeft, maxAllowedLeft));
+                        currentWidth = initialWidth + (initialLeft - currentLeft);
+                        bar.style.left = `${currentLeft}px`;
+                        bar.style.width = `${currentWidth}px`;
+                    }
+
+                    updateTooltip(currentLeft, currentWidth);
+                    this.updateLiveDependencyCurves();
+                };
+
+                const onMouseUp = async (upEvent) => {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    bar.classList.remove('dragging-bar');
+
+                    if (tooltip) {
+                        tooltip.remove();
+                    }
+
+                    if (!hasMoved) {
+                        // Regular click opens task detail drawer
+                        eventBus.emit('task:open-drawer', task);
+                        return;
+                    }
+
+                    // Compute dates from snapped pixel offsets
+                    const finalLeft = parseFloat(bar.style.left);
+                    const finalWidth = parseFloat(bar.style.width);
+                    const startDayOffset = Math.max(0, Math.round(finalLeft / this.cellWidth));
+                    const durationDays = Math.max(1, Math.round(finalWidth / this.cellWidth));
+
+                    const newStartTs = baseMs + startDayOffset * oneDayMs;
+                    const newDueTs = newStartTs + (durationDays - 1) * oneDayMs;
+
+                    const newStartDate = new Date(newStartTs).toISOString().split('T')[0] + ' 00:00:00';
+                    const newDueDate = new Date(newDueTs).toISOString().split('T')[0] + ' 23:59:59';
+
+                    try {
+                        await api.patch(`/api/v1/tasks/${taskId}`, {
+                            start_date: newStartDate,
+                            due_date: newDueDate,
+                        });
+                        toast.success(`Updated timeline for "${task.title}"`);
+                        this.loadData();
+                        eventBus.emit('task:created');
+                    } catch (err) {
+                        toast.error('Failed to update task dates');
+                        this.loadData();
+                    }
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
             };
         });
     }

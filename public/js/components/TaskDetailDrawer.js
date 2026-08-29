@@ -133,8 +133,12 @@ export class TaskDetailDrawer {
                     </select>
                 </div>
                 <div class="drawer-meta-row">
-                    <span class="drawer-meta-label">Due Date</span>
-                    <input type="date" class="field-inline-input" id="drawer-due-date" value="${this.task.due_date ? this.task.due_date.split(' ')[0] : ''}" />
+                    <span class="drawer-meta-label">Start Date &amp; Time</span>
+                    <input type="datetime-local" class="field-inline-input" id="drawer-start-date" value="${this.formatForInput(this.task.start_date)}" />
+                </div>
+                <div class="drawer-meta-row">
+                    <span class="drawer-meta-label">Due Date &amp; Time</span>
+                    <input type="datetime-local" class="field-inline-input" id="drawer-due-date" value="${this.formatForInput(this.task.due_date)}" />
                 </div>
                 <div class="drawer-meta-row">
                     <span class="drawer-meta-label">Estimate (hrs)</span>
@@ -189,18 +193,27 @@ export class TaskDetailDrawer {
         const descInput = this.backdrop.querySelector('#drawer-description');
         const statusSelect = this.backdrop.querySelector('#drawer-status-select');
         const prioSelect = this.backdrop.querySelector('#drawer-priority-select');
+        const startDateInput = this.backdrop.querySelector('#drawer-start-date');
         const dueDateInput = this.backdrop.querySelector('#drawer-due-date');
         const estimateInput = this.backdrop.querySelector('#drawer-estimate-hours');
         const toggleCompleteBtn = this.backdrop.querySelector('#drawer-toggle-complete');
         const newSubtaskInput = this.backdrop.querySelector('#drawer-new-subtask-input');
 
         const autoSave = async () => {
+            const formatForDb = (val) => {
+                if (!val) return null;
+                // Convert 'YYYY-MM-DDTHH:MM' or 'YYYY-MM-DD' to 'YYYY-MM-DD HH:MM:SS'
+                const clean = val.replace('T', ' ');
+                return clean.length === 16 ? `${clean}:00` : (clean.length === 10 ? `${clean} 00:00:00` : clean);
+            };
+
             const updates = {
                 title: titleInput.value.trim() || this.task.title,
                 description: descInput.value.trim() || null,
                 status_id: parseInt(statusSelect.value, 10),
                 priority: prioSelect.value,
-                due_date: dueDateInput.value ? `${dueDateInput.value} 23:59:59` : null,
+                start_date: formatForDb(startDateInput.value),
+                due_date: formatForDb(dueDateInput.value),
                 estimated_hours: estimateInput.value ? parseFloat(estimateInput.value) : null,
             };
 
@@ -218,6 +231,7 @@ export class TaskDetailDrawer {
         descInput.onblur = autoSave;
         statusSelect.onchange = autoSave;
         prioSelect.onchange = autoSave;
+        startDateInput.onchange = autoSave;
         dueDateInput.onchange = autoSave;
         estimateInput.onblur = autoSave;
 
@@ -321,6 +335,19 @@ export class TaskDetailDrawer {
                 }
             };
         }
+    }
+
+    formatForInput(val) {
+        if (!val) return '';
+        // Convert MySQL 'YYYY-MM-DD HH:MM:SS' or ISO string to 'YYYY-MM-DDTHH:MM'
+        const parts = String(val).split(' ');
+        if (parts.length >= 2) {
+            return `${parts[0]}T${parts[1].substring(0, 5)}`;
+        }
+        if (val.includes('T')) {
+            return val.substring(0, 16);
+        }
+        return `${val}T00:00`;
     }
 
     escapeHtml(str) {

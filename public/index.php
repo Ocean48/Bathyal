@@ -13,8 +13,10 @@ use App\Controllers\DocumentController;
 use App\Controllers\FolderController;
 use App\Controllers\ProjectController;
 use App\Controllers\StatusController;
+use App\Controllers\SystemController;
 use App\Controllers\TaskController;
 use App\Controllers\TimeLogController;
+use App\Controllers\UserGroupController;
 use App\Controllers\WorkspaceController;
 use App\Core\Config;
 use App\Core\Database;
@@ -70,6 +72,9 @@ $router->get('/api/v1/statuses', [StatusController::class, 'index']);
 $router->post('/api/v1/auth/login', [AuthController::class, 'login']);
 $router->post('/api/v1/auth/register', [AuthController::class, 'register']);
 
+// Development System Endpoints
+$router->post('/api/v1/system/reset-db', [SystemController::class, 'resetDatabase']);
+
 // Protected Route Group
 $router->group(['prefix' => '/api/v1', 'middleware' => [AuthMiddleware::class]], function (Router $r) {
     // 1. Auth & User Profile
@@ -77,11 +82,21 @@ $router->group(['prefix' => '/api/v1', 'middleware' => [AuthMiddleware::class]],
     $r->post('/auth/logout', [AuthController::class, 'logout']);
     $r->patch('/auth/preferences', [AuthController::class, 'updatePreferences']);
 
-    // 2. Workspaces
+    // 2. Workspaces & User Groups
     $r->get('/workspaces', [WorkspaceController::class, 'index']);
     $r->post('/workspaces', [WorkspaceController::class, 'store']);
     $r->get('/workspaces/{id:\d+}', [WorkspaceController::class, 'show']);
     $r->get('/workspaces/{id:\d+}/tree', [WorkspaceController::class, 'tree']);
+
+    $r->get('/user-groups', [UserGroupController::class, 'index']);
+    $r->post('/user-groups', [UserGroupController::class, 'store']);
+    $r->get('/user-groups/{id:\d+}', [UserGroupController::class, 'show']);
+    $r->patch('/user-groups/{id:\d+}', [UserGroupController::class, 'update']);
+    $r->delete('/user-groups/{id:\d+}', [UserGroupController::class, 'destroy']);
+    $r->post('/user-groups/{id:\d+}/members', [UserGroupController::class, 'addMember']);
+    $r->delete('/user-groups/{id:\d+}/members/{userId:\d+}', [UserGroupController::class, 'removeMember']);
+    $r->post('/tasks/{id:\d+}/group-assignees', [UserGroupController::class, 'assignTaskGroup']);
+    $r->delete('/tasks/{id:\d+}/group-assignees/{groupId:\d+}', [UserGroupController::class, 'unassignTaskGroup']);
 
     // 3. Folders & Projects
     $r->get('/folders', [FolderController::class, 'index']);

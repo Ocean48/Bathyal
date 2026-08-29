@@ -7,6 +7,7 @@ import { toast } from './Toast.js';
 import { eventBus } from '../core/eventBus.js';
 import { optimistic } from '../core/optimistic.js';
 import { fieldRegistry } from '../core/fieldRegistry.js';
+import { renderPriorityBadge } from '../core/priorities.js';
 
 export class SimpleTaskList {
     constructor(container) {
@@ -64,7 +65,6 @@ export class SimpleTaskList {
 
         const itemsHtml = this.tasks.map(task => {
             const isCompleted = task.status_type === 'completed' || task.status_id == 3;
-            const prioClass = task.priority && task.priority !== 'none' ? `prio-${task.priority}` : 'prio-none';
 
             let dueText = '';
             if (task.due_date) {
@@ -82,7 +82,7 @@ export class SimpleTaskList {
                             <span class="task-title" data-id="${task.id}">${this.escapeHtml(task.title)}</span>
                             <div class="task-meta">
                                 ${task.project_name ? `<span class="badge-tag" style="background-color: ${task.project_color}20; color: ${task.project_color};">${this.escapeHtml(task.project_name)}</span>` : ''}
-                                ${prioClass !== 'prio-none' ? `<span class="badge-prio ${prioClass}">${task.priority}</span>` : ''}
+                                ${renderPriorityBadge(task.priority)}
                                 ${dueText ? `<span>Due ${dueText}</span>` : ''}
                             </div>
                         </div>
@@ -155,6 +155,19 @@ export class SimpleTaskList {
                     if (e.key === 'Enter') save();
                     if (e.key === 'Escape') this.loadTasks();
                 };
+            };
+        });
+
+        // Click task meta or info to open side drawer
+        this.container.querySelectorAll('.task-meta').forEach(meta => {
+            meta.style.cursor = 'pointer';
+            meta.onclick = (e) => {
+                e.stopPropagation();
+                const item = meta.closest('.task-item');
+                if (item) {
+                    const task = this.tasks.find(t => t.id == item.dataset.id);
+                    if (task) eventBus.emit('task:open-drawer', task);
+                }
             };
         });
 

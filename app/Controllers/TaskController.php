@@ -302,6 +302,14 @@ class TaskController extends BaseController
             ['id' => $id]
         );
 
+        $task['group_assignees'] = Database::fetchAll(
+            "SELECT ug.id, ug.name, ug.color_hex, ug.slug
+             FROM task_group_assignees tga
+             JOIN user_groups ug ON tga.group_id = ug.id
+             WHERE tga.task_id = :id",
+            ['id' => $id]
+        );
+
         return $task;
     }
 
