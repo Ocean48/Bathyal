@@ -1,1 +1,0 @@
-<?php require 'core/database.php'; require 'core/db_query.php'; \ = new DBQueries(\); echo json_encode(\->getTasksByProjectId(1)); ?>
